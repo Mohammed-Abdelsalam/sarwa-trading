@@ -1,0 +1,153 @@
+import { act, renderHook } from '@testing-library/react';
+
+import {
+  queryKeys,
+  useAverageChange,
+  useConnection,
+  useLiveStatus,
+  useLiveSymbols,
+  useMarketConnection,
+  useMarketStatus,
+  useQuote,
+  useSyncStocksOnChange,
+} from '../../src/hooks';
+import { createTestClient, createWrapper, makeQuote } from '../utils';
+
+describe('useLiveSymbols', () => {
+  it('acquires the symbols and releases them on unmount', () => {
+    const client = createTestClient();
+    const release = jest.fn();
+    jest.mocked(client.market.acquire).mockReturnValue(release);
+    const { Wrapper } = createWrapper(client);
+
+    const { unmount } = renderHook(() => useLiveSymbols(['AAPL', 'TSLA']), { wrapper: Wrapper });
+    expect(client.market.acquire).toHaveBeenCalledWith(['AAPL', 'TSLA']);
+
+    unmount();
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('swaps the subscription when the symbol list changes', () => {
+    const client = createTestClient();
+    const releases = [jest.fn(), jest.fn()];
+    jest
+      .mocked(client.market.acquire)
+      .mockReturnValueOnce(releases[0] ?? jest.fn())
+      .mockReturnValueOnce(releases[1] ?? jest.fn());
+    const { Wrapper } = createWrapper(client);
+    const { rerender } = renderHook(({ symbols }) => useLiveSymbols(symbols), {
+      wrapper: Wrapper,
+      initialProps: { symbols: ['AAPL'] },
+    });
+
+    rerender({ symbols: ['NVDA'] });
+
+    expect(releases[0]).toHaveBeenCalledTimes(1);
+    expect(client.market.acquire).toHaveBeenLastCalledWith(['NVDA']);
+  });
+
+  it('does nothing for an empty list', () => {
+    const client = createTestClient();
+    const { Wrapper } = createWrapper(client);
+
+    renderHook(() => useLiveSymbols([]), { wrapper: Wrapper });
+
+    expect(client.market.acquire).not.toHaveBeenCalled();
+  });
+});
+
+describe('live store hooks', () => {
+  it('reads the quote, connection and market status, and updates when the store changes', () => {
+    const client = createTestClient();
+    const { Wrapper } = createWrapper(client);
+    const { result } = renderHook(
+      () => ({
+        quote: useQuote('AAPL'),
+        connection: useConnection(),
+        market: useMarketStatus(),
+        live: useLiveStatus(),
+      }),
+      { wrapper: Wrapper },
+    );
+    expect(result.current.quote).toBeUndefined();
+    expect(result.current.live).toBe('reconnecting');
+
+    act(() => {
+      client.store.getState().applyQuotes([makeQuote({ price: 300 })]);
+      client.store.getState().setConnection({ status: 'open' });
+      client.store.getState().setMarketStatus({ state: 'paused', volatility: 1, since: 1 });
+    });
+
+    expect(result.current.quote?.price).toBe(300);
+    expect(result.current.connection).toEqual({ status: 'open' });
+    expect(result.current.market?.state).toBe('paused');
+    expect(result.current.live).toBe('paused');
+  });
+});
+
+describe('useAverageChange', () => {
+  it('is null without quotes and the rounded average day change otherwise', () => {
+    const client = createTestClient();
+    const { Wrapper } = createWrapper(client);
+    const { result } = renderHook(() => useAverageChange(['AAPL', 'TSLA']), { wrapper: Wrapper });
+    expect(result.current).toBeNull();
+
+    act(() => {
+      client.store
+        .getState()
+        .applyQuotes([
+          makeQuote({ symbol: 'AAPL', price: 110, prevClose: 100 }),
+          makeQuote({ symbol: 'TSLA', price: 96.667, prevClose: 100 }),
+        ]);
+    });
+
+    expect(result.current).toBe(3.33);
+  });
+});
+
+describe('useMarketConnection', () => {
+  it('connects in the foreground, disconnects in the background and on unmount', () => {
+    const client = createTestClient();
+    const { Wrapper } = createWrapper(client);
+    const { rerender, unmount } = renderHook((state) => useMarketConnection(state), {
+      wrapper: Wrapper,
+      initialProps: { foreground: true, online: true },
+    });
+    expect(client.market.connect).toHaveBeenCalledTimes(1);
+
+    rerender({ foreground: false, online: true });
+    expect(client.market.disconnect).toHaveBeenCalledTimes(1);
+    expect(client.store.getState().connection.status).not.toBe('offline');
+
+    unmount();
+    expect(client.market.disconnect).toHaveBeenCalledTimes(2);
+  });
+
+  it('disconnects and reports offline when the network drops', () => {
+    const client = createTestClient();
+    const { Wrapper } = createWrapper(client);
+
+    renderHook(() => useMarketConnection({ foreground: true, online: false }), {
+      wrapper: Wrapper,
+    });
+
+    expect(client.market.connect).not.toHaveBeenCalled();
+    expect(client.store.getState().connection.status).toBe('offline');
+  });
+});
+
+describe('useSyncStocksOnChange', () => {
+  it('invalidates the stock list and details when the server reports a change', () => {
+    const client = createTestClient();
+    const { Wrapper, queryClient } = createWrapper(client);
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    renderHook(() => useSyncStocksOnChange(), { wrapper: Wrapper });
+    expect(invalidate).not.toHaveBeenCalled();
+
+    act(() => {
+      client.store.getState().setStocksChangedAt(1);
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.stocks });
+  });
+});

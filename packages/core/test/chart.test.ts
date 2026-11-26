@@ -1,6 +1,13 @@
 import { type Candle } from '@sarwa/contracts';
 
-import { chartBaseline, chartGeometry, nearestPointIndex, withLiveQuote } from '../src/chart';
+import {
+  axisCandles,
+  chartBaseline,
+  chartGeometry,
+  nearestPointIndex,
+  resolvePeriod,
+  withLiveQuote,
+} from '../src/chart';
 
 const candle = (t: number, c: number): Candle => ({ t, o: c, h: c + 1, l: c - 1, c, v: 1 });
 
@@ -79,5 +86,27 @@ describe('chartBaseline', () => {
 
   it('is null when there is nothing to compare against', () => {
     expect(chartBaseline('1W', [], undefined)).toBeNull();
+  });
+});
+
+describe('axisCandles', () => {
+  it('picks five evenly spaced candles for the time axis', () => {
+    const candles = Array.from({ length: 9 }, (_, i) => candle(i, 100 + i));
+
+    expect(axisCandles(candles).map((c) => c?.t)).toEqual([0, 2, 4, 6, 8]);
+  });
+
+  it('returns empty slots when there are no candles', () => {
+    expect(axisCandles([])).toEqual([undefined, undefined, undefined, undefined, undefined]);
+  });
+});
+
+describe('resolvePeriod', () => {
+  it('keeps the selected period while it is enabled', () => {
+    expect(resolvePeriod(['1D', '1W'], '1W')).toBe('1W');
+  });
+
+  it('falls back to the first enabled period when the admin disables the selected one', () => {
+    expect(resolvePeriod(['1M', '1Y'], '1D')).toBe('1M');
   });
 });

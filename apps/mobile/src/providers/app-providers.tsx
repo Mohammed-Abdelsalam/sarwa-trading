@@ -3,21 +3,34 @@ import NetInfo from '@react-native-community/netinfo';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { focusManager, onlineManager, QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { type ReactNode, useEffect } from 'react';
+import Constants from 'expo-constants';
+import { type ReactNode, useEffect, useState } from 'react';
 import { AppState, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { SarwaProvider, shouldRetry, useSyncStocksOnChange } from '@sarwa/core';
+import {
+  SarwaProvider,
+  shouldRetry,
+  useMarketConnection,
+  useSyncStocksOnChange,
+} from '@sarwa/core';
 
 import { client } from '../lib/client';
 import { useThemeVars } from '../lib/theme';
 
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { gcTime: 24 * 60 * 60 * 1000, retry: shouldRetry } },
+  defaultOptions: { queries: { gcTime: CACHE_TTL_MS, retry: shouldRetry } },
 });
 
-const persister = createAsyncStoragePersister({ storage: AsyncStorage, key: 'sarwa.query-cache' });
+// A new app version never restores cache shaped by an older contract.
+export const persistOptions = {
+  persister: createAsyncStoragePersister({ storage: AsyncStorage, key: 'sarwa.query-cache' }),
+  buster: Constants.expoConfig?.version ?? '',
+  maxAge: CACHE_TTL_MS,
+};
 
 onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => {
@@ -25,53 +38,41 @@ onlineManager.setEventListener((setOnline) =>
   }),
 );
 
-// The socket lives only while the app is in the foreground and online: no wasted battery or data.
-function useRealtimeLifecycle(): void {
+function useAppLifecycle(): { foreground: boolean; online: boolean } {
+  const [foreground, setForeground] = useState(AppState.currentState === 'active');
+  const [online, setOnline] = useState(true);
+
   useEffect(() => {
-    let foreground = AppState.currentState === 'active';
-    let online = true;
-
-    const sync = () => {
-      if (foreground && online) {
-        client.market.connect();
-        return;
-      }
-      client.market.disconnect();
-      if (!online) client.store.getState().setConnection({ status: 'offline' });
-    };
-
     const appState = AppState.addEventListener('change', (status) => {
-      foreground = status === 'active';
-      focusManager.setFocused(foreground);
-      sync();
+      const active = status === 'active';
+      focusManager.setFocused(active);
+      setForeground(active);
     });
     const netInfo = NetInfo.addEventListener((state) => {
-      online = state.isConnected !== false;
-      sync();
+      setOnline(state.isConnected !== false);
     });
-    sync();
-
     return () => {
       appState.remove();
       netInfo();
-      client.market.disconnect();
     };
   }, []);
+
+  return { foreground, online };
 }
 
 function LiveSync() {
+  useMarketConnection(useAppLifecycle());
   useSyncStocksOnChange();
   return null;
 }
 
 export function AppProviders({ children }: { children: ReactNode }) {
-  useRealtimeLifecycle();
   const themeVars = useThemeVars();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}>
+        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
           <SarwaProvider client={client}>
             <LiveSync />
             <View style={[{ flex: 1 }, themeVars]} className="bg-bg">

@@ -72,3 +72,14 @@ export function chartBaseline(
   if (period === '1D' && quote) return quote.prevClose;
   return candles[0]?.c ?? null;
 }
+
+const AXIS_STOPS = [0, 0.25, 0.5, 0.75, 1];
+
+export function axisCandles(candles: readonly Candle[]): (Candle | undefined)[] {
+  return AXIS_STOPS.map((f) => candles[Math.round(f * (candles.length - 1))]);
+}
+
+// The admin can disable the selected period while a chart is open; fall back to the first one left.
+export function resolvePeriod(enabled: readonly Period[], selected: Period): Period {
+  return enabled.includes(selected) ? selected : (enabled[0] ?? '1D');
+}

@@ -1,6 +1,16 @@
 import { z } from 'zod';
 
-import { ApiError, createRequest, isNotFound, shouldRetry, TimeoutError } from '../src/api';
+import { DEVICE_ID_HEADER } from '@sarwa/contracts';
+
+import {
+  ApiError,
+  createApiClient,
+  createRequest,
+  isNotFound,
+  shouldRetry,
+  TimeoutError,
+} from '../src/api';
+import { makeQuote } from './utils';
 
 function neverAnswers(): jest.Mock {
   return jest.fn(
@@ -81,5 +91,110 @@ describe('isNotFound', () => {
     expect(isNotFound(notFound)).toBe(true);
     expect(isNotFound(unavailable)).toBe(false);
     expect(isNotFound(new TimeoutError(10))).toBe(false);
+  });
+});
+
+describe('createApiClient', () => {
+  const originalFetch = global.fetch;
+  const DEVICE_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  const BODIES: Record<string, unknown> = {
+    '/api/v1/stocks': { items: [] },
+    '/api/v1/stocks/AAPL': {
+      stock: { symbol: 'AAPL', name: 'Apple', sector: 'tech', exchange: 'NASDAQ', currency: 'USD' },
+      quote: makeQuote(),
+      stats: { marketCap: 1, peRatio: null, week52High: 2, week52Low: 1, avgVolume: 1 },
+    },
+    '/api/v1/stocks/AAPL/candles?period=1W': { symbol: 'AAPL', period: '1W', candles: [] },
+    '/api/v1/app-config': {
+      maintenanceMode: false,
+      banner: null,
+      enabledPeriods: ['1D'],
+      updatedAt: 1,
+    },
+    '/api/v1/watchlist': { symbols: ['AAPL'] },
+  };
+
+  function fakeServer() {
+    const calls: { path: string; method: string; headers: Record<string, string> }[] = [];
+    global.fetch = jest.fn((url: string, init: RequestInit) => {
+      const path = url.replace('http://api', '');
+      calls.push({
+        path,
+        method: init.method ?? 'GET',
+        headers: init.headers as Record<string, string>,
+      });
+      const body = init.method ? undefined : BODIES[path];
+      return Promise.resolve({
+        ok: true,
+        status: body === undefined ? 204 : 200,
+        json: () => Promise.resolve(body),
+      });
+    }) as unknown as typeof fetch;
+    return calls;
+  }
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('calls every endpoint with the right path and method', async () => {
+    const calls = fakeServer();
+    const api = createApiClient({
+      baseUrl: 'http://api/',
+      getDeviceId: () => Promise.resolve(DEVICE_ID),
+    });
+
+    await api.listStocks();
+    await api.getStock('AAPL');
+    await api.getCandles('AAPL', '1W');
+    await api.getAppConfig();
+    await expect(api.getWatchlist()).resolves.toEqual({ symbols: ['AAPL'] });
+    await api.addToWatchlist('AAPL');
+    await api.removeFromWatchlist('AAPL');
+
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      'GET /api/v1/stocks',
+      'GET /api/v1/stocks/AAPL',
+      'GET /api/v1/stocks/AAPL/candles?period=1W',
+      'GET /api/v1/app-config',
+      'GET /api/v1/watchlist',
+      'PUT /api/v1/watchlist/AAPL',
+      'DELETE /api/v1/watchlist/AAPL',
+    ]);
+  });
+
+  it('sends the device id header on every request', async () => {
+    const calls = fakeServer();
+    const api = createApiClient({
+      baseUrl: 'http://api',
+      getDeviceId: () => Promise.resolve(DEVICE_ID),
+    });
+
+    await api.getWatchlist();
+
+    expect(calls[0]?.headers[DEVICE_ID_HEADER]).toBe(DEVICE_ID);
+  });
+
+  it('turns an error without a problem body into an ApiError with the HTTP status', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        json: () => Promise.reject(new SyntaxError('Unexpected token <')),
+      }),
+    ) as unknown as typeof fetch;
+    const api = createApiClient({
+      baseUrl: 'http://api',
+      getDeviceId: () => Promise.resolve(DEVICE_ID),
+    });
+
+    const error = await api.listStocks().catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({
+      status: 502,
+      problem: { title: 'Bad Gateway', code: 'INTERNAL' },
+    });
   });
 });
