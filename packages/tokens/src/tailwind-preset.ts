@@ -3,7 +3,6 @@ import { fontFamily, radius } from './scale';
 
 const preset = {
   content: [] as string[],
-  darkMode: 'class' as const,
   theme: {
     extend: {
       colors: Object.fromEntries(colorNames().map((name) => [name, `var(${cssVarName(name)})`])),

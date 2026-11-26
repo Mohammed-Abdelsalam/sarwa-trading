@@ -1,4 +1,4 @@
-import { type Quote } from '@sarwa/contracts';
+import { type Period, type Quote } from '@sarwa/contracts';
 
 export type Direction = 'up' | 'down' | 'flat';
 
@@ -58,3 +58,15 @@ export function formatMarketCap(value: number): string {
 }
 
 export const DIRECTION_ARROW: Record<Direction, string> = { up: '▲', down: '▼', flat: '■' };
+
+const CANDLE_TIME: Record<Period, Intl.DateTimeFormat> = {
+  '1D': new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }),
+  '1W': new Intl.DateTimeFormat('en-US', { weekday: 'short' }),
+  '1M': new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }),
+  '1Y': new Intl.DateTimeFormat('en-US', { month: 'short' }),
+  ALL: new Intl.DateTimeFormat('en-US', { year: 'numeric' }),
+};
+
+export function formatCandleTime(t: number, period: Period): string {
+  return CANDLE_TIME[period].format(t);
+}

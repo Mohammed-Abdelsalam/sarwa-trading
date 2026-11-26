@@ -5,7 +5,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useStore } from 'zustand';
 
 import {
@@ -18,7 +18,9 @@ import {
   type StockWithQuote,
 } from '@sarwa/contracts';
 
+import { averageChangePct } from './markets';
 import { useSarwa } from './provider';
+import { type AppNotice, appNotices, type LiveStatus, liveStatus } from './status';
 import { type ConnectionState } from './store';
 
 export const queryKeys = {
@@ -119,6 +121,52 @@ export function useConnection(): ConnectionState {
 export function useMarketStatus(): MarketStatus | null {
   const { store } = useSarwa();
   return useStore(store, (state) => state.marketStatus);
+}
+
+export function useLiveStatus(): LiveStatus {
+  return liveStatus(useConnection(), useMarketStatus());
+}
+
+export function useAppNotices(): { notices: AppNotice[]; dismiss: (notice: AppNotice) => void } {
+  const connection = useConnection();
+  const market = useMarketStatus();
+  const banner = useAppConfig()?.banner;
+  const [dismissed, setDismissed] = useState<string | null>(null);
+
+  return {
+    notices: appNotices({
+      connection,
+      market,
+      banner: banner?.message === dismissed ? null : banner,
+    }),
+    dismiss: (notice) => {
+      setDismissed(notice.message);
+    },
+  };
+}
+
+export function useAverageChange(symbols: readonly string[]): number | null {
+  const { store } = useSarwa();
+  return useStore(store, (state) =>
+    averageChangePct(symbols.flatMap((s) => state.quotes[s] ?? [])),
+  );
+}
+
+export function useRefreshAppConfig({ every }: { every?: number } = {}): () => void {
+  const queryClient = useQueryClient();
+  const refresh = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.appConfig });
+  }, [queryClient]);
+
+  useEffect(() => {
+    if (!every) return;
+    const timer = setInterval(refresh, every);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [every, refresh]);
+
+  return refresh;
 }
 
 export function useAppConfig(): AppConfig | undefined {

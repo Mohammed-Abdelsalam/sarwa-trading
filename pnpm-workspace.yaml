@@ -10,3 +10,8 @@ onlyBuiltDependencies:
   - '@prisma/engines'
   - esbuild
   - prisma
+
+overrides:
+  react: 19.3.0
+  react-dom: 19.3.0
+  '@types/react': ~19.3.0

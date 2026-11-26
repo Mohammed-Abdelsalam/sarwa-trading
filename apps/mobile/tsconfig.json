@@ -1,0 +1,5 @@
+{
+  "extends": ["expo/tsconfig.base", "@sarwa/tsconfig/react-native.json"],
+  "compilerOptions": { "types": ["jest", "node"] },
+  "include": ["src", "test", "nativewind-env.d.ts", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}

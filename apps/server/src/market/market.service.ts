@@ -111,7 +111,13 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
         ({ row }) =>
           !q || row.symbol.toLowerCase().includes(q) || row.name.toLowerCase().includes(q),
       )
-      .map(({ row, quote }) => ({ ...toStock(row), quote }));
+      .map(({ row, quote }) => ({ ...toStock(row), quote, sparkline: this.sparkline(row.symbol) }));
+  }
+
+  // Every 12th 5-minute close of the 1D chart: one point per hour for the list rows.
+  private sparkline(symbol: string): number[] {
+    const candles = this.candles(symbol, '1D');
+    return candles.filter((_, i) => i % 12 === 0 || i === candles.length - 1).map((c) => c.c);
   }
 
   find(symbol: string): { stock: Stock; quote: Quote } | undefined {
