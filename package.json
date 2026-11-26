@@ -1,0 +1,26 @@
+{
+  "name": "sarwa-trading",
+  "private": true,
+  "description": "Sarwa Mini Trading Platform — mobile (Expo), web (Next.js), admin dashboard (Next.js) and a NestJS server in one monorepo.",
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "turbo run clean && rimraf node_modules"
+  },
+  "devDependencies": {
+    "prettier": "^3.10.1",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "rimraf": "^6.1.4",
+    "turbo": "^2.11.13",
+    "typescript": "~6.0.3"
+  }
+}

@@ -1,0 +1,44 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+.next/
+out/
+build/
+.expo/
+web-build/
+*.tsbuildinfo
+next-env.d.ts
+
+# turbo / caches
+.turbo/
+.eslintcache
+
+# tests
+coverage/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# database (SQLite dev file)
+*.db
+*.db-journal
+
+# logs & OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# editors
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# native (Expo prebuild output — we run in Expo Go)
+apps/mobile/ios/
+apps/mobile/android/
