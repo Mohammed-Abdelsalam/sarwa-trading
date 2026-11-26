@@ -17,6 +17,7 @@ export interface MarketSocketOptions {
   store: LiveStore;
   flushMs?: number;
   syncDelayMs?: number;
+  reconnectJitterMs?: number;
   createSocket?: (url: string) => MarketIo;
 }
 
@@ -41,6 +42,7 @@ export function createMarketSocket({
   store,
   flushMs = 100,
   syncDelayMs = 200,
+  reconnectJitterMs = 1_000,
   createSocket = defaultCreateSocket,
 }: MarketSocketOptions): MarketSocket {
   const socket = createSocket(`${url.replace(/\/$/, '')}${MARKET_NAMESPACE}`);
@@ -49,6 +51,7 @@ export function createMarketSocket({
   const buffer = new Map<string, Quote>();
   let flushTimer: ReturnType<typeof setInterval> | undefined;
   let syncTimer: ReturnType<typeof setTimeout> | undefined;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   const setConnection = (connection: ConnectionState) => {
     store.getState().setConnection(connection);
   };
@@ -91,11 +94,18 @@ export function createMarketSocket({
   });
   socket.on('disconnect', (reason) => {
     subscribed.clear();
-    setConnection(
-      reason === 'io client disconnect'
-        ? { status: 'offline' }
-        : { status: 'reconnecting', attempt: 0 },
-    );
+    if (reason === 'io client disconnect') {
+      setConnection({ status: 'offline' });
+      return;
+    }
+    setConnection({ status: 'reconnecting', attempt: 0 });
+    // Socket.IO won't reconnect after a server-side kick; jitter so dropped clients don't return at once.
+    if (reason === 'io server disconnect') {
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = undefined;
+        socket.connect();
+      }, Math.random() * reconnectJitterMs);
+    }
   });
   socket.io.on('reconnect_attempt', (attempt) => {
     setConnection({ status: 'reconnecting', attempt });
@@ -120,6 +130,8 @@ export function createMarketSocket({
       socket.connect();
     },
     disconnect() {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
       socket.disconnect();
       clearInterval(flushTimer);
       flushTimer = undefined;
