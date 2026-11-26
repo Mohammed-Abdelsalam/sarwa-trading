@@ -10,6 +10,7 @@ import {
   SubscribeAckSchema,
 } from '@sarwa/contracts';
 
+import { MarketService } from '../src/market/market.service';
 import { startApp } from './app';
 
 type ClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -67,6 +68,16 @@ describe('market socket', () => {
     );
     const ack = await subscribe(symbols);
     expect(ack.ok).toBe(false);
+  });
+
+  it('tells every client when the stock list changes', async () => {
+    const changed = new Promise<{ at: number }>((resolve) => {
+      socket.once('stocks:changed', resolve);
+    });
+
+    await app.get(MarketService).reload();
+
+    expect((await changed).at).toBeGreaterThan(0);
   });
 
   it('sends the market status and app config on connect', async () => {

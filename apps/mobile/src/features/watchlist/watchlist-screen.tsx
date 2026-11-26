@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Hand, Trash2 } from 'lucide-react-native';
+import { AlertTriangle, Hand, Trash2 } from 'lucide-react-native';
 import { Pressable, ScrollView, View } from 'react-native';
 import ReanimatedSwipeable, {
   SwipeDirection,
@@ -12,7 +12,9 @@ import { formatPct } from '@sarwa/core';
 import { AppBanners } from '../../components/layout/app-banners';
 import { ScreenHeader } from '../../components/layout/screen-header';
 import { ChangeText } from '../../components/trading/change';
-import { StockRow, StockRowSkeleton } from '../../components/trading/stock-row';
+import { StockListSkeleton, StockRow } from '../../components/trading/stock-row';
+import { Button } from '../../components/ui/button';
+import { StateView } from '../../components/ui/state-view';
 import { Text } from '../../components/ui/text';
 import { useColors } from '../../lib/theme';
 import { EmptyWatchlist } from './empty-watchlist';
@@ -79,7 +81,7 @@ function WatchlistSummary({ count, average }: { count: number; average: number |
 
 export function WatchlistScreen() {
   const colors = useColors();
-  const { rows, average, isLoading, remove } = useWatchlistScreen();
+  const { rows, average, isLoading, isError, retry, remove } = useWatchlistScreen();
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
@@ -87,11 +89,15 @@ export function WatchlistScreen() {
       <AppBanners />
 
       {isLoading ? (
-        <View>
-          {Array.from({ length: 4 }, (_, i) => (
-            <StockRowSkeleton key={i} />
-          ))}
-        </View>
+        <StockListSkeleton rows={4} />
+      ) : isError ? (
+        <StateView
+          icon={AlertTriangle}
+          tone="neg"
+          title="Couldn't load your watchlist"
+          description="We couldn't reach the price server. Check your connection and try again."
+          action={<Button label="Retry" variant="secondary" onPress={retry} />}
+        />
       ) : rows.length === 0 ? (
         <EmptyWatchlist
           onBrowse={() => {

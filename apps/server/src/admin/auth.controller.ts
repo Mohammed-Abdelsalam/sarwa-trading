@@ -28,6 +28,8 @@ import { PrismaService } from '../prisma.service';
 import { AuditService } from './audit.service';
 import { AdminGuard, CurrentAdmin, SESSION_TTL_SECONDS, toAdminUser } from './auth';
 
+const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 10);
+
 @Controller('admin/auth')
 export class AuthController {
   constructor(
@@ -47,8 +49,8 @@ export class AuthController {
   ): Promise<SessionResponse> {
     const user = await this.prisma.adminUser.findUnique({ where: { email: email.toLowerCase() } });
 
-    // Same error for an unknown email and a wrong password to prevent account enumeration.
-    const valid = user !== null && (await bcrypt.compare(password, user.passwordHash));
+    // Always run bcrypt and answer with one error, so neither timing nor message reveals which emails exist.
+    const valid = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
     if (!user || !valid || user.status !== 'active') {
       throw new UnauthorizedException('Invalid email or password');
     }

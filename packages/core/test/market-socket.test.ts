@@ -111,6 +111,53 @@ describe('market socket', () => {
     expect(store.getState().quotes.AAPL?.price).toBe(2);
   });
 
+  it('ignores streamed quotes that fail validation', () => {
+    const { fake, market, store } = setup();
+    market.connect();
+
+    fake.emit('quotes', [{ ...makeQuote(), price: -1 }]);
+    jest.advanceTimersByTime(100);
+
+    expect(store.getState().quotes.AAPL).toBeUndefined();
+  });
+
+  it('stores a valid market status and ignores a malformed one', () => {
+    const { fake, market, store } = setup();
+    market.connect();
+    const status = { state: 'paused', volatility: 1, since: 10 };
+
+    fake.emit('market:status', status);
+    fake.emit('market:status', { state: 'exploded', volatility: 1, since: 11 });
+
+    expect(store.getState().marketStatus).toEqual(status);
+  });
+
+  it('stores a valid remote config and ignores a malformed one', () => {
+    const { fake, market, store } = setup();
+    market.connect();
+    const config = {
+      maintenanceMode: true,
+      banner: null,
+      enabledPeriods: ['1D'],
+      updatedAt: 5,
+    };
+
+    fake.emit('config:updated', config);
+    fake.emit('config:updated', { ...config, enabledPeriods: [], updatedAt: 6 });
+
+    expect(store.getState().appConfig).toEqual(config);
+  });
+
+  it('records when the server says the stock list changed and ignores bad payloads', () => {
+    const { fake, market, store } = setup();
+    market.connect();
+
+    fake.emit('stocks:changed', { at: 42 });
+    fake.emit('stocks:changed', { at: 'soon' });
+
+    expect(store.getState().stocksChangedAt).toBe(42);
+  });
+
   it('reports reconnecting and resubscribes everything on reconnect', () => {
     const { fake, market, store } = setup();
     market.connect();
@@ -152,6 +199,18 @@ describe('market socket', () => {
 
     expect(connect).not.toHaveBeenCalled();
     expect(store.getState().connection.status).toBe('offline');
+  });
+
+  it('connects only once when the app reconnects during the kick jitter', () => {
+    const { fake, market } = setup();
+    market.connect();
+    const connect = jest.spyOn(fake, 'connect');
+
+    fake.serverKick();
+    market.connect();
+    jest.advanceTimersByTime(1_000);
+
+    expect(connect).toHaveBeenCalledTimes(1);
   });
 
   it('goes offline on a manual disconnect', () => {

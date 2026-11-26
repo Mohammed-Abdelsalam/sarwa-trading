@@ -59,6 +59,15 @@ export function formatMarketCap(value: number): string {
 
 export const DIRECTION_ARROW: Record<Direction, string> = { up: '▲', down: '▼', flat: '■' };
 
+const DIRECTION_WORD: Record<Direction, string> = { up: 'up', down: 'down', flat: 'unchanged' };
+
+export function formatQuoteLabel(quote: Pick<Quote, 'price' | 'prevClose'>): string {
+  const pct = changePct(quote);
+  const dir = direction(pct);
+  const amount = dir === 'flat' ? '' : ` ${decimal.format(Math.abs(pct))}%`;
+  return `${formatPrice(quote.price)}, ${DIRECTION_WORD[dir]}${amount} today`;
+}
+
 const CANDLE_TIME: Record<Period, Intl.DateTimeFormat> = {
   '1D': new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }),
   '1W': new Intl.DateTimeFormat('en-US', { weekday: 'short' }),

@@ -1,5 +1,9 @@
 import { MAX_SUBSCRIBE_SYMBOLS } from '../src/constants';
-import { SubscribeAckSchema, SubscribePayloadSchema } from '../src/socket';
+import {
+  StocksChangedEventSchema,
+  SubscribeAckSchema,
+  SubscribePayloadSchema,
+} from '../src/socket';
 
 const letter = (n: number): string => String.fromCharCode(65 + n);
 
@@ -35,5 +39,13 @@ describe('SubscribeAckSchema', () => {
   it('narrows on ok', () => {
     const ack = SubscribeAckSchema.parse({ ok: false, error: { code: 'X', message: 'nope' } });
     expect(ack.ok ? 'quotes' : ack.error.code).toBe('X');
+  });
+});
+
+describe('StocksChangedEventSchema', () => {
+  it('accepts a timestamp and rejects anything else', () => {
+    expect(StocksChangedEventSchema.safeParse({ at: 1_700_000_000_000 }).success).toBe(true);
+    expect(StocksChangedEventSchema.safeParse({ at: -1 }).success).toBe(false);
+    expect(StocksChangedEventSchema.safeParse({}).success).toBe(false);
   });
 });

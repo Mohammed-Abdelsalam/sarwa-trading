@@ -35,8 +35,8 @@ export function useStocks(): UseQueryResult<StockWithQuote[]> {
   const { api, store } = useSarwa();
   return useQuery({
     queryKey: queryKeys.stocks,
-    queryFn: async () => {
-      const { items } = await api.listStocks();
+    queryFn: async ({ signal }) => {
+      const { items } = await api.listStocks({ signal });
       store.getState().applyQuotes(items.map((item) => item.quote));
       return items;
     },
@@ -48,8 +48,8 @@ export function useStock(symbol: string): UseQueryResult<StockDetailResponse> {
   const { api, store } = useSarwa();
   return useQuery({
     queryKey: queryKeys.stock(symbol),
-    queryFn: async () => {
-      const detail = await api.getStock(symbol);
+    queryFn: async ({ signal }) => {
+      const detail = await api.getStock(symbol, { signal });
       store.getState().applyQuotes([detail.quote]);
       return detail;
     },
@@ -61,7 +61,7 @@ export function useCandles(symbol: string, period: Period): UseQueryResult<Candl
   const { api } = useSarwa();
   return useQuery({
     queryKey: queryKeys.candles(symbol, period),
-    queryFn: async () => (await api.getCandles(symbol, period)).candles,
+    queryFn: async ({ signal }) => (await api.getCandles(symbol, period, { signal })).candles,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
@@ -71,7 +71,7 @@ export function useWatchlist(): UseQueryResult<string[]> {
   const { api } = useSarwa();
   return useQuery({
     queryKey: queryKeys.watchlist,
-    queryFn: async () => (await api.getWatchlist()).symbols,
+    queryFn: async ({ signal }) => (await api.getWatchlist({ signal })).symbols,
   });
 }
 
@@ -169,12 +169,23 @@ export function useRefreshAppConfig({ every }: { every?: number } = {}): () => v
   return refresh;
 }
 
+// Admin stock changes (enable, disable, add, delete) refresh the lists right away instead of after staleTime.
+export function useSyncStocksOnChange(): void {
+  const { store } = useSarwa();
+  const queryClient = useQueryClient();
+  const changedAt = useStore(store, (state) => state.stocksChangedAt);
+
+  useEffect(() => {
+    if (changedAt !== null) void queryClient.invalidateQueries({ queryKey: queryKeys.stocks });
+  }, [changedAt, queryClient]);
+}
+
 export function useAppConfig(): AppConfig | undefined {
   const { api, store } = useSarwa();
   const live = useStore(store, (state) => state.appConfig);
   const { data } = useQuery({
     queryKey: queryKeys.appConfig,
-    queryFn: () => api.getAppConfig(),
+    queryFn: ({ signal }) => api.getAppConfig({ signal }),
     staleTime: 60_000,
   });
   if (!live) return data;

@@ -54,6 +54,7 @@ export class MarketGateway implements OnGatewayInit, OnGatewayConnection, OnModu
         for (const quote of quotes) this.pending.set(quote.symbol, quote);
       }),
       this.market.status$.subscribe((status) => this.server.emit('market:status', status)),
+      this.market.stocksChanged$.subscribe((event) => this.server.emit('stocks:changed', event)),
       this.appConfig.changes$.subscribe((config) => this.server.emit('config:updated', config)),
     );
     this.flushTimer = setInterval(() => {

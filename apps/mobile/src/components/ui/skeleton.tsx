@@ -16,5 +16,12 @@ export function Skeleton({ className }: { className?: string }) {
     if (!reducedMotion) opacity.set(withRepeat(withTiming(0.45, { duration: 700 }), -1, true));
   }, [opacity, reducedMotion]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
-  return <Animated.View style={style} className={cx('rounded-sm bg-surface-3', className)} />;
+  return (
+    <Animated.View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={style}
+      className={cx('rounded-sm bg-surface-3', className)}
+    />
+  );
 }

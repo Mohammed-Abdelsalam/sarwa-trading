@@ -1,13 +1,13 @@
 import { FlashList, type ViewToken } from '@shopify/flash-list';
 import { AlertTriangle, Search } from 'lucide-react-native';
-import { RefreshControl, View } from 'react-native';
+import { RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { type StockWithQuote } from '@sarwa/contracts';
 
 import { AppBanners } from '../../components/layout/app-banners';
 import { ScreenHeader } from '../../components/layout/screen-header';
-import { StockRow, StockRowSkeleton } from '../../components/trading/stock-row';
+import { StockListSkeleton, StockRow } from '../../components/trading/stock-row';
 import { Button } from '../../components/ui/button';
 import { StateView } from '../../components/ui/state-view';
 import { useColors } from '../../lib/theme';
@@ -38,11 +38,7 @@ export function MarketsScreen() {
       <ListMeta count={rows.length} sort={filters.sort} onCycleSort={actions.cycleSort} />
 
       {isLoading ? (
-        <View>
-          {Array.from({ length: 8 }, (_, i) => (
-            <StockRowSkeleton key={i} />
-          ))}
-        </View>
+        <StockListSkeleton rows={8} />
       ) : isError ? (
         <StateView
           icon={AlertTriangle}

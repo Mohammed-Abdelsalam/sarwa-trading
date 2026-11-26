@@ -6,6 +6,7 @@ import {
   formatMarketCap,
   formatPct,
   formatPrice,
+  formatQuoteLabel,
 } from '../src/format';
 
 describe('formatters', () => {
@@ -46,5 +47,13 @@ describe('formatCandleTime', () => {
     expect(formatCandleTime(t, '1D')).toBe('3:30 PM');
     expect(formatCandleTime(t, '1M')).toBe('Mar 14');
     expect(formatCandleTime(t, 'ALL')).toBe('2026');
+  });
+});
+
+describe('formatQuoteLabel', () => {
+  it('reads the price and day change in words for screen readers', () => {
+    expect(formatQuoteLabel({ price: 110, prevClose: 100 })).toBe('$110.00, up 10.00% today');
+    expect(formatQuoteLabel({ price: 95, prevClose: 100 })).toBe('$95.00, down 5.00% today');
+    expect(formatQuoteLabel({ price: 100, prevClose: 100 })).toBe('$100.00, unchanged today');
   });
 });

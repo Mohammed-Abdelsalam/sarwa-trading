@@ -1,5 +1,23 @@
-export { ApiError, createApiClient, createRequest, type ApiClient, type Request } from './api';
-export { chartGeometry, nearestPointIndex, type ChartGeometry, type ChartPoint } from './chart';
+export {
+  ApiError,
+  createApiClient,
+  createRequest,
+  isNotFound,
+  REQUEST_TIMEOUT_MS,
+  shouldRetry,
+  TimeoutError,
+  type ApiClient,
+  type CallOptions,
+  type Request,
+} from './api';
+export {
+  chartBaseline,
+  chartGeometry,
+  nearestPointIndex,
+  withLiveQuote,
+  type ChartGeometry,
+  type ChartPoint,
+} from './chart';
 export { createDeviceIdGetter, type KeyValueStorage } from './device';
 export * from './format';
 export * from './hooks';
