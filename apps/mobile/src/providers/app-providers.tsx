@@ -8,13 +8,13 @@ import { AppState, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { SarwaProvider } from '@sarwa/core';
+import { SarwaProvider, shouldRetry, useSyncStocksOnChange } from '@sarwa/core';
 
 import { client } from '../lib/client';
 import { useThemeVars } from '../lib/theme';
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { gcTime: 24 * 60 * 60 * 1000, retry: 2 } },
+  defaultOptions: { queries: { gcTime: 24 * 60 * 60 * 1000, retry: shouldRetry } },
 });
 
 const persister = createAsyncStoragePersister({ storage: AsyncStorage, key: 'sarwa.query-cache' });
@@ -59,6 +59,11 @@ function useRealtimeLifecycle(): void {
   }, []);
 }
 
+function LiveSync() {
+  useSyncStocksOnChange();
+  return null;
+}
+
 export function AppProviders({ children }: { children: ReactNode }) {
   useRealtimeLifecycle();
   const themeVars = useThemeVars();
@@ -68,6 +73,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <SafeAreaProvider>
         <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}>
           <SarwaProvider client={client}>
+            <LiveSync />
             <View style={[{ flex: 1 }, themeVars]} className="bg-bg">
               {children}
             </View>

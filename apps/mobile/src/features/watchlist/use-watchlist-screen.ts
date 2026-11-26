@@ -19,6 +19,12 @@ export function useWatchlistScreen() {
     rows: (stocks.data ?? []).filter((stock) => symbols.includes(stock.symbol)),
     average,
     isLoading: watchlist.isPending || stocks.isPending,
+    // Only a failure without cached data is an error; otherwise the cached list keeps showing.
+    isError: (watchlist.isError && !watchlist.data) || (stocks.isError && !stocks.data),
+    retry: () => {
+      if (watchlist.isError) void watchlist.refetch();
+      if (stocks.isError) void stocks.refetch();
+    },
     remove: (symbol: string) => {
       toggle({ symbol, watched: true });
     },

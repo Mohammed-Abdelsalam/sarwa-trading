@@ -9,6 +9,7 @@ import {
   type Quote,
   type Stock,
   type StockStats,
+  type StocksChangedEvent,
   type StockWithQuote,
   TICK_MS,
 } from '@sarwa/contracts';
@@ -35,6 +36,7 @@ const MOVE_PROBABILITY = 0.6;
 export class MarketService implements OnModuleInit, OnModuleDestroy {
   readonly quotes$ = new Subject<Quote[]>();
   readonly status$ = new Subject<MarketStatus>();
+  readonly stocksChanged$ = new Subject<StocksChangedEvent>();
 
   private readonly logger = new Logger(MarketService.name);
   private instruments = new Map<string, Instrument>();
@@ -62,6 +64,7 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
     clearInterval(this.timer);
     this.quotes$.complete();
     this.status$.complete();
+    this.stocksChanged$.complete();
   }
 
   async reload(): Promise<void> {
@@ -72,6 +75,7 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
       next.set(row.symbol, { row, quote: existing?.quote ?? this.openingQuote(row) });
     }
     this.instruments = next;
+    this.stocksChanged$.next({ at: Date.now() });
   }
 
   tick(now = Date.now()): Quote[] {

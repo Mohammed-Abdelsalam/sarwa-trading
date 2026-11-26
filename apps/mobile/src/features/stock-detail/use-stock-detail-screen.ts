@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { type Candle, type Period, PERIODS } from '@sarwa/contracts';
 import {
+  isNotFound,
   keyStats,
   useAppConfig,
   useIsWatched,
@@ -24,6 +25,7 @@ export function useStockDetailScreen(symbol: string) {
   useLiveSymbols([symbol]);
 
   const quote = liveQuote ?? detail.data?.quote;
+  const notFound = isNotFound(detail.error);
 
   return {
     stock: detail.data?.stock,
@@ -31,7 +33,8 @@ export function useStockDetailScreen(symbol: string) {
     stats: detail.data && quote ? keyStats(detail.data, quote) : null,
     status,
     watched,
-    isError: detail.isError && !detail.data,
+    notFound,
+    isError: detail.isError && !detail.data && !notFound,
     chart: {
       // The admin can disable the selected period while the screen is open.
       period: enabledPeriods.includes(period) ? period : (enabledPeriods.at(0) ?? '1D'),

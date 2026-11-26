@@ -49,6 +49,7 @@ export const ErrorCode = {
   Forbidden: 'FORBIDDEN',
   RateLimited: 'RATE_LIMITED',
   Maintenance: 'MAINTENANCE',
+  Unavailable: 'UNAVAILABLE',
   Internal: 'INTERNAL',
 } as const;
 

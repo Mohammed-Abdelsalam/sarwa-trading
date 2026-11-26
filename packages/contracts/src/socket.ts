@@ -23,18 +23,22 @@ export const QuotesEventSchema = z.array(QuoteSchema);
 
 export const SocketErrorSchema = z.object({ code: z.string(), message: z.string() });
 
+export const StocksChangedEventSchema = z.object({ at: z.number().int().nonnegative() });
+
 export const SocketEvent = {
   Subscribe: 'subscribe',
   Unsubscribe: 'unsubscribe',
   Quotes: 'quotes',
   MarketStatus: 'market:status',
   ConfigUpdated: 'config:updated',
+  StocksChanged: 'stocks:changed',
   Error: 'error',
 } as const;
 
 export type SubscribePayload = z.infer<typeof SubscribePayloadSchema>;
 export type SubscribeAck = z.infer<typeof SubscribeAckSchema>;
 export type SocketError = z.infer<typeof SocketErrorSchema>;
+export type StocksChangedEvent = z.infer<typeof StocksChangedEventSchema>;
 
 export interface ClientToServerEvents {
   subscribe: (payload: SubscribePayload, ack: (res: SubscribeAck) => void) => void;
@@ -45,5 +49,6 @@ export interface ServerToClientEvents {
   quotes: (quotes: Quote[]) => void;
   'market:status': (status: MarketStatus) => void;
   'config:updated': (config: AppConfig) => void;
+  'stocks:changed': (event: StocksChangedEvent) => void;
   error: (err: SocketError) => void;
 }

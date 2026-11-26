@@ -1,11 +1,14 @@
 import { io, type Socket } from 'socket.io-client';
 
 import {
+  AppConfigSchema,
   type ClientToServerEvents,
   MARKET_NAMESPACE,
+  MarketStatusSchema,
   type Quote,
   QuotesEventSchema,
   type ServerToClientEvents,
+  StocksChangedEventSchema,
 } from '@sarwa/contracts';
 
 import { type ConnectionState, type LiveStore } from './store';
@@ -115,15 +118,23 @@ export function createMarketSocket({
     if (!parsed.success) return;
     for (const quote of parsed.data) buffer.set(quote.symbol, quote);
   });
-  socket.on('market:status', (status) => {
-    store.getState().setMarketStatus(status);
+  socket.on('market:status', (payload) => {
+    const parsed = MarketStatusSchema.safeParse(payload);
+    if (parsed.success) store.getState().setMarketStatus(parsed.data);
   });
-  socket.on('config:updated', (config) => {
-    store.getState().setAppConfig(config);
+  socket.on('config:updated', (payload) => {
+    const parsed = AppConfigSchema.safeParse(payload);
+    if (parsed.success) store.getState().setAppConfig(parsed.data);
+  });
+  socket.on('stocks:changed', (payload) => {
+    const parsed = StocksChangedEventSchema.safeParse(payload);
+    if (parsed.success) store.getState().setStocksChangedAt(parsed.data.at);
   });
 
   return {
     connect() {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
       if (socket.connected || socket.active) return;
       setConnection({ status: 'connecting' });
       flushTimer ??= setInterval(flush, flushMs);

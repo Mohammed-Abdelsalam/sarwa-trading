@@ -13,7 +13,7 @@ jest.mock('../../../src/components/layout/screen-header', () => ({
 }));
 jest.mock('../../../src/components/trading/stock-row', () => ({
   StockRow: ({ stock }: { stock: StockWithQuote }) => <MockText>{stock.symbol}</MockText>,
-  StockRowSkeleton: () => null,
+  StockListSkeleton: () => null,
 }));
 jest.mock('expo-router', () => ({ router: { navigate: jest.fn() } }));
 // The native swipe gesture can't run in Jest; render the row with its action visible instead.
@@ -58,22 +58,42 @@ function stock(symbol: string): StockWithQuote {
   };
 }
 
+function viewModel(
+  overrides: Partial<ReturnType<typeof useWatchlistScreen>> = {},
+): ReturnType<typeof useWatchlistScreen> {
+  return {
+    rows: [],
+    average: null,
+    isLoading: false,
+    isError: false,
+    retry: jest.fn(),
+    remove: jest.fn(),
+    ...overrides,
+  };
+}
+
 describe('WatchlistScreen', () => {
   it('invites the user to browse markets when nothing is starred', async () => {
-    mockedHook.mockReturnValue({ rows: [], average: null, isLoading: false, remove: jest.fn() });
+    mockedHook.mockReturnValue(viewModel());
     await render(<WatchlistScreen />);
 
     expect(screen.getByText('Your watchlist is empty')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Browse markets' })).toBeOnTheScreen();
   });
 
+  it('shows an error with retry instead of the empty state when loading fails', async () => {
+    const retry = jest.fn();
+    mockedHook.mockReturnValue(viewModel({ isError: true, retry }));
+    await render(<WatchlistScreen />);
+
+    expect(screen.queryByText('Your watchlist is empty')).not.toBeOnTheScreen();
+    expect(screen.getByText("Couldn't load your watchlist")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
   it('lists starred stocks with the average change', async () => {
-    mockedHook.mockReturnValue({
-      rows: [stock('AAPL'), stock('NVDA')],
-      average: 1.5,
-      isLoading: false,
-      remove: jest.fn(),
-    });
+    mockedHook.mockReturnValue(viewModel({ rows: [stock('AAPL'), stock('NVDA')], average: 1.5 }));
     await render(<WatchlistScreen />);
 
     expect(screen.getByText('AAPL')).toBeOnTheScreen();
@@ -84,7 +104,7 @@ describe('WatchlistScreen', () => {
 
   it('removes a stock from its swipe action', async () => {
     const remove = jest.fn();
-    mockedHook.mockReturnValue({ rows: [stock('AAPL')], average: null, isLoading: false, remove });
+    mockedHook.mockReturnValue(viewModel({ rows: [stock('AAPL')], remove }));
     await render(<WatchlistScreen />);
 
     await fireEvent.press(screen.getByRole('button', { name: 'Remove AAPL from watchlist' }));

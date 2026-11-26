@@ -94,16 +94,29 @@ export class UsersController {
     }
 
     const row = await this.prisma.adminUser.update({ where: { id }, data: changes });
-    await this.audit.log({
-      actorEmail: admin.email,
-      action: changes.role ? 'user.role' : 'user.status',
-      entity: `User · ${row.email}`,
-      payload: {
-        ...(changes.role && { role: { from: target.role, to: changes.role } }),
-        ...(changes.status && { status: { from: target.status, to: changes.status } }),
-      },
-      ip: request.ip,
-    });
+    const entries = [
+      changes.role && changes.role !== target.role
+        ? {
+            action: 'user.role' as const,
+            payload: { role: { from: target.role, to: changes.role } },
+          }
+        : null,
+      changes.status && changes.status !== target.status
+        ? {
+            action: 'user.status' as const,
+            payload: { status: { from: target.status, to: changes.status } },
+          }
+        : null,
+    ].filter((entry) => entry !== null);
+    for (const { action, payload } of entries) {
+      await this.audit.log({
+        actorEmail: admin.email,
+        action,
+        entity: `User · ${row.email}`,
+        payload,
+        ip: request.ip,
+      });
+    }
     return toAdminUser(row);
   }
 }

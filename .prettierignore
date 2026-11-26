@@ -7,3 +7,4 @@ coverage
 pnpm-lock.yaml
 *.db
 apps/server/prisma/migrations
+apps/mobile/expo-env.d.ts

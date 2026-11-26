@@ -1,17 +1,21 @@
 import { randomUUID } from 'node:crypto';
 
 import { type INestApplication } from '@nestjs/common';
+import bcrypt from 'bcryptjs';
+import { type Application } from 'express';
 import request from 'supertest';
 
 import {
   ADMIN_SESSION_COOKIE,
   CandlesResponseSchema,
   DEVICE_ID_HEADER,
+  HealthResponseSchema,
   ProblemSchema,
   StockDetailResponseSchema,
   StocksResponseSchema,
 } from '@sarwa/contracts';
 
+import { PrismaService } from '../src/prisma.service';
 import { startApp } from './app';
 
 let app: INestApplication;
@@ -28,8 +32,13 @@ afterAll(async () => {
 
 const api = (path: string) => `/api/v1${path}`;
 
-async function login(email: string, password: string): Promise<string> {
-  const res = await http.post(api('/admin/auth/login')).send({ email, password }).expect(200);
+// supertest connects over loopback like the admin proxy, so each test can log in from its own forwarded IP.
+async function login(email: string, password: string, ip = '127.0.0.1'): Promise<string> {
+  const res = await http
+    .post(api('/admin/auth/login'))
+    .set('X-Forwarded-For', ip)
+    .send({ email, password })
+    .expect(200);
   const cookie = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0];
   expect(cookie).toContain(`${ADMIN_SESSION_COOKIE}=`);
   expect(cookie).toContain('HttpOnly');
@@ -100,6 +109,39 @@ describe('watchlist', () => {
   it('404s for a symbol that does not exist', async () => {
     await http.put(api('/watchlist/ZZZZ')).set(DEVICE_ID_HEADER, deviceId).expect(404);
   });
+
+  it('404s for a stock the admin disabled', async () => {
+    const cookie = await login('admin@sarwa.dev', 'admin12345', '198.51.100.10');
+    await http
+      .patch(api('/admin/stocks/INTC'))
+      .set('Cookie', cookie)
+      .send({ isEnabled: false })
+      .expect(200);
+
+    await http.put(api('/watchlist/INTC')).set(DEVICE_ID_HEADER, deviceId).expect(404);
+
+    await http
+      .patch(api('/admin/stocks/INTC'))
+      .set('Cookie', cookie)
+      .send({ isEnabled: true })
+      .expect(200);
+  });
+});
+
+describe('health', () => {
+  it('reports ok when the database answers', async () => {
+    const res = await http.get(api('/health')).expect(200);
+    expect(HealthResponseSchema.safeParse(res.body).success).toBe(true);
+  });
+
+  it('answers 503 problem details when the database is down', async () => {
+    jest.spyOn(app.get(PrismaService), '$queryRaw').mockRejectedValueOnce(new Error('db down'));
+
+    const res = await http.get(api('/health')).expect(503);
+
+    expect(ProblemSchema.safeParse(res.body).success).toBe(true);
+    expect(res.body.code).toBe('UNAVAILABLE');
+  });
 });
 
 describe('admin', () => {
@@ -109,6 +151,63 @@ describe('admin', () => {
       .send({ email: 'admin@sarwa.dev', password: 'wrong-password' })
       .expect(401);
     expect(res.body.detail).toBe('Invalid email or password');
+  });
+
+  it('runs bcrypt even for an unknown email so timing does not reveal accounts', async () => {
+    const compare = jest.spyOn(bcrypt, 'compare');
+
+    const res = await http
+      .post(api('/admin/auth/login'))
+      .set('X-Forwarded-For', '198.51.100.11')
+      .send({ email: 'nobody@sarwa.dev', password: 'whatever-123' })
+      .expect(401);
+
+    expect(res.body.detail).toBe('Invalid email or password');
+    expect(compare).toHaveBeenCalledTimes(1);
+  });
+
+  it('trusts X-Forwarded-For only from the local admin proxy', () => {
+    const trusts = (app.getHttpAdapter().getInstance() as Application).get('trust proxy fn') as (
+      address: string,
+      hop: number,
+    ) => boolean;
+
+    expect(trusts('127.0.0.1', 0)).toBe(true);
+    expect(trusts('192.168.1.20', 0)).toBe(false);
+  });
+
+  it('records the client IP forwarded by the admin proxy', async () => {
+    const cookie = await login('admin@sarwa.dev', 'admin12345', '203.0.113.7');
+
+    const audit = await http
+      .get(api('/admin/audit?action=auth.login'))
+      .set('Cookie', cookie)
+      .expect(200);
+
+    expect(audit.body.items[0]).toMatchObject({ action: 'auth.login', ip: '203.0.113.7' });
+  });
+
+  it('logs one audit entry per field when role and status change together', async () => {
+    const cookie = await login('admin@sarwa.dev', 'admin12345', '198.51.100.12');
+    const email = `analyst-${randomUUID().slice(0, 8)}@sarwa.dev`;
+    const created = await http
+      .post(api('/admin/users'))
+      .set('Cookie', cookie)
+      .send({ email, name: 'Analyst', role: 'VIEWER', password: 'analyst12345' })
+      .expect(201);
+
+    await http
+      .patch(api(`/admin/users/${String(created.body.id)}`))
+      .set('Cookie', cookie)
+      .send({ role: 'ADMIN', status: 'disabled' })
+      .expect(200);
+
+    const audit = await http.get(api('/admin/audit')).set('Cookie', cookie).expect(200);
+    const forUser = (audit.body.items as { action: string; entity: string }[])
+      .filter((item) => item.entity.endsWith(email))
+      .map((item) => item.action)
+      .sort();
+    expect(forUser).toEqual(['user.create', 'user.role', 'user.status']);
   });
 
   it('requires a session for admin routes', async () => {

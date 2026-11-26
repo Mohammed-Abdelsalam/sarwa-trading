@@ -14,10 +14,12 @@ export interface LiveState {
   connection: ConnectionState;
   marketStatus: MarketStatus | null;
   appConfig: AppConfig | null;
+  stocksChangedAt: number | null;
   applyQuotes(quotes: Quote[]): void;
   setConnection(connection: ConnectionState): void;
   setMarketStatus(status: MarketStatus): void;
   setAppConfig(config: AppConfig): void;
+  setStocksChangedAt(at: number): void;
 }
 
 export type LiveStore = ReturnType<typeof createLiveStore>;
@@ -33,6 +35,7 @@ export function createLiveStore() {
     connection: { status: 'idle' },
     marketStatus: null,
     appConfig: null,
+    stocksChangedAt: null,
 
     applyQuotes: (incoming) => {
       const current = get().quotes;
@@ -55,6 +58,9 @@ export function createLiveStore() {
     setAppConfig: (appConfig) => {
       const current = get().appConfig;
       if (!current || appConfig.updatedAt >= current.updatedAt) set({ appConfig });
+    },
+    setStocksChangedAt: (stocksChangedAt) => {
+      set({ stocksChangedAt });
     },
   }));
 }

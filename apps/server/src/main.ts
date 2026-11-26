@@ -1,6 +1,7 @@
 import { type INestApplication, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
+import { type Application } from 'express';
 import helmet from 'helmet';
 
 import { API_PREFIX } from '@sarwa/contracts';
@@ -10,6 +11,8 @@ import { ProblemDetailsFilter } from './common/problem-details.filter';
 import { env } from './env';
 
 export function configureApp(app: INestApplication): INestApplication {
+  // Only the admin's Next.js rewrite on this machine may set X-Forwarded-For; direct clients can't spoof it.
+  (app.getHttpAdapter().getInstance() as Application).set('trust proxy', 'loopback');
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({ origin: env.CORS_ORIGINS, credentials: true });

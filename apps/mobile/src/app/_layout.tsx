@@ -14,9 +14,12 @@ import { useEffect } from 'react';
 
 import { useAppConfig } from '@sarwa/core';
 
+import { ErrorFallback } from '../components/layout/route-fallbacks';
 import { MaintenanceScreen } from '../features/maintenance/maintenance-screen';
 import { useColors } from '../lib/theme';
 import { AppProviders } from '../providers/app-providers';
+
+export { ErrorFallback as ErrorBoundary };
 
 void SplashScreen.preventAutoHideAsync();
 

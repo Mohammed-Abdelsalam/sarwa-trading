@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { AlertTriangle, ChevronLeft } from 'lucide-react-native';
+import { AlertTriangle, ChevronLeft, SearchX } from 'lucide-react-native';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,6 +11,7 @@ import {
   formatChange,
   formatPct,
   formatPrice,
+  formatQuoteLabel,
   type LiveStatus,
 } from '@sarwa/core';
 
@@ -45,7 +46,7 @@ function TopBar({
     <View className="flex-row items-center justify-between px-2 pb-1">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Back to Markets"
+        accessibilityLabel="Back"
         onPress={() => {
           router.back();
         }}
@@ -98,7 +99,7 @@ function PriceHeader({
   period: Period;
 }) {
   return (
-    <View className="gap-1 px-5 pb-3 pt-4" accessibilityLiveRegion="polite">
+    <View className="gap-1 px-5 pb-3 pt-4">
       {scrubbed ? (
         <>
           <Text variant="display">{formatPrice(scrubbed.c)}</Text>
@@ -107,7 +108,8 @@ function PriceHeader({
           </Text>
         </>
       ) : quote ? (
-        <>
+        // No live region: the price ticks several times a second and would never stop being read.
+        <View accessible accessibilityLabel={formatQuoteLabel(quote)} className="gap-1">
           <View className="self-start">
             <PriceFlash price={quote.price} variant="display" />
           </View>
@@ -120,7 +122,7 @@ function PriceHeader({
               · Today
             </Text>
           </View>
-        </>
+        </View>
       ) : (
         <Skeleton className="h-12 w-48" />
       )}
@@ -129,7 +131,7 @@ function PriceHeader({
 }
 
 export function StockDetailScreen({ symbol }: { symbol: string }) {
-  const { stock, quote, stats, status, watched, isError, chart, actions } =
+  const { stock, quote, stats, status, watched, notFound, isError, chart, actions } =
     useStockDetailScreen(symbol);
 
   return (
@@ -141,7 +143,22 @@ export function StockDetailScreen({ symbol }: { symbol: string }) {
         onToggleWatch={actions.toggleWatch}
       />
 
-      {isError ? (
+      {notFound ? (
+        <StateView
+          icon={SearchX}
+          title="Stock not found"
+          description={`${symbol} isn't listed or has been disabled.`}
+          action={
+            <Button
+              label="Back to Markets"
+              variant="secondary"
+              onPress={() => {
+                router.navigate('/');
+              }}
+            />
+          }
+        />
+      ) : isError ? (
         <StateView
           icon={AlertTriangle}
           tone="neg"

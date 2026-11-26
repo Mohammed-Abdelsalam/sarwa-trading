@@ -1,7 +1,13 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { ApiError } from '../src/api';
-import { queryKeys, useStocks, useToggleWatchlist } from '../src/hooks';
+import {
+  queryKeys,
+  useStocks,
+  useSyncStocksOnChange,
+  useToggleWatchlist,
+  useWatchlist,
+} from '../src/hooks';
 import { createTestClient, createWrapper, makeQuote } from './utils';
 
 describe('useStocks', () => {
@@ -31,6 +37,36 @@ describe('useStocks', () => {
       expect(result.current.isSuccess).toBe(true);
     });
     expect(client.store.getState().quotes.NVDA).toEqual(quote);
+  });
+});
+
+describe('useWatchlist', () => {
+  it('passes the query abort signal to the API so leaving a screen cancels the request', async () => {
+    const getWatchlist = jest.fn(() => Promise.resolve({ symbols: [] }));
+    const { Wrapper } = createWrapper(createTestClient({ getWatchlist }));
+
+    const { result } = renderHook(() => useWatchlist(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(getWatchlist).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) });
+  });
+});
+
+describe('useSyncStocksOnChange', () => {
+  it('invalidates the stock list and details when the server reports a change', () => {
+    const client = createTestClient();
+    const { Wrapper, queryClient } = createWrapper(client);
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    renderHook(() => useSyncStocksOnChange(), { wrapper: Wrapper });
+    expect(invalidate).not.toHaveBeenCalled();
+
+    act(() => {
+      client.store.getState().setStocksChangedAt(1);
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.stocks });
   });
 });
 

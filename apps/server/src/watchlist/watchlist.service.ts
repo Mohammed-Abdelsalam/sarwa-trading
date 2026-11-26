@@ -26,9 +26,9 @@ export class WatchlistService {
     this.assertWritable();
     const stock = await this.prisma.stock.findUnique({
       where: { symbol },
-      select: { symbol: true },
+      select: { isEnabled: true },
     });
-    if (!stock) throw new NotFoundException(`Unknown symbol ${symbol}`);
+    if (!stock?.isEnabled) throw new NotFoundException(`Unknown symbol ${symbol}`);
     await this.touchDevice(deviceId);
     await this.prisma.watchlistItem.upsert({
       where: { deviceId_symbol: { deviceId, symbol } },
