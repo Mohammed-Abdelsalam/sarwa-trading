@@ -5,7 +5,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useStore } from 'zustand';
 
 import {
@@ -13,12 +13,15 @@ import {
   type Candle,
   type MarketStatus,
   type Period,
+  PERIODS,
   type Quote,
   type StockDetailResponse,
   type StockWithQuote,
 } from '@sarwa/contracts';
 
-import { averageChangePct } from './markets';
+import { isNotFound } from './api';
+import { axisCandles, chartBaseline, withLiveQuote } from './chart';
+import { averageChangePct, filterAndSort, keyStats, type MarketFilter } from './markets';
 import { useSarwa } from './provider';
 import { type AppNotice, appNotices, type LiveStatus, liveStatus } from './status';
 import { type ConnectionState } from './store';
@@ -80,11 +83,19 @@ export function useIsWatched(symbol: string): boolean {
   return data?.includes(symbol) ?? false;
 }
 
+export function useWatchedSymbols(): ReadonlySet<string> {
+  const { data } = useWatchlist();
+  return useMemo(() => new Set(data), [data]);
+}
+
+const TOGGLE_WATCHLIST_KEY = ['watchlist', 'toggle'] as const;
+
 export function useToggleWatchlist() {
   const { api } = useSarwa();
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: TOGGLE_WATCHLIST_KEY,
     mutationFn: ({ symbol, watched }: { symbol: string; watched: boolean }) =>
       watched ? api.removeFromWatchlist(symbol) : api.addToWatchlist(symbol),
     onMutate: async ({ symbol, watched }) => {
@@ -98,7 +109,11 @@ export function useToggleWatchlist() {
     onError: (_error, _variables, context) => {
       queryClient.setQueryData(queryKeys.watchlist, context?.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.watchlist }),
+    // Only the last toggle in flight refetches, so an early refetch can't undo a later optimistic star.
+    onSettled: () =>
+      queryClient.isMutating({ mutationKey: TOGGLE_WATCHLIST_KEY }) === 1
+        ? queryClient.invalidateQueries({ queryKey: queryKeys.watchlist })
+        : undefined,
   });
 }
 
@@ -169,6 +184,33 @@ export function useRefreshAppConfig({ every }: { every?: number } = {}): () => v
   return refresh;
 }
 
+// The socket lives only while the app is visible and online: no wasted battery or data.
+export function useMarketConnection({
+  foreground,
+  online,
+}: {
+  foreground: boolean;
+  online: boolean;
+}): void {
+  const { market, store } = useSarwa();
+
+  useEffect(() => {
+    if (foreground && online) {
+      market.connect();
+      return;
+    }
+    market.disconnect();
+    if (!online) store.getState().setConnection({ status: 'offline' });
+  }, [foreground, online, market, store]);
+
+  useEffect(
+    () => () => {
+      market.disconnect();
+    },
+    [market],
+  );
+}
+
 // Admin stock changes (enable, disable, add, delete) refresh the lists right away instead of after staleTime.
 export function useSyncStocksOnChange(): void {
   const { store } = useSarwa();
@@ -178,6 +220,80 @@ export function useSyncStocksOnChange(): void {
   useEffect(() => {
     if (changedAt !== null) void queryClient.invalidateQueries({ queryKey: queryKeys.stocks });
   }, [changedAt, queryClient]);
+}
+
+export type LoadState = 'loading' | 'error' | 'ready';
+
+export function useEnabledPeriods(): readonly Period[] {
+  return useAppConfig()?.enabledPeriods ?? PERIODS;
+}
+
+export function useChartSeries(symbol: string, period: Period) {
+  const query = useCandles(symbol, period);
+  const quote = useQuote(symbol);
+  const candles = withLiveQuote(query.data ?? [], quote);
+  const baseline = chartBaseline(period, candles, quote);
+  const state: LoadState = query.isPending ? 'loading' : query.isError ? 'error' : 'ready';
+
+  return {
+    candles,
+    baseline,
+    showBaseline: period === '1D' && baseline !== null,
+    rising: (candles.at(-1)?.c ?? 0) >= (baseline ?? 0),
+    axisCandles: axisCandles(candles),
+    state,
+    retry: () => void query.refetch(),
+  };
+}
+
+export function useStockDetail(symbol: string) {
+  const detail = useStock(symbol);
+  const liveQuote = useQuote(symbol);
+  useLiveSymbols([symbol]);
+
+  const quote = liveQuote ?? detail.data?.quote;
+  const notFound = isNotFound(detail.error);
+
+  return {
+    stock: detail.data?.stock,
+    quote,
+    stats: detail.data && quote ? keyStats(detail.data, quote) : null,
+    notFound,
+    isError: detail.isError && !detail.data && !notFound,
+    retry: () => void detail.refetch(),
+  };
+}
+
+export function useWatchlistStocks() {
+  const watchlist = useWatchlist();
+  const stocks = useStocks();
+  const symbols = watchlist.data ?? [];
+  const average = useAverageChange(symbols);
+  useLiveSymbols(symbols);
+
+  return {
+    rows: (stocks.data ?? []).filter((stock) => symbols.includes(stock.symbol)),
+    symbols,
+    average,
+    isLoading: watchlist.isPending || stocks.isPending,
+    // Only a failure without cached data is an error; otherwise the cached list keeps showing.
+    isError: (watchlist.isError && !watchlist.data) || (stocks.isError && !stocks.data),
+    retry: () => {
+      if (watchlist.isError) void watchlist.refetch();
+      if (stocks.isError) void stocks.refetch();
+    },
+  };
+}
+
+export function useMarketList(filter: MarketFilter) {
+  const stocks = useStocks();
+  return {
+    rows: filterAndSort(stocks.data ?? [], filter),
+    isLoading: stocks.isPending,
+    isError: stocks.isError && !stocks.data,
+    isRefreshing: stocks.isRefetching,
+    refresh: () => void stocks.refetch(),
+  };
 }
 
 export function useAppConfig(): AppConfig | undefined {

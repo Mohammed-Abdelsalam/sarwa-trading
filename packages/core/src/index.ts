@@ -11,9 +11,11 @@ export {
   type Request,
 } from './api';
 export {
+  axisCandles,
   chartBaseline,
   chartGeometry,
   nearestPointIndex,
+  resolvePeriod,
   withLiveQuote,
   type ChartGeometry,
   type ChartPoint,

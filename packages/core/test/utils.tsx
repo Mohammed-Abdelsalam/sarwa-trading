@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 
-import { type Quote } from '@sarwa/contracts';
+import { type Quote, type StockWithQuote } from '@sarwa/contracts';
 
-import { type ApiClient } from '../src/api';
+import { ApiError, type ApiClient } from '../src/api';
 import { type MarketSocket } from '../src/market-socket';
 import { type SarwaClient, SarwaProvider } from '../src/provider';
 import { createLiveStore } from '../src/store';
@@ -21,6 +21,27 @@ export function makeQuote(overrides: Partial<Quote> = {}): Quote {
     seq: 1,
     ...overrides,
   };
+}
+
+export function makeStock(
+  symbol: string,
+  overrides: Partial<StockWithQuote> = {},
+  quote: Partial<Quote> = {},
+): StockWithQuote {
+  return {
+    symbol,
+    name: `${symbol} Inc.`,
+    sector: 'tech',
+    exchange: 'NASDAQ',
+    currency: 'USD',
+    sparkline: [1, 2],
+    quote: makeQuote({ symbol, ...quote }),
+    ...overrides,
+  };
+}
+
+export function makeProblem(status: number): ApiError {
+  return new ApiError({ type: 'about:blank', title: 'Error', status, code: 'X' });
 }
 
 export function createTestClient(api: Partial<ApiClient> = {}): SarwaClient {

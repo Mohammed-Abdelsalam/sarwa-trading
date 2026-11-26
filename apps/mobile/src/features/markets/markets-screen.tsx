@@ -18,8 +18,7 @@ const VIEWABILITY = { itemVisiblePercentThreshold: 10 };
 
 export function MarketsScreen() {
   const colors = useColors();
-  const { rows, watched, watchlistVersion, isLoading, isError, isRefreshing, filters, actions } =
-    useMarketsScreen();
+  const { rows, watched, isLoading, isError, isRefreshing, filters, actions } = useMarketsScreen();
 
   const onViewableItemsChanged = ({
     viewableItems,
@@ -51,7 +50,7 @@ export function MarketsScreen() {
         <FlashList
           data={rows}
           keyExtractor={(item) => item.symbol}
-          extraData={watchlistVersion}
+          extraData={watched}
           renderItem={({ item }) => (
             <StockRow
               stock={item}

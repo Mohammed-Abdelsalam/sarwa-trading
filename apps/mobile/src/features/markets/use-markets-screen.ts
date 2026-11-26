@@ -2,35 +2,37 @@ import { useDeferredValue, useState } from 'react';
 
 import {
   DEFAULT_SORT,
-  filterAndSort,
   nextSort,
   type SectorFilter,
   useLiveSymbols,
-  useStocks,
+  useMarketList,
   useToggleWatchlist,
-  useWatchlist,
+  useWatchedSymbols,
 } from '@sarwa/core';
 
 export function useMarketsScreen() {
-  const stocks = useStocks();
-  const watchlist = useWatchlist();
-  const { mutate: toggle } = useToggleWatchlist();
   const [query, setQuery] = useState('');
   const [sector, setSector] = useState<SectorFilter>('all');
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [visibleSymbols, setVisibleSymbols] = useState<string[]>([]);
   const searchedQuery = useDeferredValue(query);
+  const { rows, isLoading, isError, isRefreshing, refresh } = useMarketList({
+    query: searchedQuery,
+    sector,
+    sort,
+  });
+  const watched = useWatchedSymbols();
+  const { mutate: toggle } = useToggleWatchlist();
 
   // Only on-screen rows stream prices; scrolling swaps the subscription set.
   useLiveSymbols(visibleSymbols);
 
   return {
-    rows: filterAndSort(stocks.data ?? [], { query: searchedQuery, sector, sort }),
-    watched: new Set(watchlist.data),
-    watchlistVersion: watchlist.data,
-    isLoading: stocks.isPending,
-    isError: stocks.isError && !stocks.data,
-    isRefreshing: stocks.isRefetching,
+    rows,
+    watched,
+    isLoading,
+    isError,
+    isRefreshing,
     filters: { query, sector, sort, searchedQuery },
     actions: {
       setQuery,
@@ -42,7 +44,7 @@ export function useMarketsScreen() {
         setQuery('');
         setSector('all');
       },
-      refresh: () => void stocks.refetch(),
+      refresh,
       setVisibleSymbols,
       toggleWatch: (symbol: string, watched: boolean) => {
         toggle({ symbol, watched });

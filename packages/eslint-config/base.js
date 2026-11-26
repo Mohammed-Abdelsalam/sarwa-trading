@@ -8,6 +8,22 @@ import tseslint from 'typescript-eslint';
 
 const APPS = ['@sarwa/server', '@sarwa/mobile', '@sarwa/web', '@sarwa/admin'];
 
+export const boundaryPatterns = [
+  {
+    group: ['@sarwa/*/src', '@sarwa/*/src/**', '@sarwa/*/dist/**'],
+    message: 'Import a package through its public entry point, never its internals.',
+  },
+  {
+    group: ['**/apps/**', ...APPS],
+    message: 'Apps are leaves of the dependency graph: nothing may import an app.',
+  },
+];
+
+// Flat config replaces a rule's options instead of merging them, so every narrower rule keeps the boundaries.
+export function restrictedImports({ patterns = [], paths = [] } = {}) {
+  return ['error', { paths, patterns: [...boundaryPatterns, ...patterns] }];
+}
+
 export default [
   {
     name: 'sarwa/ignores',
@@ -89,23 +105,7 @@ export default [
   },
   {
     name: 'sarwa/boundaries',
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@sarwa/*/src', '@sarwa/*/src/**', '@sarwa/*/dist/**'],
-              message: 'Import a package through its public entry point, never its internals.',
-            },
-            {
-              group: ['**/apps/**', ...APPS],
-              message: 'Apps are leaves of the dependency graph: nothing may import an app.',
-            },
-          ],
-        },
-      ],
-    },
+    rules: { 'no-restricted-imports': restrictedImports() },
   },
   {
     name: 'sarwa/js-files',

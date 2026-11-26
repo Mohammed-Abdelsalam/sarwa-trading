@@ -4,18 +4,10 @@ import { useAnimatedProps, useSharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { type Candle, type Period } from '@sarwa/contracts';
-import {
-  chartBaseline,
-  chartGeometry,
-  nearestPointIndex,
-  useCandles,
-  useQuote,
-  withLiveQuote,
-} from '@sarwa/core';
+import { chartGeometry, nearestPointIndex, useChartSeries } from '@sarwa/core';
 
 const LONG_PRESS_MS = 150;
 const PADDING = 12;
-const AXIS_STOPS = [0, 0.25, 0.5, 0.75, 1];
 const NONE = -1;
 
 export function usePriceChart({
@@ -31,22 +23,18 @@ export function usePriceChart({
   height: number;
   onScrub: (candle: Candle | null) => void;
 }) {
-  const candles = useCandles(symbol, period);
-  const quote = useQuote(symbol);
+  const series = useChartSeries(symbol, period);
   const activeIndex = useSharedValue(NONE);
 
-  const data = withLiveQuote(candles.data ?? [], quote);
-  const baseline = chartBaseline(period, data, quote);
-  const showBaseline = period === '1D' && baseline !== null;
   const { line, area, points, referenceY } = chartGeometry(
-    data.map((c) => c.c),
+    series.candles.map((c) => c.c),
     width,
     height,
     PADDING,
-    showBaseline ? baseline : undefined,
+    series.showBaseline ? (series.baseline ?? undefined) : undefined,
   );
   const select = (index: number) => {
-    onScrub(index === NONE ? null : (data[index] ?? null));
+    onScrub(index === NONE ? null : (series.candles[index] ?? null));
     if (index !== NONE) void Haptics.selectionAsync();
   };
 
@@ -89,14 +77,14 @@ export function usePriceChart({
   });
 
   return {
-    state: candles.isPending ? 'loading' : candles.isError ? 'error' : 'ready',
-    retry: () => void candles.refetch(),
+    state: series.state,
+    retry: series.retry,
     line,
     area,
-    rising: (data.at(-1)?.c ?? 0) >= (baseline ?? 0),
+    rising: series.rising,
     baselineY: referenceY,
     lastPoint: points.at(-1) ?? null,
-    axisLabels: AXIS_STOPS.map((f) => data[Math.round(f * (data.length - 1))]),
+    axisLabels: series.axisCandles,
     scrubGesture,
     crosshairProps,
     dotProps,
