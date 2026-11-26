@@ -39,6 +39,12 @@ class FakeSocket extends EventEmitter {
     this.connected = false;
     super.emit('disconnect', 'transport close');
   }
+
+  serverKick() {
+    this.connected = false;
+    this.active = false;
+    super.emit('disconnect', 'io server disconnect');
+  }
 }
 
 function setup() {
@@ -117,6 +123,35 @@ describe('market socket', () => {
     fake.connect();
     expect(store.getState().connection.status).toBe('open');
     expect(fake.sent.at(-1)).toEqual({ event: 'subscribe', symbols: ['AAPL', 'MSFT'] });
+  });
+
+  it('reconnects and resubscribes by itself when the server kicks the client', () => {
+    const { fake, market, store } = setup();
+    market.connect();
+    market.acquire(['AAPL', 'MSFT']);
+    jest.advanceTimersByTime(200);
+    const connect = jest.spyOn(fake, 'connect');
+
+    fake.serverKick();
+    expect(store.getState().connection.status).toBe('reconnecting');
+
+    jest.advanceTimersByTime(1_000);
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(store.getState().connection.status).toBe('open');
+    expect(fake.sent.at(-1)).toEqual({ event: 'subscribe', symbols: ['AAPL', 'MSFT'] });
+  });
+
+  it('does not reconnect after a kick when the app disconnects meanwhile', () => {
+    const { fake, market, store } = setup();
+    market.connect();
+    const connect = jest.spyOn(fake, 'connect');
+
+    fake.serverKick();
+    market.disconnect();
+    jest.advanceTimersByTime(1_000);
+
+    expect(connect).not.toHaveBeenCalled();
+    expect(store.getState().connection.status).toBe('offline');
   });
 
   it('goes offline on a manual disconnect', () => {
