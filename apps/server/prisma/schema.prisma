@@ -1,0 +1,77 @@
+// SQLite for zero-setup local runs; switch provider and DATABASE_URL to use Postgres.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Stock {
+  symbol     String   @id
+  name       String
+  sector     String
+  exchange   String
+  basePrice  Float
+  volatility Float    @default(1)
+  marketCap  Float    @default(0)
+  peRatio    Float?
+  isEnabled  Boolean  @default(true)
+  updatedAt  DateTime @updatedAt
+
+  watchers WatchlistItem[]
+}
+
+model Device {
+  id         String   @id
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  watchlist WatchlistItem[]
+}
+
+model WatchlistItem {
+  deviceId  String
+  symbol    String
+  createdAt DateTime @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  stock  Stock  @relation(fields: [symbol], references: [symbol], onDelete: Cascade)
+
+  @@id([deviceId, symbol])
+  @@index([symbol])
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         String    @default("VIEWER")
+  status       String    @default("active")
+  lastActiveAt DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model AppConfig {
+  id              Int      @id @default(1)
+  maintenanceMode Boolean  @default(false)
+  bannerMessage   String?
+  bannerTone      String   @default("info")
+  enabledPeriods  String   @default("1D,1W,1M,1Y,ALL")
+  updatedAt       DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorEmail String
+  action     String
+  entity     String
+  payload    String
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+}

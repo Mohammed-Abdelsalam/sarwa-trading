@@ -1,15 +1,3 @@
-// @ts-check
-/**
- * Base config for every TypeScript workspace.
- *  - typescript-eslint strict + stylistic, type-aware (projectService)
- *  - import hygiene (order, cycles, duplicates) via import-x
- *  - architectural boundaries: packages never import apps, apps never import each other,
- *    nobody deep-imports another package's internals (only its public entry points).
- *
- * Usage (in a workspace eslint.config.js):
- *   import base from '@sarwa/eslint-config/base';
- *   export default [...base, { languageOptions: { parserOptions: { tsconfigRootDir: import.meta.dirname } } }];
- */
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
@@ -20,7 +8,6 @@ import tseslint from 'typescript-eslint';
 
 const APPS = ['@sarwa/server', '@sarwa/mobile', '@sarwa/web', '@sarwa/admin'];
 
-/** @type {import('eslint').Linter.Config[]} */
 export default [
   {
     name: 'sarwa/ignores',
@@ -63,7 +50,7 @@ export default [
         'error',
         { allowNumber: true, allowBoolean: true },
       ],
-      '@typescript-eslint/no-unused-vars': 'off', // handled by unused-imports below
+      '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-confusing-void-expression': ['error', { ignoreArrowShorthand: true }],
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
@@ -126,7 +113,6 @@ export default [
     ...tseslint.configs.disableTypeChecked,
   },
   {
-    // build/dev scripts run in Node and are allowed to log
     name: 'sarwa/scripts',
     files: ['**/scripts/**/*.{js,mjs,cjs,ts}'],
     languageOptions: { globals: { ...globals.node } },

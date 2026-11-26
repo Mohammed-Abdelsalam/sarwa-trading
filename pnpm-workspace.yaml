@@ -2,8 +2,11 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
-# pnpm 10 blocks dependency install scripts by default (supply-chain safety).
-# Only packages that genuinely need a native/postinstall step are allowed here.
+# Only these packages may run install scripts; pnpm blocks the rest.
 onlyBuiltDependencies:
   - '@parcel/watcher'
   - '@swc/core'
+  - '@prisma/client'
+  - '@prisma/engines'
+  - esbuild
+  - prisma

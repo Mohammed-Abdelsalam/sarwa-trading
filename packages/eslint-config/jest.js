@@ -1,10 +1,3 @@
-// @ts-check
-/**
- * Rules for test files only.
- *   jestConfig()                 → node/logic tests
- *   jestConfig({ dom: true })    → + Testing Library (React DOM) + jest-dom
- *   jestConfig({ native: true }) → + Testing Library rules for React Native Testing Library
- */
 import jestPlugin from 'eslint-plugin-jest';
 import jestDom from 'eslint-plugin-jest-dom';
 import testingLibrary from 'eslint-plugin-testing-library';
@@ -17,12 +10,7 @@ const TEST_FILES = [
   '**/test-utils/**/*.{ts,tsx}',
 ];
 
-/**
- * @param {{ dom?: boolean; native?: boolean }} [options]
- * @returns {import('eslint').Linter.Config[]}
- */
 export function jestConfig({ dom = false, native = false } = {}) {
-  /** @type {import('eslint').Linter.Config[]} */
   const configs = [
     { ...jestPlugin.configs['flat/recommended'], name: 'sarwa/jest', files: TEST_FILES },
     { ...jestPlugin.configs['flat/style'], name: 'sarwa/jest/style', files: TEST_FILES },
@@ -35,7 +23,10 @@ export function jestConfig({ dom = false, native = false } = {}) {
         'jest/no-disabled-tests': 'error',
         'jest/no-focused-tests': 'error',
         'jest/prefer-hooks-on-top': 'error',
-        // mocks and fixtures legitimately need looser typing
+        'jest/expect-expect': [
+          'error',
+          { assertFunctionNames: ['expect', 'http.**.expect', 'request.**.expect'] },
+        ],
         '@typescript-eslint/no-non-null-assertion': 'off',
         '@typescript-eslint/unbound-method': 'off',
         '@typescript-eslint/no-unsafe-assignment': 'off',

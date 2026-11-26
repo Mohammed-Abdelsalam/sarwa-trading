@@ -1,54 +1,37 @@
-/**
- * Semantic color tokens — "Mini Trading UI design system v1.0" (Claude Design canvas).
- *
- * One token set powers all three apps. Components only use these ROLE names
- * (`bg-surface`, `text-fg-2`, `text-pos`…), never raw hex, so dark mode is a variable swap.
- * Dark is the hero theme for trading; light is a full peer.
- *
- * Rule from the design system: price colour is never the only signal — every change also
- * carries ▲ / ▼ or a + / − sign, and the neutral state uses ■ with 0.00%.
- */
-
 export const COLOR_ROLES = [
-  // surfaces & lines
-  'bg', // app canvas behind everything
-  'surface', // cards, lists, nav bars
-  'surface-2', // elevated: dialogs, menus, toasts (+ shadow e2/e3)
-  'surface-3', // muted: hover rows, segmented track, skeleton
-  'border', // dividers, card strokes
-  'border-strong', // inputs, chips, focusable outlines
-  // text
-  'fg', // primary text: prices, titles
-  'fg-2', // secondary: body, labels
-  'fg-3', // muted: captions, company names
-  // brand
-  'brand', // primary fills
+  'bg',
+  'surface',
+  'surface-2',
+  'surface-3',
+  'border',
+  'border-strong',
+  'fg',
+  'fg-2',
+  'fg-3',
+  'brand',
   'brand-hover',
   'brand-press',
-  'brand-fg', // brand-coloured text: links, active tab
-  'brand-subtle', // active nav item, brand badge
-  'on-brand', // label on brand / danger fills
-  // market direction
-  'pos', // price up ▲
-  'pos-subtle', // ChangePill bg
-  'neg', // price down ▼
+  'brand-fg',
+  'brand-subtle',
+  'on-brand',
+  'pos',
+  'pos-subtle',
+  'neg',
   'neg-subtle',
-  'flat', // unchanged ■ 0.00%
+  'flat',
   'flat-subtle',
-  'flash-up', // PriceFlash tick up (400 ms fade)
+  'flash-up',
   'flash-down',
-  // status
-  'warn', // reconnecting, maintenance
+  'warn',
   'warn-subtle',
-  'info', // remote banners, market paused
+  'info',
   'info-subtle',
-  'danger', // destructive fills
+  'danger',
   'danger-hover',
   'danger-press',
-  'star', // watchlist star on
-  // utility
-  'focus', // 2 px focus ring, 2 px offset
-  'scrim', // behind dialogs & sheets
+  'star',
+  'focus',
+  'scrim',
   'chart-grid',
 ] as const;
 
@@ -131,7 +114,6 @@ export const themes: Record<ThemeName, ThemeColors> = {
   },
 };
 
-/** Sector avatar colours (the rounded-square ticker initial in every StockRow). */
 export const SECTORS = ['tech', 'fin', 'energy', 'health', 'consumer', 'media'] as const;
 export type Sector = (typeof SECTORS)[number];
 
@@ -160,7 +142,6 @@ export function isHex(color: string): boolean {
   return HEX.test(color);
 }
 
-/** WCAG 2.x relative luminance of an opaque hex colour. */
 export function relativeLuminance(hex: string): number {
   const match = HEX.exec(hex);
   if (!match?.[1]) throw new Error(`Expected an opaque hex color, got: ${hex}`);

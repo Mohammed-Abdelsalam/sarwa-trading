@@ -1,5 +1,3 @@
-// @ts-check
-/** Next.js apps (web + admin): base + react + a11y + Next core-web-vitals. */
 import nextPlugin from '@next/eslint-plugin-next';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import globals from 'globals';
@@ -9,7 +7,6 @@ import react from './react.js';
 
 const FILES = ['**/*.{ts,tsx,jsx}'];
 
-/** @type {import('eslint').Linter.Config[]} */
 export default [
   ...base,
   ...react,

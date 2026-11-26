@@ -1,4 +1,3 @@
-// Writes the generated CSS next to the JS build. Runs after `tsup` (see package.json "build").
 import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
