@@ -3,12 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "description": "Shared Jest presets (SWC transform): node and jsdom.",
-  "main": "index.js",
   "exports": {
-    ".": "./index.js",
     "./node": "./node.js",
-    "./jsdom": "./jsdom.js",
-    "./setup-dom": "./setup-dom.js"
+    "./jsdom": "./jsdom.js"
   },
   "files": [
     "*.js"

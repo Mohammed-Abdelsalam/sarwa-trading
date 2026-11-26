@@ -35,6 +35,11 @@ export function jestConfig({ dom = false, native = false } = {}) {
         'jest/no-disabled-tests': 'error',
         'jest/no-focused-tests': 'error',
         'jest/prefer-hooks-on-top': 'error',
+        // supertest assertions: http.get(...).expect(200)
+        'jest/expect-expect': [
+          'error',
+          { assertFunctionNames: ['expect', 'http.**.expect', 'request.**.expect'] },
+        ],
         // mocks and fixtures legitimately need looser typing
         '@typescript-eslint/no-non-null-assertion': 'off',
         '@typescript-eslint/unbound-method': 'off',

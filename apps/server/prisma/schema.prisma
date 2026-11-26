@@ -1,0 +1,81 @@
+// SQLite for zero-setup local runs. To move to Postgres: change `provider` and DATABASE_URL,
+// then `prisma migrate dev` (see docs/adr/0010).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// The tradable universe. The simulator streams prices for enabled stocks.
+model Stock {
+  symbol     String   @id
+  name       String
+  sector     String // tech | fin | energy | health | consumer | media (validated by Zod)
+  exchange   String // NASDAQ | NYSE
+  basePrice  Float
+  volatility Float    @default(1)
+  marketCap  Float    @default(0)
+  peRatio    Float?
+  isEnabled  Boolean  @default(true)
+  updatedAt  DateTime @updatedAt
+
+  watchers WatchlistItem[]
+}
+
+/// Anonymous app install (no end-user accounts — see docs/adr/0008).
+model Device {
+  id         String   @id // uuid sent as X-Device-Id
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  watchlist WatchlistItem[]
+}
+
+model WatchlistItem {
+  deviceId  String
+  symbol    String
+  createdAt DateTime @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  stock  Stock  @relation(fields: [symbol], references: [symbol], onDelete: Cascade)
+
+  @@id([deviceId, symbol])
+  @@index([symbol]) // "top watchlisted" on the admin overview
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         String    @default("VIEWER") // ADMIN | VIEWER
+  status       String    @default("active") // active | disabled
+  lastActiveAt DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+/// Single-row table holding the remote app config.
+model AppConfig {
+  id              Int      @id @default(1)
+  maintenanceMode Boolean  @default(false)
+  bannerMessage   String?
+  bannerTone      String   @default("info")
+  enabledPeriods  String   @default("1D,1W,1M,1Y,ALL")
+  updatedAt       DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorEmail String
+  action     String
+  entity     String
+  payload    String // JSON
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+}

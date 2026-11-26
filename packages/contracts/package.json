@@ -1,0 +1,37 @@
+{
+  "name": "@sarwa/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Single source of truth between server and clients: Zod schemas, inferred types, socket events and constants.",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "clean": "rimraf dist coverage .turbo"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@sarwa/eslint-config": "workspace:*",
+    "@sarwa/jest-config": "workspace:*",
+    "@sarwa/tsconfig": "workspace:*",
+    "tsup": "^9.0.0"
+  }
+}
