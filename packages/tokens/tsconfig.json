@@ -1,0 +1,7 @@
+{
+  "extends": "@sarwa/tsconfig/library.json",
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": ["src", "tsup.config.ts"]
+}

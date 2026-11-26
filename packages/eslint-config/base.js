@@ -13,6 +13,7 @@
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
+import globals from 'globals';
 import importX from 'eslint-plugin-import-x';
 import unusedImports from 'eslint-plugin-unused-imports';
 import tseslint from 'typescript-eslint';
@@ -123,6 +124,13 @@ export default [
     name: 'sarwa/js-files',
     files: ['**/*.{js,cjs,mjs}'],
     ...tseslint.configs.disableTypeChecked,
+  },
+  {
+    // build/dev scripts run in Node and are allowed to log
+    name: 'sarwa/scripts',
+    files: ['**/scripts/**/*.{js,mjs,cjs,ts}'],
+    languageOptions: { globals: { ...globals.node } },
+    rules: { 'no-console': 'off' },
   },
   { name: 'sarwa/prettier', ...prettier },
 ];

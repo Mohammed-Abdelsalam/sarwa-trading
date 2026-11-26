@@ -1,0 +1,43 @@
+{
+  "name": "@sarwa/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Design tokens (colors, type, spacing, radius, motion) — one source for web, admin and mobile.",
+  "sideEffects": [
+    "*.css"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./tailwind-preset": {
+      "types": "./dist/tailwind-preset.d.ts",
+      "import": "./dist/tailwind-preset.mjs",
+      "require": "./dist/tailwind-preset.js"
+    },
+    "./theme.css": "./dist/theme.css",
+    "./native.css": "./dist/native.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup && node scripts/build-css.mjs",
+    "dev": "tsup --watch --onSuccess \"node scripts/build-css.mjs\"",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "clean": "rimraf dist coverage .turbo"
+  },
+  "devDependencies": {
+    "@sarwa/eslint-config": "workspace:*",
+    "@sarwa/jest-config": "workspace:*",
+    "@sarwa/tsconfig": "workspace:*",
+    "tsup": "^9.0.0"
+  }
+}
