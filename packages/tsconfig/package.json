@@ -1,0 +1,9 @@
+{
+  "name": "@sarwa/tsconfig",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared TypeScript configs for every workspace.",
+  "files": [
+    "*.json"
+  ]
+}

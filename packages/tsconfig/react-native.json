@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Expo / React Native app (use together with expo/tsconfig.base)",
+  "extends": "./strict.json",
+  "compilerOptions": {
+    "types": ["jest"]
+  }
+}

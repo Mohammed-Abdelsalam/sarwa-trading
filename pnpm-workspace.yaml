@@ -1,3 +1,9 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# pnpm 10 blocks dependency install scripts by default (supply-chain safety).
+# Only packages that genuinely need a native/postinstall step are allowed here.
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - '@swc/core'
