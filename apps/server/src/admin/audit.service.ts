@@ -13,7 +13,6 @@ export interface AuditEntry {
   ip?: string | undefined;
 }
 
-/** Append-only log of every admin action (shown in Admin › Audit log and on the overview). */
 @Injectable()
 export class AuditService {
   constructor(private readonly prisma: PrismaService) {}

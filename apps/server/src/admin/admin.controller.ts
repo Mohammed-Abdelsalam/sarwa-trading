@@ -23,7 +23,6 @@ import { PrismaService } from '../prisma.service';
 import { AuditService } from './audit.service';
 import { AdminGuard, CurrentAdmin, Roles } from './auth';
 
-/** Overview stats, market control room, remote config and the audit log. */
 @Controller('admin')
 @UseGuards(AdminGuard)
 export class AdminController {

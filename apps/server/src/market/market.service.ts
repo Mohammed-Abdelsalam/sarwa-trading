@@ -29,14 +29,8 @@ interface Instrument {
   quote: Quote;
 }
 
-/** Share of symbols that move on each tick — real markets don't move every symbol every 500 ms. */
 const MOVE_PROBABILITY = 0.6;
 
-/**
- * Owns the simulated market: the in-memory quote for every stock, the tick loop, and the
- * running/paused + volatility state. Other parts of the app subscribe to `quotes$`/`status$`
- * instead of calling each other, which keeps the gateway and the admin decoupled.
- */
 @Injectable()
 export class MarketService implements OnModuleInit, OnModuleDestroy {
   readonly quotes$ = new Subject<Quote[]>();
@@ -51,7 +45,7 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
   };
   private timer?: NodeJS.Timeout;
   private ticksLastSecond = { second: 0, count: 0, rate: 0 };
-  /** Replaceable in tests for deterministic ticks. */
+
   random: Random = Math.random;
 
   constructor(private readonly prisma: PrismaService) {}
@@ -70,7 +64,6 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
     this.status$.complete();
   }
 
-  /** (Re)load the universe from the database, keeping live quotes of existing symbols. */
   async reload(): Promise<void> {
     const rows = await this.prisma.stock.findMany({ orderBy: { symbol: 'asc' } });
     const next = new Map<string, Instrument>();
@@ -81,7 +74,6 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
     this.instruments = next;
   }
 
-  /** One simulation step: move some enabled symbols and publish the ones that changed. */
   tick(now = Date.now()): Quote[] {
     if (this.status.state === 'paused') return [];
     const changed: Quote[] = [];
@@ -111,8 +103,6 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
     return changed;
   }
 
-  // ── reads ────────────────────────────────────────────────────────────────
-
   listStocks(query?: string): StockWithQuote[] {
     const q = query?.trim().toLowerCase();
     return [...this.instruments.values()]
@@ -124,7 +114,6 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
       .map(({ row, quote }) => ({ ...toStock(row), quote }));
   }
 
-  /** Enabled instrument or undefined (disabled stocks are invisible to clients). */
   find(symbol: string): { stock: Stock; quote: Quote } | undefined {
     const instrument = this.instruments.get(symbol);
     if (!instrument?.row.isEnabled) return undefined;
@@ -138,7 +127,6 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  /** Live price of any stock (enabled or not) — used by the admin table. */
   livePrice(symbol: string): number | null {
     return this.instruments.get(symbol)?.quote.price ?? null;
   }
@@ -155,7 +143,7 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  /** Key statistics, derived from the 1Y history so they always agree with the chart. */
+  // Derived from the 1Y candles so the stats always agree with the chart.
   stats(symbol: string): StockStats | undefined {
     const instrument = this.instruments.get(symbol);
     if (!instrument) return undefined;
@@ -182,8 +170,6 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
     return { enabled: all.filter((i) => i.row.isEnabled).length, total: all.length };
   }
 
-  // ── admin commands ───────────────────────────────────────────────────────
-
   pause(): MarketStatus {
     return this.setStatus({ state: 'paused' });
   }
@@ -195,8 +181,6 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
   setVolatility(volatility: number): MarketStatus {
     return this.setStatus({ volatility });
   }
-
-  // ── internals ────────────────────────────────────────────────────────────
 
   private setStatus(patch: Partial<MarketStatus>): MarketStatus {
     const stateChanged = patch.state !== undefined && patch.state !== this.status.state;

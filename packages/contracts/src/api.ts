@@ -10,19 +10,14 @@ import {
   SymbolSchema,
 } from './market';
 
-/** Public REST response bodies (prefix /api/v1). Clients validate every response with these. */
-
-/** GET /stocks?q= — list + current quote snapshot (initial render and catch-up after reconnect) */
 export const StocksResponseSchema = z.object({ items: z.array(StockWithQuoteSchema) });
 
-/** GET /stocks/:symbol */
 export const StockDetailResponseSchema = z.object({
   stock: StockSchema,
   quote: QuoteSchema,
   stats: StockStatsSchema,
 });
 
-/** GET /stocks/:symbol/candles?period= */
 export const CandlesQuerySchema = z.object({ period: PeriodSchema });
 export const CandlesResponseSchema = z.object({
   symbol: SymbolSchema,
@@ -30,19 +25,13 @@ export const CandlesResponseSchema = z.object({
   candles: z.array(CandleSchema),
 });
 
-/** GET /watchlist — header X-Device-Id */
 export const WatchlistResponseSchema = z.object({ symbols: z.array(SymbolSchema) });
 
-/** GET /health */
 export const HealthResponseSchema = z.object({
   status: z.literal('ok'),
   uptimeSeconds: z.number().nonnegative(),
 });
 
-/**
- * Every error uses RFC 9457 "problem details". `code` is a stable machine-readable string the
- * UI can switch on; `errors` carries per-field validation messages for forms.
- */
 export const ProblemSchema = z.object({
   type: z.string(),
   title: z.string(),

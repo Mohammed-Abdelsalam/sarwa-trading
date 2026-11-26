@@ -1,9 +1,3 @@
-/**
- * Non-colour tokens from the design system Foundations board.
- * Numbers are px (React Native uses them as unitless dp; the CSS build adds units).
- */
-
-/** Fonts: Inter (UI + numbers, tabular) · Manrope (headings) · JetBrains Mono (code). */
 export const fontFamily = {
   sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
   display: ['Manrope', 'Inter', 'ui-sans-serif', 'sans-serif'],
@@ -15,10 +9,10 @@ export interface TypeToken {
   size: number;
   lineHeight: number;
   weight: 400 | 500 | 600 | 700 | 800;
-  /** em, e.g. -0.02 = −2% */
+
   tracking?: number;
   uppercase?: boolean;
-  /** tabular numbers so live ticks never jitter columns */
+
   tabular?: boolean;
 }
 
@@ -61,7 +55,6 @@ export const typography = {
 
 export type TypographyToken = keyof typeof typography;
 
-/** 4pt grid. Key = Tailwind spacing step. */
 export const spacing = {
   0: 0,
   0.5: 2,
@@ -78,15 +71,14 @@ export const spacing = {
 } as const;
 
 export const radius = {
-  xs: 4, // tooltips, kbd
-  sm: 6, // badges, pills
-  md: 10, // buttons, inputs
-  lg: 14, // cards, tables
-  xl: 20, // dialogs, sheets
-  full: 999, // chips, status
+  xs: 4,
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 20,
+  full: 999,
 } as const;
 
-/** Elevation: light uses shadow, dark uses a lighter surface + deeper shadow. */
 export const shadows = {
   dark: {
     e1: '0 1px 2px rgba(0,0,0,0.45)',
@@ -100,23 +92,18 @@ export const shadows = {
   },
 } as const;
 
-/**
- * Motion. Every token has a reduced-motion behaviour (see the `reduced` notes):
- * fast/base → 0 ms, slow → 120 ms opacity only, flash → 2 px underline instead of a fade,
- * spring → linear with no overshoot.
- */
 export const motion = {
   duration: {
-    instant: 0, // value text swaps
-    fast: 120, // hover, press, focus ring
-    base: 200, // switch, tab indicator, crosshair fade
-    slow: 320, // dialogs, sheets, star pop
-    flash: 400, // PriceFlash background fade
+    instant: 0,
+    fast: 120,
+    base: 200,
+    slow: 320,
+    flash: 400,
   },
   easing: {
-    standard: [0.2, 0, 0, 1], // default for everything
-    exit: [0.4, 0, 1, 1], // dismiss toast / banner
-    spring: [0.34, 1.56, 0.64, 1], // star toggle overshoot
+    standard: [0.2, 0, 0, 1],
+    exit: [0.4, 0, 1, 1],
+    spring: [0.34, 1.56, 0.64, 1],
   },
   reduced: {
     slowOpacityMs: 120,
@@ -128,7 +115,6 @@ export function cubicBezier(points: readonly [number, number, number, number]): 
   return `cubic-bezier(${points.join(',')})`;
 }
 
-/** Layout specs from the developer notes. */
 export const layout = {
   minTouchTarget: 44,
   mobile: { sideMargin: 20, listMargin: 16, searchHeight: 44, chipHeight: 36, tabBarHeight: 58 },

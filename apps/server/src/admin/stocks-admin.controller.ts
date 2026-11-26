@@ -30,7 +30,6 @@ import { PrismaService } from '../prisma.service';
 import { AuditService } from './audit.service';
 import { AdminGuard, CurrentAdmin, Roles } from './auth';
 
-/** Stock universe CRUD. Every change reloads the simulator so it applies on the next tick. */
 @Controller('admin/stocks')
 @UseGuards(AdminGuard)
 export class StocksAdminController {

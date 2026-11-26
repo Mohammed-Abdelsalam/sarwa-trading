@@ -1,9 +1,8 @@
-// Runs once before all tests: build a fresh, seeded test database.
-// Only touches prisma/test.db (a throwaway file owned by the test suite) — never dev.db.
 const { execFileSync } = require('node:child_process');
 const { rmSync } = require('node:fs');
 const { join } = require('node:path');
 
+// Builds a throwaway test database; dev.db is never touched.
 module.exports = () => {
   const root = join(__dirname, '..');
   rmSync(join(root, 'prisma', 'test.db'), { force: true });

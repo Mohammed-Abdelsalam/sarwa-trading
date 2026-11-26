@@ -23,10 +23,6 @@ const CODE_BY_STATUS: Record<number, string> = {
   503: ErrorCode.Maintenance,
 };
 
-/**
- * Every error leaves the API as an RFC 9457 problem document with a stable `code`.
- * Unexpected errors are logged server-side and returned without details or stack traces.
- */
 @Catch()
 export class ProblemDetailsFilter implements ExceptionFilter {
   private readonly logger = new Logger(ProblemDetailsFilter.name);
@@ -63,7 +59,6 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       };
     }
 
-    // Prisma: record not found / unique constraint → proper HTTP statuses instead of 500.
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       if (exception.code === 'P2025') return this.simple(404, ErrorCode.NotFound, 'Not found');
       if (exception.code === 'P2002') return this.simple(409, ErrorCode.Conflict, 'Already exists');

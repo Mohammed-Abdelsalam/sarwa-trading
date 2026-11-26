@@ -85,7 +85,7 @@ describe('watchlist', () => {
 
   it('adds, lists and removes symbols idempotently', async () => {
     await http.put(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, deviceId).expect(204);
-    await http.put(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, deviceId).expect(204); // retry is safe
+    await http.put(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, deviceId).expect(204);
     await http.put(api('/watchlist/NVDA')).set(DEVICE_ID_HEADER, deviceId).expect(204);
 
     const list = await http.get(api('/watchlist')).set(DEVICE_ID_HEADER, deviceId).expect(200);

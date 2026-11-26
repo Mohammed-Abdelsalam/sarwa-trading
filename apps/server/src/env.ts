@@ -1,10 +1,9 @@
 import { z } from 'zod';
 
-// Node ≥ 20.12 loads .env natively — no dotenv dependency needed.
 try {
   process.loadEnvFile();
 } catch {
-  // no .env file: rely on the real environment (CI, production)
+  // No .env file: use the real environment (CI, production).
 }
 
 const EnvSchema = z.object({
@@ -18,5 +17,4 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
 });
 
-/** Validated once at startup: a missing or invalid variable fails fast with a clear message. */
 export const env = EnvSchema.parse(process.env);

@@ -1,14 +1,8 @@
-/**
- * Idempotent seed (safe to run on every `pnpm dev`): the 22 stocks from the design system,
- * two demo admins (ADMIN + VIEWER) and the default app config. Existing rows are left as they are,
- * so changes made from the admin dashboard survive restarts.
- */
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// symbol, name, sector, exchange, base price, market cap, P/E, volatility
 const STOCKS: [string, string, string, string, number, number, number | null, number][] = [
   ['AAPL', 'Apple Inc.', 'tech', 'NASDAQ', 231.48, 3.52e12, 35.1, 1.0],
   ['MSFT', 'Microsoft Corp.', 'tech', 'NASDAQ', 438.12, 3.26e12, 36.8, 0.9],
@@ -34,6 +28,7 @@ const STOCKS: [string, string, string, string, number, number, number | null, nu
   ['INTC', 'Intel Corp.', 'tech', 'NASDAQ', 23.47, 101.2e9, null, 1.0],
 ];
 
+// Idempotent: existing rows are kept, so admin edits survive restarts.
 async function main(): Promise<void> {
   for (const [
     symbol,

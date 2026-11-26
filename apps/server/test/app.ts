@@ -4,7 +4,6 @@ import { Test } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/main';
 
-/** Boots the real application (same middleware as production) on a random free port. */
 export async function startApp(): Promise<{ app: INestApplication; url: string }> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = configureApp(moduleRef.createNestApplication());

@@ -2,7 +2,7 @@ import { MAX_SUBSCRIBE_SYMBOLS } from './constants';
 import { SubscribeAckSchema, SubscribePayloadSchema } from './socket';
 
 const letter = (n: number): string => String.fromCharCode(65 + n);
-/** n distinct valid symbols: AA, AB, … AZ, BA, … */
+
 const symbols = (n: number): string[] =>
   Array.from({ length: n }, (_, i) => letter(Math.floor(i / 26)) + letter(i % 26));
 

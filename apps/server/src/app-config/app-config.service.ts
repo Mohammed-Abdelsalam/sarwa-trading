@@ -6,10 +6,6 @@ import { type AppConfig, type Period, type UpdateAppConfig } from '@sarwa/contra
 
 import { PrismaService } from '../prisma.service';
 
-/**
- * Remote config ("feature flags"). Kept in memory so every request and socket connection reads it
- * for free; persisted in the single-row AppConfig table; changes are broadcast via `changes$`.
- */
 @Injectable()
 export class AppConfigService implements OnModuleInit {
   readonly changes$ = new Subject<AppConfig>();

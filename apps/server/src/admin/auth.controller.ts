@@ -36,7 +36,7 @@ export class AuthController {
     private readonly audit: AuditService,
   ) {}
 
-  /** Brute-force protection: 5 attempts per minute per IP. */
+  // Brute-force protection: 5 login attempts per minute per IP.
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
   @HttpCode(200)
@@ -46,7 +46,8 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<SessionResponse> {
     const user = await this.prisma.adminUser.findUnique({ where: { email: email.toLowerCase() } });
-    // Same message whether the email or the password is wrong (no account enumeration).
+
+    // Same error for an unknown email and a wrong password to prevent account enumeration.
     const valid = user !== null && (await bcrypt.compare(password, user.passwordHash));
     if (!user || !valid || user.status !== 'active') {
       throw new UnauthorizedException('Invalid email or password');
@@ -58,8 +59,8 @@ export class AuthController {
     });
     const token = await this.jwt.signAsync({ sub: user.id }, { expiresIn: SESSION_TTL_SECONDS });
     response.cookie(ADMIN_SESSION_COOKIE, token, {
-      httpOnly: true, // not readable by JavaScript → safe from XSS token theft
-      sameSite: 'strict', // not sent on cross-site requests → CSRF protection
+      httpOnly: true,
+      sameSite: 'strict',
       secure: env.NODE_ENV === 'production',
       maxAge: SESSION_TTL_SECONDS * 1000,
       path: '/',

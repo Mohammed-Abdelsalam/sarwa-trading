@@ -1,22 +1,14 @@
-/**
- * Pure price-simulation helpers (no Nest, no I/O) — easy to unit-test and to reason about.
- *
- * Prices follow geometric Brownian motion (GBM), the textbook model for stock prices:
- *   next = price × exp(σ·√dt·Z − ½σ²·dt),   Z ~ N(0, 1)
- * It never goes negative, and moves are proportional to price (a $500 stock moves more
- * dollars than a $25 one), which is what makes the simulated market feel real.
- */
 import { type Candle, type Period } from '@sarwa/contracts';
 
 export type Random = () => number;
 
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-/** Base annual volatility; multiplied by the stock's and the market's volatility settings. */
+
 export const BASE_ANNUAL_VOLATILITY = 0.3;
-/** Simulated time runs 60× faster than wall time so ticks are visible in a demo. */
+
+// Simulated time runs 60× faster than wall time so ticks are visible in a demo.
 export const TIME_SCALE = 60;
 
-/** Deterministic PRNG (mulberry32) — same seed, same sequence. */
 export function seededRandom(seed: number): Random {
   let a = seed >>> 0;
   return () => {
@@ -27,20 +19,18 @@ export function seededRandom(seed: number): Random {
   };
 }
 
-/** FNV-1a string hash → seed (e.g. "AAPL:1Y"). */
 export function hashSeed(text: string): number {
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
   return h >>> 0;
 }
 
-/** Standard normal sample (Box–Muller). */
 export function gaussian(random: Random): number {
   const u = Math.max(random(), Number.EPSILON);
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
 }
 
-/** One GBM step. `sigma` is annualised volatility, `dtMs` the simulated time elapsed. */
+// Geometric Brownian motion: never negative, and moves are proportional to price.
 export function nextPrice(price: number, sigma: number, dtMs: number, random: Random): number {
   const dt = dtMs / YEAR_MS;
   const next =
@@ -56,7 +46,6 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-/** Candle resolution and count per chart period. */
 export const CANDLE_SPECS: Record<Period, { stepMs: number; count: number }> = {
   '1D': { stepMs: 5 * MINUTE, count: 288 },
   '1W': { stepMs: HOUR, count: 168 },
@@ -65,11 +54,7 @@ export const CANDLE_SPECS: Record<Period, { stepMs: number; count: number }> = {
   ALL: { stepMs: 7 * DAY, count: 260 },
 };
 
-/**
- * Deterministic history that ends exactly at the current price: we walk BACKWARDS from the
- * live price with a PRNG seeded by symbol+period, so the same chart comes back on every request
- * and the last candle always matches the price shown in the header.
- */
+// Walks backwards from the live price so the last candle always matches the header.
 export function generateCandles(
   symbol: string,
   period: Period,
@@ -84,7 +69,7 @@ export function generateCandles(
 
   let close = currentPrice;
   for (let i = 0; i < count; i++) {
-    const open = nextPrice(close, sigma, stepMs, random); // stepping backwards in time
+    const open = nextPrice(close, sigma, stepMs, random);
     const wick = close * sigma * Math.sqrt(stepMs / YEAR_MS) * random();
     candles.push({
       t: lastOpenTime - i * stepMs,

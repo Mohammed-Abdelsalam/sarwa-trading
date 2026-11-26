@@ -40,15 +40,12 @@ describe.each(THEMES)('%s theme', (name) => {
     }
   });
 
-  // Design system promise: every text token passes WCAG AA (4.5:1) on surface AND bg.
   const textRoles: ColorRole[] = ['fg', 'fg-2', 'fg-3', 'brand-fg', 'pos', 'neg', 'warn', 'info'];
   it.each(textRoles)('gives %s text at least 4.5:1 on surface and bg', (role) => {
     expect(contrastRatio(theme[role], theme.surface)).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio(theme[role], theme.bg)).toBeGreaterThanOrEqual(4.5);
   });
 
-  // Fills carrying white labels (primary + destructive buttons): the design system quotes
-  // ~5.2:1 (danger is 5.196 exactly), so we assert WCAG AA with a safety margin.
   it.each(['brand', 'danger'] as const)('gives the white label at least 5:1 on %s', (fill) => {
     expect(contrastRatio(theme['on-brand'], theme[fill])).toBeGreaterThanOrEqual(5);
   });

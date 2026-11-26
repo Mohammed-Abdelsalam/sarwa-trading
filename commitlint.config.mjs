@@ -1,5 +1,3 @@
-// Conventional Commits: <type>(<scope>): <subject>
-// e.g. feat(mobile): add live StockRow with price flash
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {

@@ -4,12 +4,6 @@ import { type AppConfig } from './config';
 import { MAX_SUBSCRIBE_SYMBOLS } from './constants';
 import { QuoteSchema, SymbolSchema, type MarketStatus, type Quote } from './market';
 
-/**
- * Socket.IO contract for namespace `/market`.
- * The two interfaces are passed as generics to `Server` (NestJS) and `io()` (clients),
- * so event names and payloads are type-checked on both ends.
- */
-
 export const SubscribePayloadSchema = z.object({
   symbols: z
     .array(SymbolSchema)
@@ -17,7 +11,6 @@ export const SubscribePayloadSchema = z.object({
     .max(MAX_SUBSCRIBE_SYMBOLS, `At most ${MAX_SUBSCRIBE_SYMBOLS} symbols per subscription`),
 });
 
-/** Ack for `subscribe`: the current snapshot, so the UI never waits for the next tick. */
 export const SubscribeAckSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), quotes: z.array(QuoteSchema) }),
   z.object({
@@ -49,7 +42,6 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
-  /** batched: latest quote per changed symbol, only for symbols this socket subscribed to */
   quotes: (quotes: Quote[]) => void;
   'market:status': (status: MarketStatus) => void;
   'config:updated': (config: AppConfig) => void;

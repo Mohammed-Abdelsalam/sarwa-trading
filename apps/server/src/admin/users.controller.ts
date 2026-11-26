@@ -71,10 +71,6 @@ export class UsersController {
     return toAdminUser(row);
   }
 
-  /**
-   * Change role or enable/disable. Guard rails from the design: you can't change your own
-   * account, and at least one active ADMIN must remain.
-   */
   @Patch(':id')
   @Roles(['ADMIN'])
   async update(

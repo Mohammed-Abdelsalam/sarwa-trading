@@ -5,10 +5,6 @@ import { type WatchlistResponse } from '@sarwa/contracts';
 import { AppConfigService } from '../app-config/app-config.service';
 import { PrismaService } from '../prisma.service';
 
-/**
- * Watchlist per anonymous device. PUT/DELETE are idempotent, so a client can safely retry
- * a star toggle on a flaky connection without flipping it back.
- */
 @Injectable()
 export class WatchlistService {
   constructor(
@@ -46,7 +42,6 @@ export class WatchlistService {
     await this.prisma.watchlistItem.deleteMany({ where: { deviceId, symbol } });
   }
 
-  /** Design: during maintenance "watchlists become read-only". */
   private assertWritable(): void {
     if (this.appConfig.get().maintenanceMode) {
       throw new ServiceUnavailableException('Watchlists are read-only during maintenance');

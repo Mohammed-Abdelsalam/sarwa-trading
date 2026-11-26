@@ -9,11 +9,6 @@ import {
   SymbolSchema,
 } from './market';
 
-/** Admin dashboard API (prefix /api/v1/admin). Session = httpOnly JWT cookie. */
-
-// ── auth & users ─────────────────────────────────────────────────────────────
-
-/** ADMIN: full control. VIEWER: read-only — sees everything, changes nothing. */
 export const RoleSchema = z.enum(['ADMIN', 'VIEWER']);
 export const UserStatusSchema = z.enum(['active', 'disabled']);
 
@@ -23,7 +18,6 @@ export const AdminUserSchema = z.object({
   name: z.string().min(1).max(80),
   role: RoleSchema,
   status: UserStatusSchema,
-  /** ISO-8601; null if never signed in */
   lastActiveAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
 });
@@ -39,7 +33,6 @@ export const CreateUserSchema = z.object({
   email: z.email('Enter a full email address, e.g. sam@minitrading.dev'),
   name: z.string().trim().min(1).max(80),
   role: RoleSchema,
-  /** initial password set by the inviting admin */
   password: LoginRequestSchema.shape.password,
 });
 
@@ -50,8 +43,6 @@ export const UpdateUserSchema = z
 
 export const UsersResponseSchema = z.object({ items: z.array(AdminUserSchema) });
 
-// ── market control ───────────────────────────────────────────────────────────
-
 export const MarketCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('pause') }),
   z.object({ action: z.literal('resume') }),
@@ -59,17 +50,13 @@ export const MarketCommandSchema = z.discriminatedUnion('action', [
     action: z.literal('setVolatility'),
     volatility: z.number().min(MARKET_VOLATILITY.min).max(MARKET_VOLATILITY.max),
   }),
-  /** UI asks the admin to type DROP; the API requires the same explicit confirmation */
   z.object({ action: z.literal('dropConnections'), confirm: z.literal('DROP') }),
 ]);
 
 export const MarketCommandResponseSchema = z.object({
   status: MarketStatusSchema,
-  /** set for dropConnections */
   dropped: z.number().int().nonnegative().optional(),
 });
-
-// ── stocks management ────────────────────────────────────────────────────────
 
 export const AdminStockSchema = StockSchema.extend({
   basePrice: z.number().positive(),
@@ -77,12 +64,10 @@ export const AdminStockSchema = StockSchema.extend({
   marketCap: z.number().nonnegative(),
   peRatio: z.number().positive().nullable(),
   isEnabled: z.boolean(),
-  /** live price from the simulator (null when disabled and never ticked) */
   price: z.number().positive().nullable(),
   updatedAt: z.iso.datetime(),
 });
 
-/** Editable stock fields WITHOUT defaults (shared by create and update). */
 const StockFieldsSchema = z.object({
   name: z.string().trim().min(1, 'Company name is required').max(80),
   sector: SectorSchema,
@@ -104,19 +89,13 @@ export const CreateStockSchema = StockFieldsSchema.extend({
   isEnabled: StockFieldsSchema.shape.isEnabled.default(true),
 });
 
-/**
- * Partial update. Built from the default-free fields on purpose: in Zod 4 `.partial()` keeps
- * `.default()`s, which would silently overwrite untouched fields (e.g. re-enable a stock
- * when only its name was edited). A test guards this.
- */
+// Built without defaults: Zod 4 .partial() keeps them and would overwrite untouched fields.
 export const UpdateStockSchema = StockFieldsSchema.partial().refine(
   (v) => Object.keys(v).length > 0,
   'Nothing to update',
 );
 
 export const AdminStocksResponseSchema = z.object({ items: z.array(AdminStockSchema) });
-
-// ── audit log ────────────────────────────────────────────────────────────────
 
 export const AUDIT_ACTIONS = [
   'auth.login',
@@ -139,15 +118,12 @@ export const AuditLogSchema = z.object({
   id: z.string().min(1),
   actorEmail: z.string(),
   action: AuditActionSchema,
-  /** human label, e.g. "Stock · INTC", "Market", "Config · banner" */
   entity: z.string(),
   payload: z.record(z.string(), z.unknown()),
   ip: z.string().nullable(),
   createdAt: z.iso.datetime(),
 });
 
-/** Query string: repeated `action` params are allowed (?action=a&action=b). */
-/** GET /admin/audit?page=1&pageSize=25&action=market.pause&actor=maya@… */
 export const AuditQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
@@ -161,8 +137,6 @@ export const AuditPageSchema = z.object({
   pageSize: z.number().int().min(1),
   total: z.number().int().nonnegative(),
 });
-
-// ── overview stats ───────────────────────────────────────────────────────────
 
 export const AdminStatsSchema = z.object({
   connectedClients: z.number().int().nonnegative(),

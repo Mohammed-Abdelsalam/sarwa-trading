@@ -20,7 +20,6 @@ class HealthController {
 
 @Module({
   imports: [
-    // 120 REST requests / minute / IP by default (login has a stricter limit).
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     PrismaModule,
     AppConfigModule,

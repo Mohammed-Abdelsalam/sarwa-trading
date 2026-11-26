@@ -20,7 +20,6 @@ import { WatchlistService } from './watchlist.service';
 
 const DeviceIdSchema = z.uuid('X-Device-Id header must be a UUID');
 
-/** Reads and validates the anonymous device id header (400 problem if missing or malformed). */
 const DeviceId = createParamDecorator((_: unknown, ctx: ExecutionContext): string => {
   const result = DeviceIdSchema.safeParse(
     ctx.switchToHttp().getRequest<Request>().header(DEVICE_ID_HEADER),

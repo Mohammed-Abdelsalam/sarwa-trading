@@ -9,7 +9,6 @@ import { AppModule } from './app.module';
 import { ProblemDetailsFilter } from './common/problem-details.filter';
 import { env } from './env';
 
-/** Shared by main() and the e2e tests so tests run the exact production setup. */
 export function configureApp(app: INestApplication): INestApplication {
   app.use(helmet());
   app.use(cookieParser());
@@ -22,7 +21,8 @@ export function configureApp(app: INestApplication): INestApplication {
 
 async function bootstrap(): Promise<void> {
   const app = configureApp(await NestFactory.create(AppModule));
-  await app.listen(env.PORT, '0.0.0.0'); // 0.0.0.0 so a phone on the same Wi-Fi can reach it
+  // 0.0.0.0 so a phone on the same Wi-Fi can reach the API.
+  await app.listen(env.PORT, '0.0.0.0');
   Logger.log(`API on http://localhost:${env.PORT}/${API_PREFIX}`, 'Bootstrap');
 }
 

@@ -1,15 +1,8 @@
-// @ts-check
-/**
- * React rules shared by web, admin, ui and mobile.
- * react-hooks "recommended-latest" also ships the React Compiler rules (purity, refs,
- * immutability…), which keep components compiler-friendly.
- */
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 const FILES = ['**/*.{ts,tsx,jsx}'];
 
-/** @type {import('eslint').Linter.Config[]} */
 export default [
   {
     ...react.configs.flat.recommended,
@@ -23,7 +16,7 @@ export default [
     name: 'sarwa/react/rules',
     files: FILES,
     rules: {
-      'react/prop-types': 'off', // TypeScript covers this
+      'react/prop-types': 'off',
       'react/jsx-no-useless-fragment': 'error',
       'react/self-closing-comp': 'error',
       'react/jsx-boolean-value': ['error', 'never'],

@@ -18,7 +18,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 }
 
-/** Global so every feature module can inject PrismaService without re-importing it. */
 @Global()
 @Module({ providers: [PrismaService], exports: [PrismaService] })
 export class PrismaModule {}

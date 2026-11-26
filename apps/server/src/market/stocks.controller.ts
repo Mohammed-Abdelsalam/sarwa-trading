@@ -12,7 +12,6 @@ import {
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { MarketService } from './market.service';
 
-/** Public, read-only market data. Prices after the first load come from the socket. */
 @Controller('stocks')
 export class StocksController {
   constructor(private readonly market: MarketService) {}
