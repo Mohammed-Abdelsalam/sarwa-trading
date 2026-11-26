@@ -1,0 +1,93 @@
+import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Text as MockText } from 'react-native';
+
+import { type StockWithQuote } from '@sarwa/contracts';
+
+import { useWatchlistScreen } from '../../../src/features/watchlist/use-watchlist-screen';
+import { WatchlistScreen } from '../../../src/features/watchlist/watchlist-screen';
+
+jest.mock('../../../src/features/watchlist/use-watchlist-screen');
+jest.mock('../../../src/components/layout/app-banners', () => ({ AppBanners: () => null }));
+jest.mock('../../../src/components/layout/screen-header', () => ({
+  ScreenHeader: ({ title }: { title: string }) => <MockText>{title}</MockText>,
+}));
+jest.mock('../../../src/components/trading/stock-row', () => ({
+  StockRow: ({ stock }: { stock: StockWithQuote }) => <MockText>{stock.symbol}</MockText>,
+  StockRowSkeleton: () => null,
+}));
+jest.mock('expo-router', () => ({ router: { navigate: jest.fn() } }));
+// The native swipe gesture can't run in Jest; render the row with its action visible instead.
+jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => ({
+  __esModule: true,
+  SwipeDirection: { LEFT: 'left', RIGHT: 'right' },
+  default: ({
+    children,
+    renderRightActions,
+  }: {
+    children: React.ReactNode;
+    renderRightActions: () => React.ReactNode;
+  }) => (
+    <>
+      {children}
+      {renderRightActions()}
+    </>
+  ),
+}));
+
+const mockedHook = jest.mocked(useWatchlistScreen);
+
+function stock(symbol: string): StockWithQuote {
+  return {
+    symbol,
+    name: symbol,
+    sector: 'tech',
+    exchange: 'NASDAQ',
+    currency: 'USD',
+    sparkline: [1, 2],
+    quote: {
+      symbol,
+      price: 10,
+      prevClose: 9,
+      open: 9,
+      dayHigh: 10,
+      dayLow: 9,
+      volume: 1,
+      ts: 1,
+      seq: 1,
+    },
+  };
+}
+
+describe('WatchlistScreen', () => {
+  it('invites the user to browse markets when nothing is starred', async () => {
+    mockedHook.mockReturnValue({ rows: [], average: null, isLoading: false, remove: jest.fn() });
+    await render(<WatchlistScreen />);
+
+    expect(screen.getByText('Your watchlist is empty')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Browse markets' })).toBeOnTheScreen();
+  });
+
+  it('lists starred stocks with the average change', async () => {
+    mockedHook.mockReturnValue({
+      rows: [stock('AAPL'), stock('NVDA')],
+      average: 1.5,
+      isLoading: false,
+      remove: jest.fn(),
+    });
+    await render(<WatchlistScreen />);
+
+    expect(screen.getByText('AAPL')).toBeOnTheScreen();
+    expect(screen.getByText('NVDA')).toBeOnTheScreen();
+    expect(screen.getByText('2 stocks')).toBeOnTheScreen();
+    expect(screen.getByText('▲ +1.50%')).toBeOnTheScreen();
+  });
+
+  it('removes a stock from its swipe action', async () => {
+    const remove = jest.fn();
+    mockedHook.mockReturnValue({ rows: [stock('AAPL')], average: null, isLoading: false, remove });
+    await render(<WatchlistScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Remove AAPL from watchlist' }));
+    expect(remove).toHaveBeenCalledWith('AAPL');
+  });
+});

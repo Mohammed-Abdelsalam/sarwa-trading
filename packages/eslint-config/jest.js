@@ -44,6 +44,14 @@ export function jestConfig({ dom = false, native = false } = {}) {
       files: TEST_FILES,
     });
   }
+  if (native) {
+    configs.push({
+      name: 'sarwa/testing-library/native',
+      files: TEST_FILES,
+      // React Native Testing Library 14 made render/fireEvent async; this rule predates that.
+      rules: { 'testing-library/no-await-sync-events': 'off' },
+    });
+  }
   if (dom) {
     configs.push({
       ...jestDom.configs['flat/recommended'],
