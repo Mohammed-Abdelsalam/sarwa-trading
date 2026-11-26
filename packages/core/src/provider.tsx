@@ -1,0 +1,23 @@
+import { createContext, type ReactNode, useContext } from 'react';
+
+import { type ApiClient } from './api';
+import { type MarketSocket } from './market-socket';
+import { type LiveStore } from './store';
+
+export interface SarwaClient {
+  api: ApiClient;
+  market: MarketSocket;
+  store: LiveStore;
+}
+
+const SarwaContext = createContext<SarwaClient | null>(null);
+
+export function SarwaProvider({ client, children }: { client: SarwaClient; children: ReactNode }) {
+  return <SarwaContext value={client}>{children}</SarwaContext>;
+}
+
+export function useSarwa(): SarwaClient {
+  const client = useContext(SarwaContext);
+  if (!client) throw new Error('useSarwa must be used inside <SarwaProvider>');
+  return client;
+}

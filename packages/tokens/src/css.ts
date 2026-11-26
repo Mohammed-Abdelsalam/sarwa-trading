@@ -93,6 +93,9 @@ ${shadowsCss}
   --animate-flash-up: sarwa-flash-up ${motion.duration.flash}ms ${cubicBezier(motion.easing.standard)};
   --animate-flash-down: sarwa-flash-down ${motion.duration.flash}ms ${cubicBezier(motion.easing.standard)};
   --animate-star-pop: sarwa-star-pop ${motion.duration.slow}ms ${cubicBezier(motion.easing.spring)};
+  --animate-live-pulse: sarwa-live-pulse 2s ${cubicBezier(motion.easing.standard)} infinite;
+  --animate-blink: sarwa-blink 1s ease-in-out infinite;
+  --animate-shimmer: sarwa-shimmer 1.4s ease infinite;
 }
 
 /* Light by default; dark follows the OS unless the user picked a theme (.light / .dark on <html>). */
@@ -126,6 +129,18 @@ ${block(themeVariables('dark'), '  ')}
   60% { transform: scale(1.22); }
   100% { transform: scale(1); }
 }
+@keyframes sarwa-live-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes sarwa-blink {
+  50% { opacity: 0.3; }
+}
+@keyframes sarwa-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
 
 ${typographyUtilities()}
 
@@ -133,7 +148,7 @@ ${typographyUtilities()}
 @media (prefers-reduced-motion: reduce) {
   .animate-flash-up { animation: none; box-shadow: inset 0 -${motion.reduced.flashUnderlinePx}px 0 var(${cssVarName('pos')}); }
   .animate-flash-down { animation: none; box-shadow: inset 0 -${motion.reduced.flashUnderlinePx}px 0 var(${cssVarName('neg')}); }
-  .animate-star-pop { animation: none; }
+  .animate-star-pop, .animate-live-pulse, .animate-blink, .animate-shimmer { animation: none; }
 }
 `;
 }
