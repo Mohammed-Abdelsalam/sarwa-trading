@@ -11,8 +11,16 @@ export default [
       'no-restricted-imports': restrictedImports({
         patterns: [
           {
-            group: ['react', 'react-*', 'react/*', '@sarwa/*', 'socket.io*', '@tanstack/*'],
-            message: 'contracts is the bottom of the graph: only zod and its own files.',
+            group: [
+              'react',
+              'react-*',
+              'react/*',
+              '@sarwa/*',
+              '!@sarwa/domain',
+              'socket.io*',
+              '@tanstack/*',
+            ],
+            message: 'contracts sits just above @sarwa/domain: only zod, domain and its own files.',
           },
         ],
       }),

@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@sarwa/contracts": "workspace:*",
+    "@sarwa/domain": "workspace:*",
     "@sarwa/tokens": "workspace:*",
     "socket.io-client": "^4.8.4",
     "zod": "^4.6.7",

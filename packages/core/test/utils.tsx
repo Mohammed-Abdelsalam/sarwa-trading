@@ -60,6 +60,7 @@ export function createTestClient(api: Partial<ApiClient> = {}): SarwaClient {
     store: createLiveStore(),
     storage: createMemoryStorage(),
     removals: createRemovalQueue(),
+    analytics: { track: jest.fn() },
   };
 }
 

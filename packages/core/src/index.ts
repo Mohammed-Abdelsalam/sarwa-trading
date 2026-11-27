@@ -1,4 +1,10 @@
 export {
+  noopAnalytics,
+  type AnalyticsEvent,
+  type AnalyticsProvider,
+  type TicketSource,
+} from './analytics';
+export {
   ApiError,
   createApiClient,
   createRequest,
@@ -40,6 +46,6 @@ export * from './hooks';
 export * from './markets';
 export * from './status';
 export { createMarketSocket, type MarketSocket } from './market-socket';
-export { SarwaProvider, useSarwa, type SarwaClient } from './provider';
+export { SarwaProvider, useSarwa, useTrack, type SarwaClient } from './provider';
 export { createLiveStore, isNewer, type ConnectionState, type LiveStore } from './store';
 export { createRemovalQueue, type RemovalQueue } from './undo';
