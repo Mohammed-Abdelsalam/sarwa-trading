@@ -25,6 +25,8 @@ export const SymbolResumedEventSchema = versioned({
   at: z.number().int().nonnegative(),
 });
 export const TradingStatusEventSchema = versioned({ status: TradingStatusSchema });
+// An admin reset the account: open clients drop their cached books and refetch.
+export const AccountResetEventSchema = versioned({});
 
 // The socket handshake proves which device's private room to join.
 export const SocketAuthSchema = z.object({ deviceId: z.uuid() });
@@ -36,6 +38,7 @@ export const TradingSocketEvent = {
   SymbolHalted: 'symbol.halted',
   SymbolResumed: 'symbol.resumed',
   TradingStatus: 'trading.status',
+  AccountReset: 'account.reset',
 } as const;
 
 export type OrderUpdatedEvent = z.infer<typeof OrderUpdatedEventSchema>;
@@ -44,6 +47,7 @@ export type NotificationEvent = z.infer<typeof NotificationEventSchema>;
 export type SymbolHaltedEvent = z.infer<typeof SymbolHaltedEventSchema>;
 export type SymbolResumedEvent = z.infer<typeof SymbolResumedEventSchema>;
 export type TradingStatusEvent = z.infer<typeof TradingStatusEventSchema>;
+export type AccountResetEvent = z.infer<typeof AccountResetEventSchema>;
 export type SocketAuth = z.infer<typeof SocketAuthSchema>;
 
 export interface TradingServerToClientEvents {
@@ -53,4 +57,5 @@ export interface TradingServerToClientEvents {
   'symbol.halted': (event: SymbolHaltedEvent) => void;
   'symbol.resumed': (event: SymbolResumedEvent) => void;
   'trading.status': (event: TradingStatusEvent) => void;
+  'account.reset': (event: AccountResetEvent) => void;
 }

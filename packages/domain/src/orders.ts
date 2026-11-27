@@ -42,6 +42,9 @@ export const TERMINAL_STATUSES: readonly OrderStatus[] = [
   'expired',
 ];
 
+export const CANCEL_REASONS = ['user', 'admin_reset', 'symbol_disabled'] as const;
+export type CancelReason = (typeof CANCEL_REASONS)[number];
+
 export function isTerminal(status: OrderStatus): boolean {
   return TERMINAL_STATUSES.includes(status);
 }
@@ -265,4 +268,32 @@ export function needsLargeOrderConfirm(notional: Cents, equity: Cents): boolean 
 export function slippageBps(side: Side, quotedTicks: Ticks, fillTicks: Ticks): Bps {
   const diff = side === 'buy' ? fillTicks - quotedTicks : quotedTicks - fillTicks;
   return bps(divide(BigInt(diff) * BigInt(BPS_PER_UNIT), BigInt(quotedTicks), 'nearest'));
+}
+
+interface OrderProgress {
+  qtyMicros: number | null;
+  amountCents: number | null;
+  filledMicros: number;
+  filledNotionalCents: number;
+}
+
+// Shares still working; an amount order has no fixed share count until it fills.
+export function remainingQtyMicros(
+  order: Pick<OrderProgress, 'qtyMicros' | 'filledMicros'>,
+): Micros | null {
+  return order.qtyMicros === null
+    ? null
+    : micros(Math.max(0, order.qtyMicros - order.filledMicros));
+}
+
+export function remainingAmountCents(
+  order: Pick<OrderProgress, 'amountCents' | 'filledNotionalCents'>,
+): Cents | null {
+  return order.amountCents === null
+    ? null
+    : cents(Math.max(0, order.amountCents - order.filledNotionalCents));
+}
+
+export function orderRealizedCents(order: { fills: readonly { realizedCents: number }[] }): Cents {
+  return cents(order.fills.reduce((sum, fill) => sum + fill.realizedCents, 0));
 }

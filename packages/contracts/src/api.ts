@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ALERT_ISSUE_CODES, REJECTION_CODES } from '@sarwa/domain';
+
 import {
   CandleSchema,
   PeriodSchema,
@@ -18,6 +20,7 @@ export const StockDetailResponseSchema = z.object({
   stats: StockStatsSchema,
 });
 
+export const StocksQuerySchema = z.object({ q: z.string().trim().max(64).optional() });
 export const CandlesQuerySchema = z.object({ period: PeriodSchema });
 export const CandlesResponseSchema = z.object({
   symbol: SymbolSchema,
@@ -35,15 +38,6 @@ export const HealthResponseSchema = z.object({
   commit: z.string().min(1),
 });
 
-export const ProblemSchema = z.object({
-  type: z.string(),
-  title: z.string(),
-  status: z.number().int(),
-  code: z.string(),
-  detail: z.string().optional(),
-  errors: z.record(z.string(), z.array(z.string())).optional(),
-});
-
 export const ErrorCode = {
   ValidationFailed: 'VALIDATION_FAILED',
   NotFound: 'NOT_FOUND',
@@ -54,13 +48,34 @@ export const ErrorCode = {
   Maintenance: 'MAINTENANCE',
   Unavailable: 'UNAVAILABLE',
   Internal: 'INTERNAL',
+  IdempotencyMismatch: 'IDEMPOTENCY_MISMATCH',
+  ConfirmationMismatch: 'CONFIRMATION_MISMATCH',
+  AlertLimit: 'ALERT_LIMIT',
+  InvalidPayload: 'INVALID_PAYLOAD',
+  TooManySymbols: 'TOO_MANY_SYMBOLS',
 } as const;
+
+// A 422 carries the rule that refused it. A code this client doesn't know yet still parses, so the
+// status and detail survive.
+export const ErrorCodeSchema = z
+  .enum([...Object.values(ErrorCode), ...REJECTION_CODES, ...ALERT_ISSUE_CODES])
+  .catch(ErrorCode.Internal);
+
+export const ProblemSchema = z.object({
+  type: z.string(),
+  title: z.string(),
+  status: z.number().int(),
+  code: ErrorCodeSchema,
+  detail: z.string().optional(),
+  errors: z.record(z.string(), z.array(z.string())).optional(),
+});
 
 export type StocksResponse = z.infer<typeof StocksResponseSchema>;
 export type StockDetailResponse = z.infer<typeof StockDetailResponseSchema>;
+export type StocksQuery = z.infer<typeof StocksQuerySchema>;
 export type CandlesQuery = z.infer<typeof CandlesQuerySchema>;
 export type CandlesResponse = z.infer<typeof CandlesResponseSchema>;
 export type WatchlistResponse = z.infer<typeof WatchlistResponseSchema>;
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 export type Problem = z.infer<typeof ProblemSchema>;
-export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
+export type ErrorCodeValue = z.infer<typeof ErrorCodeSchema>;

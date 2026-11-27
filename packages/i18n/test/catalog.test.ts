@@ -7,10 +7,12 @@ import {
   SIDES,
 } from '@sarwa/domain';
 
-import { createFormatter, getMessages, type Messages } from '../src';
+import { createFormatter, getAdminMessages, getMessages } from '../src';
 
 const en = getMessages('en');
 const ar = getMessages('ar');
+const adminEn = getAdminMessages('en');
+const adminAr = getAdminMessages('ar');
 
 function shape(value: unknown): unknown {
   if (typeof value !== 'object' || value === null) return typeof value;
@@ -26,12 +28,15 @@ function strings(value: unknown): string[] {
 describe('catalogs', () => {
   it('gives Arabic the same keys and value kinds as English', () => {
     expect(shape(ar)).toEqual(shape(en));
+    expect(shape(adminAr)).toEqual(shape(adminEn));
   });
 
   it.each([
     ['en', en],
     ['ar', ar],
-  ] as [string, Messages][])(
+    ['admin en', adminEn],
+    ['admin ar', adminAr],
+  ] as [string, object][])(
     'hardcodes no digits in %s strings, so the digit setting holds',
     (_, messages) => {
       expect(strings(messages).filter((text) => /[0-9٠-٩]/.test(text))).toEqual([]);
@@ -49,8 +54,9 @@ describe('catalogs', () => {
     for (const messages of [en, ar]) {
       for (const side of SIDES) expect(messages.common.sides[side]).toBeTruthy();
       for (const phase of SESSION_PHASES) expect(messages.market.phases[phase]).toBeTruthy();
-      for (const mode of SESSION_MODES)
-        expect(messages.admin.trading.sessionModes[mode]).toBeTruthy();
+    }
+    for (const admin of [adminEn, adminAr]) {
+      for (const mode of SESSION_MODES) expect(admin.trading.sessionModes[mode]).toBeTruthy();
     }
   });
 
@@ -80,12 +86,16 @@ describe('every message function', () => {
     ['ar', 2, ar],
     ['ar', 5, ar],
     ['ar', 11, ar],
-  ] as [string, number, Messages][])(
+    ['admin en', 1, adminEn],
+    ['admin en', 2, adminEn],
+    ['admin ar', 2, adminAr],
+    ['admin ar', 11, adminAr],
+  ] as [string, number, object][])(
     'renders %s copy with all its params when count is %i',
     (_, count, messages) => {
       const rendered = render(messages, count);
 
-      expect(rendered.length).toBeGreaterThan(100);
+      expect(rendered.length).toBeGreaterThan(50);
       expect(rendered.filter((text) => !text || /undefined|\[object/.test(text))).toEqual([]);
     },
   );
@@ -108,21 +118,21 @@ describe('message functions', () => {
   });
 
   it('pluralises English counts', () => {
-    expect(en.admin.tripsToday(enF.count(1))).toBe('1 trip today');
-    expect(en.admin.tripsToday(enF.count(3))).toBe('3 trips today');
+    expect(adminEn.tripsToday(enF.count(1))).toBe('1 trip today');
+    expect(adminEn.tripsToday(enF.count(3))).toBe('3 trips today');
     expect(en.portfolio.openOrdersLink(enF.count(2))).toBe('2 open orders · View');
-    expect(en.admin.haltOpenOrders({ ...enF.count(1), symbol: 'NVDA' })).toContain(
+    expect(adminEn.haltOpenOrders({ ...enF.count(1), symbol: 'NVDA' })).toContain(
       '1 open NVDA order will pause.',
     );
   });
 
   it('keeps the typed confirmation word inside one sentence per language', () => {
-    expect(en.admin.market.dropConfirmLabel({ word: 'DROP' })).toBe('Type DROP to confirm');
-    expect(ar.admin.market.dropConfirmLabel({ word: 'DROP' })).toBe('اكتب DROP للتأكيد');
+    expect(adminEn.market.dropConfirmLabel({ word: 'DROP' })).toBe('Type DROP to confirm');
+    expect(adminAr.market.dropConfirmLabel({ word: 'DROP' })).toBe('اكتب DROP للتأكيد');
   });
 
   it('uses the Arabic dual and few forms', () => {
-    expect(ar.admin.tripsToday(arF.count(2))).toBe('تفعيلان اليوم');
+    expect(adminAr.tripsToday(arF.count(2))).toBe('تفعيلان اليوم');
     expect(ar.common.minutes(arF.count(5))).toBe('٥ دقائق');
     expect(ar.ticket.quoteValid(arF.count(7))).toBe('السعر صالح لمدة ٧ ثوانٍ');
     expect(ar.orders.lastDays(arF.count(7))).toBe('آخر ٧ أيام');

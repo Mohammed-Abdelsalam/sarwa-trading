@@ -13,6 +13,8 @@ import { type Count } from './copy';
 import { DEFAULT_DIGITS, type Digits, INTL_LOCALE, isRtl, type Locale } from './locale';
 
 const MINUS = '−';
+const CURRENCY = '$';
+const ARABIC_INDIC_ZERO = 0x0660;
 const LTR_ISOLATE = '⁦';
 const POP_ISOLATE = '⁩';
 const MINUTE_MS = 60_000;
@@ -47,6 +49,10 @@ export interface Formatter {
   dateTime(ms: number): string;
   date(ms: number, options?: { weekday?: boolean }): string;
   multiplier(value: number): string;
+  // The symbol a money input shows beside the typed amount.
+  currencyAffix(): string;
+  // Typed text (e.g. "12.5") keeps its exact shape; only its digits follow the setting.
+  localDigits(text: string): string;
   relative(ms: number, now: number): string;
   chartTime(ms: number, span: ChartSpan): string;
   chartDate(ms: number, span: ChartSpan): string;
@@ -125,9 +131,10 @@ function buildFormatter(locale: Locale, digits: Digits): Formatter {
     money: (cents, { signed = false, compact: short = false, whole = false } = {}) => {
       const dollars = Math.abs(cents) / 100;
       const format = short ? compact : whole ? noDecimals : twoDecimals;
-      return withSign(cents, `$${format.format(dollars)}`, signed);
+      return withSign(cents, `${CURRENCY}${format.format(dollars)}`, signed);
     },
-    price: (ticks) => withSign(ticks, `$${priceDecimals.format(Math.abs(ticksToDollars(ticks)))}`),
+    price: (ticks) =>
+      withSign(ticks, `${CURRENCY}${priceDecimals.format(Math.abs(ticksToDollars(ticks)))}`),
     shares: (micros) => unsigned(shareDecimals, microsToShares(micros)),
     percent: (bps, { signed = false } = {}) =>
       withSign(bps, `${twoDecimals.format(Math.abs(bps) / 100)}${percentSign}`, signed),
@@ -138,6 +145,11 @@ function buildFormatter(locale: Locale, digits: Digits): Formatter {
     dateTime: (ms) => `${dayClock.format(ms)} ET`,
     date: (ms, { weekday: withWeekday = false } = {}) => (withWeekday ? weekday : day).format(ms),
     multiplier: (value) => `${unsigned(oneDecimal, value)}×`,
+    currencyAffix: () => CURRENCY,
+    localDigits: (text) =>
+      digits === 'arab'
+        ? text.replace(/[0-9]/g, (d) => String.fromCharCode(ARABIC_INDIC_ZERO + Number(d)))
+        : text,
     relative: (ms, now) => {
       const elapsed = Math.max(0, now - ms);
       if (elapsed < MINUTE_MS) return messages.justNow;

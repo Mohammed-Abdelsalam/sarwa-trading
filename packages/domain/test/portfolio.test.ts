@@ -9,6 +9,7 @@ import {
   reservedCents,
   sellableMicros,
   summarizePortfolio,
+  todayActivity,
 } from '../src/portfolio';
 import { POLICY } from '../src/rules';
 
@@ -232,5 +233,29 @@ describe('summarizePortfolio', () => {
       positions: [],
       allocation: [{ key: 'cash', cents: START, weightBps: 10_000 }],
     });
+  });
+});
+
+describe('todayActivity', () => {
+  const position = { symbol: 'AAPL', qtyMicros: shares(10) };
+  const fill = (side: 'buy' | 'sell', count: number, notional: number, symbol = 'AAPL') => ({
+    symbol,
+    side,
+    qtyMicros: BigInt(count * SHARE),
+    notionalCents: notional,
+  });
+
+  it("works the opening shares back from today's fills of that symbol only", () => {
+    const fills = [fill('buy', 4, 40_000), fill('sell', 1, 11_000), fill('buy', 9, 1, 'MSFT')];
+
+    expect(todayActivity(fills, position)).toEqual({
+      qtyAtOpenMicros: shares(7),
+      boughtCents: 40_000,
+      soldCents: 11_000,
+    });
+  });
+
+  it('is null when the symbol did not trade today', () => {
+    expect(todayActivity([fill('buy', 1, 1, 'MSFT')], position)).toBeNull();
   });
 });

@@ -84,7 +84,6 @@ import {
   QUOTE_BATCH_MS,
   QuotesEventSchema,
   ResetAccountSchema,
-  SECTOR_LABELS,
   SessionResponseSchema,
   SocketAuthSchema,
   SocketErrorSchema,
@@ -643,9 +642,26 @@ describe('wire constants', () => {
     expect(QUOTE_BATCH_MS).toBeLessThanOrEqual(TICK_MS);
   });
 
-  it('labels every sector and audits every admin action once', () => {
-    expect(Object.keys(SECTOR_LABELS)).toHaveLength(6);
+  it('audits every admin action once', () => {
     expect(new Set(AUDIT_ACTIONS).size).toBe(AUDIT_ACTIONS.length);
+  });
+});
+
+describe('ProblemSchema', () => {
+  it('keeps the status and detail when the code is one this client does not know', () => {
+    const problem = ProblemSchema.parse({
+      type: 'about:blank',
+      title: 'Teapot',
+      status: 418,
+      code: 'BREWING',
+      detail: 'Short and stout',
+    });
+
+    expect(problem).toMatchObject({
+      status: 418,
+      code: ErrorCode.Internal,
+      detail: 'Short and stout',
+    });
   });
 });
 

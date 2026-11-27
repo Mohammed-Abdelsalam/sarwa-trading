@@ -101,6 +101,8 @@ export const AdminStocksResponseSchema = z.object({ items: z.array(AdminStockSch
 
 export const AUDIT_ACTIONS = [
   'auth.login',
+  'auth.login_failed',
+  'auth.logout',
   'market.pause',
   'market.resume',
   'market.volatility',

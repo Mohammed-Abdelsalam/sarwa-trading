@@ -1,6 +1,7 @@
 import {
   type AlertCondition,
   type AlertRepeat,
+  type CancelReason,
   type OrderStatus,
   type OrderType,
   type SessionPhase,
@@ -10,7 +11,6 @@ import {
 
 import { type AlertIssueCopy, type Count, type RejectionCopy } from '../copy';
 import { plural } from '../locale';
-import { adminEn } from './admin-en';
 
 const rejections: RejectionCopy = {
   TRADING_DISABLED: () => ({
@@ -365,6 +365,18 @@ export const en = {
     tradingDisclosure: 'Paper trading · simulated prices · not investment advice',
     orderNote:
       'Paper order on simulated prices. Market orders can fill at a slightly different price than the quote.',
+    virtualStart: 'Virtual start',
+  },
+  notFound: {
+    metaTitle: 'Not found',
+    title: 'Page not found',
+    body: "This link doesn't lead anywhere in Mini Trading.",
+    back: 'Back to Markets',
+  },
+  errorPage: {
+    title: 'Something went wrong',
+    body: 'Something unexpected happened. Your watchlist is safe.',
+    retry: 'Try again',
   },
   market: {
     open: ({ time }: { time: string }) => `Open · closes ${time}`,
@@ -563,12 +575,18 @@ export const en = {
       `Filled ${shares} @ ${price}`,
     filledAtPrice: ({ price }: { price: string }) => `Filled @ ${price}`,
     working: ({ shares }: { shares: string }) => `Working · ${shares} remaining`,
+    workingAmount: ({ amount }: { amount: string }) => `Working · ${amount} remaining`,
+    reservedCash: ({ amount }: { amount: string }) => `reserved ${amount}`,
     expiresAtClose: ({ time }: { time: string }) => `Expires at today's close · ${time}`,
     earlyCloseNote: '(early close)',
     triggersAbove: ({ price }: { price: string }) => `Triggers if ≥ ${price}`,
     triggersBelow: ({ price }: { price: string }) => `Triggers if ≤ ${price}`,
     lastAway: ({ price, pct }: { price: string; pct: string }) => `Last ${price} · ${pct} away`,
-    canceledByYou: 'Canceled by you',
+    canceledBy: {
+      user: 'Canceled by you',
+      admin_reset: 'Canceled · account reset',
+      symbol_disabled: 'Canceled · stock no longer trades',
+    } satisfies Record<CancelReason, string>,
     expiredAtClose: 'Expired at close',
     proceedsSoFar: 'Proceeds so far',
     costSoFar: 'Cost so far',
@@ -658,6 +676,7 @@ export const en = {
     aboveCurrent: ({ pct }: { pct: string }) => `${pct} above current price`,
     belowCurrent: ({ pct }: { pct: string }) => `${pct} below current price`,
     away: ({ price, pct }: { price: string; pct: string }) => `Now ${price} · ${pct} away`,
+    todayMove: ({ pct }: { pct: string }) => `Today ${pct}`,
     triggeredAt: ({ time, price }: { time: string; price: string }) =>
       `Triggered ${time} at ${price}`,
     repeat: 'Repeat',
@@ -724,7 +743,6 @@ export const en = {
     marketClosesEarly: 'Markets close early today',
     marketClosesEarlyBody: ({ time }: { time: string }) => `Regular session ends at ${time}.`,
   },
-  admin: adminEn,
   rejections,
   alertIssues,
 };

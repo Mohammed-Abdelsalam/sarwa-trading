@@ -37,8 +37,11 @@ describe('SubscribePayloadSchema', () => {
 
 describe('SubscribeAckSchema', () => {
   it('narrows on ok', () => {
-    const ack = SubscribeAckSchema.parse({ ok: false, error: { code: 'X', message: 'nope' } });
-    expect(ack.ok ? 'quotes' : ack.error.code).toBe('X');
+    const ack = SubscribeAckSchema.parse({
+      ok: false,
+      error: { code: 'TOO_MANY_SYMBOLS', message: 'nope' },
+    });
+    expect(ack.ok ? 'quotes' : ack.error.code).toBe('TOO_MANY_SYMBOLS');
   });
 });
 

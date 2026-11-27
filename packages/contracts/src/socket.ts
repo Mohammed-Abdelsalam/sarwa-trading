@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { ErrorCodeSchema } from './api';
 import { type AppConfig } from './config';
 import { MAX_SUBSCRIBE_SYMBOLS } from './constants';
 import { QuoteSchema, SymbolSchema, type MarketStatus, type Quote } from './market';
@@ -15,7 +16,7 @@ export const SubscribeAckSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), quotes: z.array(QuoteSchema) }),
   z.object({
     ok: z.literal(false),
-    error: z.object({ code: z.string(), message: z.string() }),
+    error: z.object({ code: ErrorCodeSchema, message: z.string() }),
   }),
 ]);
 
