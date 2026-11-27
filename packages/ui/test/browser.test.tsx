@@ -1,9 +1,11 @@
 import { act, renderHook } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 
 import {
   downloadCsv,
   safeLocalStorage,
   toCsv,
+  useHydrated,
   useLocalPreference,
   usePageLifecycle,
   useTheme,
@@ -86,8 +88,10 @@ describe('useTheme', () => {
 });
 
 describe('useLocalPreference', () => {
-  afterEach(() => {
+  afterEach(async () => {
     window.localStorage.clear();
+    // jsdom announces storage changes on a Node timer; let them land before the window is torn down.
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it('returns the fallback when nothing is saved', () => {
@@ -131,6 +135,17 @@ describe('useLocalPreference', () => {
     const { result } = renderHook(() => useLocalPreference('pref.stale', VIEWS, 'table'));
 
     expect(result.current[0]).toBe('table');
+  });
+});
+
+describe('useHydrated', () => {
+  function Probe() {
+    return <>{String(useHydrated())}</>;
+  }
+
+  it('is false on the server and true once mounted on the client', () => {
+    expect(renderToString(<Probe />)).toBe('false');
+    expect(renderHook(() => useHydrated()).result.current).toBe(true);
   });
 });
 

@@ -18,6 +18,17 @@ function subscribeOnline(onChange: () => void) {
   };
 }
 
+const subscribeNever = () => () => undefined;
+
+// False on the server and while hydrating, so client-only state can't make the first render differ.
+export function useHydrated(): boolean {
+  return useSyncExternalStore(
+    subscribeNever,
+    () => true,
+    () => false,
+  );
+}
+
 export function usePageLifecycle(): { foreground: boolean; online: boolean } {
   const foreground = useSyncExternalStore(
     subscribeVisibility,

@@ -1,4 +1,4 @@
-export { safeLocalStorage, useLocalPreference, usePageLifecycle } from './lib/browser';
+export { safeLocalStorage, useHydrated, useLocalPreference, usePageLifecycle } from './lib/browser';
 export { cn } from './lib/cn';
 export { downloadCsv, toCsv } from './lib/csv';
 export { useTheme } from './lib/theme';
@@ -37,7 +37,19 @@ export {
   type ProgressBarProps,
   type ProgressTone,
 } from './primitives/feedback';
-export { Field, Input, Select, Slider, Switch, type InputProps } from './primitives/form';
+export {
+  Field,
+  Input,
+  PasswordInput,
+  PasswordStrengthMeter,
+  Select,
+  Slider,
+  Switch,
+  type InputProps,
+  type PasswordInputProps,
+  type PasswordStrengthLevel,
+  type PasswordStrengthMeterProps,
+} from './primitives/form';
 export { Breadcrumbs, Kbd, Logo, type Crumb, type LinkComponent } from './primitives/navigation';
 export {
   Drawer,
