@@ -66,6 +66,11 @@ model AdminUser {
   status       String    @default("active")
   lastActiveAt DateTime?
   createdAt    DateTime  @default(now())
+  // Bumped on sign-out: every token issued before it stops working.
+  tokenVersion Int       @default(0)
+  // Consecutive wrong passwords; reaching the limit locks sign-in until lockedUntil.
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime?
 }
 
 model AppConfig {
@@ -164,6 +169,9 @@ model Order {
   @@index([status])
   @@index([symbol, status])
   @@index([accountId, createdAt])
+  // Housekeeping looks up expired working orders every second; admin stats scan today's orders.
+  @@index([status, expiresAt])
+  @@index([createdAt])
 }
 
 model Fill {

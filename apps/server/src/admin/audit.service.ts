@@ -3,6 +3,7 @@ import { type AuditLog as AuditLogRow } from '@prisma/client';
 
 import { type AuditAction, type AuditLog, type AuditPage, type AuditQuery } from '@sarwa/contracts';
 
+import { maskDeep, maskEmail, maskIp, type PiiView } from '../common/pii';
 import { PrismaService, type Tx } from '../prisma.service';
 
 export interface Actor {
@@ -32,7 +33,10 @@ export class AuditService {
     });
   }
 
-  async list({ page = 1, pageSize = 25, action, actor }: AuditQuery): Promise<AuditPage> {
+  async list(
+    { page = 1, pageSize = 25, action, actor }: AuditQuery,
+    view: PiiView,
+  ): Promise<AuditPage> {
     const where = {
       ...(action && { action }),
       ...(actor && { actorEmail: { contains: actor } }),
@@ -46,13 +50,28 @@ export class AuditService {
       }),
       this.prisma.auditLog.count({ where }),
     ]);
-    return { items: rows.map(toAuditLog), page: Number(page), pageSize: Number(pageSize), total };
+    return {
+      items: rows.map((row) => present(toAuditLog(row), view)),
+      page: Number(page),
+      pageSize: Number(pageSize),
+      total,
+    };
   }
 
-  async recent(take: number): Promise<AuditLog[]> {
+  async recent(take: number, view: PiiView): Promise<AuditLog[]> {
     const rows = await this.prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take });
-    return rows.map(toAuditLog);
+    return rows.map((row) => present(toAuditLog(row), view));
   }
+}
+
+function present(log: AuditLog, view: PiiView): AuditLog {
+  if (view === 'full') return log;
+  return {
+    ...log,
+    actorEmail: maskEmail(log.actorEmail),
+    ip: log.ip && maskIp(log.ip),
+    payload: maskDeep(log.payload) as Record<string, unknown>,
+  };
 }
 
 @Global()

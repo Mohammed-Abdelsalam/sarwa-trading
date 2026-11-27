@@ -5,11 +5,10 @@ import { type Namespace, type Socket } from 'socket.io';
 import {
   ADMIN_NAMESPACE,
   ADMIN_SESSION_COOKIE,
-  type AdminOrder,
   type AdminServerToClientEvents,
-  type AdminTrading,
 } from '@sarwa/contracts';
 
+import { EventBus } from '../common/events';
 import { env } from '../env';
 import { AdminSessions } from './auth';
 
@@ -31,7 +30,20 @@ export class AdminGateway implements OnGatewayInit {
 
   private readonly logger = new Logger(AdminGateway.name);
 
-  constructor(private readonly sessions: AdminSessions) {}
+  constructor(
+    private readonly sessions: AdminSessions,
+    events: EventBus,
+  ) {
+    events.on('order.changed').subscribe(({ account, order, latencyMs }) => {
+      this.server.emit('admin.order', {
+        v: 1,
+        order: { ...order, accountHandle: account.handle, latencyMs },
+      });
+    });
+    events.on('trading.changed').subscribe(({ admin }) => {
+      this.server.emit('admin.trading', { v: 1, trading: admin });
+    });
+  }
 
   afterInit(server: Namespace): void {
     server.use((socket: Socket, next) => {
@@ -46,14 +58,6 @@ export class AdminGateway implements OnGatewayInit {
           next(new Error('Unauthorized'));
         });
     });
-  }
-
-  order(order: AdminOrder): void {
-    this.server.emit('admin.order', { v: 1, order });
-  }
-
-  trading(trading: AdminTrading): void {
-    this.server.emit('admin.trading', { v: 1, trading });
   }
 
   // The session is only checked at connect, so a disabled or re-roled admin is dropped here.
