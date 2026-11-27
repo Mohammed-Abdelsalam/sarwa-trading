@@ -1,0 +1,10 @@
+{
+  "extends": "@sarwa/tsconfig/nextjs.json",
+  "compilerOptions": {
+    // Next's generated .next/dev/types files have unused imports; ESLint's unused-imports covers our code.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["next-env.d.ts", "src", "test", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
