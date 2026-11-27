@@ -2,19 +2,29 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 
 import { type Quote, type StockWithQuote } from '@sarwa/contracts';
+import { createFormatter, type Digits, getMessages, type Locale } from '@sarwa/i18n';
 
 import { ApiError, type ApiClient } from '../src/api';
 import { type KeyValueStorage } from '../src/device';
+import { type Localized } from '../src/format';
 import { type MarketSocket } from '../src/market-socket';
 import { type SarwaClient, SarwaProvider } from '../src/provider';
 import { createLiveStore } from '../src/store';
 import { createRemovalQueue } from '../src/undo';
+
+export function localized(locale: Locale = 'en', digits: Digits = 'latn'): Localized {
+  return { t: getMessages(locale), f: createFormatter({ locale, digits }) };
+}
 
 export function makeQuote(overrides: Partial<Quote> = {}): Quote {
   return {
     symbol: 'AAPL',
     price: 231.48,
     prevClose: 228.64,
+    bid: 231.46,
+    ask: 231.5,
+    bidSize: 300,
+    askSize: 200,
     open: 229.1,
     dayHigh: 232.1,
     dayLow: 228.4,
@@ -47,12 +57,15 @@ export function makeProblem(status: number): ApiError {
   return new ApiError({ type: 'about:blank', title: 'Error', status, code: 'X' });
 }
 
+let nextId = 0;
+
 export function createTestClient(api: Partial<ApiClient> = {}): SarwaClient {
   const market: MarketSocket = {
     connect: jest.fn(),
     disconnect: jest.fn(),
     acquire: jest.fn(() => jest.fn()),
     subscribedSymbols: () => [],
+    onTradingEvent: jest.fn(() => jest.fn()),
   };
   return {
     api: api as ApiClient,
@@ -61,6 +74,7 @@ export function createTestClient(api: Partial<ApiClient> = {}): SarwaClient {
     storage: createMemoryStorage(),
     removals: createRemovalQueue(),
     analytics: { track: jest.fn() },
+    newId: jest.fn(() => `key-${String((nextId += 1))}`),
   };
 }
 

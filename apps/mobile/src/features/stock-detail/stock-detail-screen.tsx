@@ -5,10 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { type Stock } from '@sarwa/contracts';
 
 import { StockAvatar } from '../../components/trading/stock-avatar';
+import { TradeBar } from '../../components/trading/trade-bar';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { StateView } from '../../components/ui/state-view';
 import { Text } from '../../components/ui/text';
+import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
 import { ChartToolbar } from './chart-toolbar';
 import { KeyStats } from './key-stats';
@@ -51,6 +53,7 @@ function StockTitle({ symbol, stock }: { symbol: string; stock: Stock | undefine
 
 export function StockDetailScreen({ symbol }: { symbol: string }) {
   const colors = useColors();
+  const { t } = useCopy();
   const screen = useStockDetailScreen(symbol);
   const { chart, actions } = screen;
 
@@ -70,11 +73,11 @@ export function StockDetailScreen({ symbol }: { symbol: string }) {
         <StateView
           icon={AlertTriangle}
           tone="neg"
-          title={`Couldn't load ${symbol}`}
-          description="Check your connection and try again."
+          title={t.stock.loadError({ symbol })}
+          description={t.common.loadErrorBody}
           action={
             <Button variant="secondary" onPress={actions.retry}>
-              Retry
+              {t.common.retry}
             </Button>
           }
         />
@@ -87,7 +90,7 @@ export function StockDetailScreen({ symbol }: { symbol: string }) {
               refreshing={screen.isRefreshing}
               onRefresh={() => void actions.refresh()}
               tintColor={colors['brand-fg']}
-              title="Updating prices…"
+              title={t.markets.updating}
               titleColor={colors['fg-3']}
             />
           }
@@ -122,10 +125,17 @@ export function StockDetailScreen({ symbol }: { symbol: string }) {
           {screen.stats ? <KeyStats stats={screen.stats} /> : null}
           {screen.week52 ? <RangeCard {...screen.week52} /> : null}
           <SimilarStocks
-            title={`More in ${screen.sectorLabel ?? 'this sector'}`}
+            title={
+              screen.sectorLabel
+                ? t.stock.moreIn({ sector: screen.sectorLabel })
+                : t.stock.moreInSector
+            }
             stocks={screen.similar}
           />
         </ScrollView>
+      )}
+      {screen.notFound || screen.isError ? null : (
+        <TradeBar symbol={symbol} sellLabel={screen.sellLabel} />
       )}
     </SafeAreaView>
   );

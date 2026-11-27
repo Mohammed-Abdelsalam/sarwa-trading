@@ -1,3 +1,5 @@
+import { bps, cents, micros, ticks } from '@sarwa/domain';
+
 import { createFormatter } from '../src';
 
 const LRI = '⁦';
@@ -8,42 +10,42 @@ describe('createFormatter in English', () => {
   const f = createFormatter({ locale: 'en' });
 
   it('formats money with a $ and two decimals', () => {
-    expect(f.money(123_456)).toBe('$1,234.56');
+    expect(f.money(cents(123_456))).toBe('$1,234.56');
   });
 
   it('uses a real minus sign for negative money', () => {
-    expect(f.money(-1_905)).toBe('−$19.05');
+    expect(f.money(cents(-1_905))).toBe('−$19.05');
   });
 
   it('adds a plus sign to positive money when signed', () => {
-    expect(f.money(2, { signed: true })).toBe('+$0.02');
-    expect(f.money(-2, { signed: true })).toBe('−$0.02');
+    expect(f.money(cents(2), { signed: true })).toBe('+$0.02');
+    expect(f.money(cents(-2), { signed: true })).toBe('−$0.02');
   });
 
   it('leaves zero unsigned when signed', () => {
-    expect(f.money(0, { signed: true })).toBe('$0.00');
+    expect(f.money(cents(0), { signed: true })).toBe('$0.00');
   });
 
   it('formats compact money like market caps', () => {
-    expect(f.money(352_000_000_000_000, { compact: true })).toBe('$3.52T');
-    expect(f.money(1_840_000_000, { compact: true })).toBe('$18.4M');
+    expect(f.money(cents(352_000_000_000_000), { compact: true })).toBe('$3.52T');
+    expect(f.money(cents(1_840_000_000), { compact: true })).toBe('$18.4M');
   });
 
   it('formats prices with two decimals and up to four only when needed', () => {
-    expect(f.price(2_315_000)).toBe('$231.50');
-    expect(f.price(2_314_825)).toBe('$231.4825');
+    expect(f.price(ticks(2_315_000))).toBe('$231.50');
+    expect(f.price(ticks(2_314_825))).toBe('$231.4825');
   });
 
   it('trims trailing zeros from share quantities', () => {
-    expect(f.shares(2_159_827)).toBe('2.159827');
-    expect(f.shares(1_500_000)).toBe('1.5');
-    expect(f.shares(42_000_000)).toBe('42');
+    expect(f.shares(micros(2_159_827))).toBe('2.159827');
+    expect(f.shares(micros(1_500_000))).toBe('1.5');
+    expect(f.shares(micros(42_000_000))).toBe('42');
   });
 
   it('formats percent from basis points with two decimals', () => {
-    expect(f.percent(500)).toBe('5.00%');
-    expect(f.percent(124, { signed: true })).toBe('+1.24%');
-    expect(f.percent(-1_020, { signed: true })).toBe('−10.20%');
+    expect(f.percent(bps(500))).toBe('5.00%');
+    expect(f.percent(bps(124), { signed: true })).toBe('+1.24%');
+    expect(f.percent(bps(-1_020), { signed: true })).toBe('−10.20%');
   });
 
   it('formats plain numbers with grouping and a real minus', () => {
@@ -56,7 +58,7 @@ describe('createFormatter in English', () => {
   });
 
   it('does not isolate data in a left-to-right locale', () => {
-    expect(f.money(-1_905)).not.toContain(LRI);
+    expect(f.money(cents(-1_905))).not.toContain(LRI);
   });
 });
 
@@ -65,29 +67,29 @@ describe('createFormatter in Arabic', () => {
   const latn = createFormatter({ locale: 'ar', digits: 'latn' });
 
   it('prints Arabic-Indic digits when digits are arab', () => {
-    expect(arab.price(2_314_800)).toBe(isolated('$٢٣١٫٤٨'));
-    expect(arab.money(123_456)).toBe(isolated('$١٬٢٣٤٫٥٦'));
+    expect(arab.price(ticks(2_314_800))).toBe(isolated('$٢٣١٫٤٨'));
+    expect(arab.money(cents(123_456))).toBe(isolated('$١٬٢٣٤٫٥٦'));
   });
 
   it('prints Western digits when digits are latn', () => {
-    expect(latn.price(2_314_800)).toBe(isolated('$231.48'));
-    expect(latn.money(123_456)).toBe(isolated('$1,234.56'));
+    expect(latn.price(ticks(2_314_800))).toBe(isolated('$231.48'));
+    expect(latn.money(cents(123_456))).toBe(isolated('$1,234.56'));
   });
 
   it('keeps sign, symbol and number together inside an LTR isolate', () => {
-    expect(arab.money(-1_905, { signed: true })).toBe(isolated('−$١٩٫٠٥'));
-    expect(arab.percent(124, { signed: true })).toBe(isolated('+١٫٢٤٪'));
-    expect(latn.percent(124, { signed: true })).toBe(isolated('+1.24%'));
+    expect(arab.money(cents(-1_905), { signed: true })).toBe(isolated('−$١٩٫٠٥'));
+    expect(arab.percent(bps(124), { signed: true })).toBe(isolated('+١٫٢٤٪'));
+    expect(latn.percent(bps(124), { signed: true })).toBe(isolated('+1.24%'));
   });
 
   it('keeps Latin compact suffixes with Arabic-Indic digits', () => {
-    expect(arab.money(352_000_000_000_000, { compact: true })).toBe(isolated('$٣٫٥٢T'));
+    expect(arab.money(cents(352_000_000_000_000), { compact: true })).toBe(isolated('$٣٫٥٢T'));
   });
 
   it('leaves bare quantities unisolated because digits never reorder', () => {
-    expect(arab.shares(2_159_827)).toBe('٢٫١٥٩٨٢٧');
+    expect(arab.shares(micros(2_159_827))).toBe('٢٫١٥٩٨٢٧');
     expect(arab.number(1_036)).toBe('١٬٠٣٦');
-    expect(latn.shares(2_159_827)).toBe('2.159827');
+    expect(latn.shares(micros(2_159_827))).toBe('2.159827');
   });
 
   it('isolates a negative bare number because of its sign', () => {
@@ -165,5 +167,72 @@ describe('relative', () => {
     expect(ar.relative(minutes(5), now)).toBe('منذ ٥ دقائق');
     expect(ar.relative(minutes(11), now)).toBe('منذ ١١ دقيقة');
     expect(ar.relative(minutes(180), now)).toBe('منذ ٣ ساعات');
+  });
+});
+
+describe('multiplier and date', () => {
+  const en = createFormatter({ locale: 'en' });
+  const ar = createFormatter({ locale: 'ar', digits: 'arab' });
+
+  it('shows a multiplier with one decimal in the chosen digits', () => {
+    expect(en.multiplier(1)).toBe('1.0×');
+    expect(ar.multiplier(1.5)).toBe('١٫٥×');
+  });
+
+  it('names the New York calendar day, not the UTC one', () => {
+    const lateEvening = Date.UTC(2026, 10, 28, 3, 0);
+
+    expect(en.date(lateEvening)).toBe('Nov 27');
+    expect(en.date(lateEvening, { weekday: true })).toBe('Fri, Nov 27');
+  });
+});
+
+describe('one formatter per locale and digits', () => {
+  it('reuses the same formatter instead of rebuilding Intl objects per call', () => {
+    expect(createFormatter({ locale: 'en' })).toBe(
+      createFormatter({ locale: 'en', digits: 'latn' }),
+    );
+    expect(createFormatter({ locale: 'ar', digits: 'arab' })).toBe(
+      createFormatter({ locale: 'ar', digits: 'arab' }),
+    );
+    expect(createFormatter({ locale: 'ar', digits: 'arab' })).not.toBe(
+      createFormatter({ locale: 'ar', digits: 'latn' }),
+    );
+  });
+});
+
+describe('list and chart formats', () => {
+  const en = createFormatter({ locale: 'en' });
+  const ar = createFormatter({ locale: 'ar', digits: 'arab' });
+  const t = Date.UTC(2026, 10, 25, 19, 41);
+
+  it('drops cents from whole-dollar money', () => {
+    expect(en.money(cents(71_234_012), { whole: true })).toBe('$712,340');
+  });
+
+  it('formats compact plain numbers like volume', () => {
+    expect(en.compact(52_300_000)).toBe('52.3M');
+    expect(ar.compact(52_300_000)).toBe('٥٢٫٣M');
+  });
+
+  it('labels chart axis ticks per period', () => {
+    expect(en.chartTime(t, '1D')).toBe('2:41 PM');
+    expect(en.chartTime(t, '1W')).toBe('Wed');
+    expect(en.chartTime(t, '1M')).toBe('Nov 25');
+    expect(en.chartTime(t, '1Y')).toBe('Nov');
+    expect(en.chartTime(t, 'ALL')).toBe('2026');
+  });
+
+  it('dates a scrubbed candle per period', () => {
+    expect(en.chartDate(t, '1D')).toBe('Nov 25 · 2:41 PM');
+    expect(en.chartDate(t, '1W')).toBe('Wed, Nov 25');
+    expect(en.chartDate(t, '1M')).toBe('Nov 25, 2026');
+    expect(en.chartDate(t, '1Y')).toBe('Nov 25, 2026');
+    expect(en.chartDate(t, 'ALL')).toBe('Nov 2026');
+  });
+
+  it('follows the Arabic digit setting on charts', () => {
+    expect(ar.chartTime(t, 'ALL')).toBe('٢٠٢٦');
+    expect(ar.chartDate(t, '1D')).toBe('٢٥ نوفمبر · ٢:٤١ م');
   });
 });

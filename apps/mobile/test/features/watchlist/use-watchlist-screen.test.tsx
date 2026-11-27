@@ -27,6 +27,10 @@ function stock(symbol: string): StockWithQuote {
       symbol,
       price: 10,
       prevClose: 9,
+      bid: 9.99,
+      ask: 10.01,
+      bidSize: 300,
+      askSize: 200,
       open: 9,
       dayHigh: 10,
       dayLow: 9,
@@ -55,13 +59,18 @@ async function renderScreenHook() {
       disconnect: jest.fn(),
       acquire: jest.fn(() => jest.fn()),
       subscribedSymbols: () => [],
+      onTradingEvent: () => () => undefined,
     },
     storage: { getItem: () => Promise.resolve(null), setItem: () => Promise.resolve() },
     removals: createRemovalQueue(),
     analytics: { track: jest.fn() },
+    newId: () => 'test-idempotency-key',
   };
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: Infinity },
+      mutations: { gcTime: Infinity },
+    },
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>

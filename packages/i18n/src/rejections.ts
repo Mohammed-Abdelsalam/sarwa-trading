@@ -1,48 +1,96 @@
 import { type AlertIssue, type Rejection } from '@sarwa/domain';
 
 import { getMessages } from './catalog';
-import { type Copy, type SymbolContext } from './copy';
+import {
+  type AlertIssueCode,
+  type AlertIssueParamTable,
+  type ClientBlock,
+  type Copy,
+  type Formatted,
+  type RejectionKey,
+  type RejectionParamTable,
+  type SymbolContext,
+} from './copy';
 import { createFormatter, type Formatter } from './format';
 import { type Digits, type Locale } from './locale';
 
-// Domain params name their unit in the key (lastTicks, minCents…), which picks the formatter.
-const FORMAT_BY_UNIT: [RegExp, (f: Formatter, value: number) => string][] = [
-  [/Ticks$/, (f, value) => f.price(value)],
-  [/Cents$/, (f, value) => f.money(value)],
-  [/Micros$/, (f, value) => f.shares(value)],
-  [/Bps$/, (f, value) => f.percent(value, { signed: true })],
-  [/Ms$/, (f, value) => f.number(Math.ceil(value / 1000))],
-];
+type ParamFormatters<Table> = {
+  [C in keyof Table]: (params: Table[C], f: Formatter) => Formatted<Table[C]>;
+};
 
-function formatParams(params: object, f: Formatter): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(params).map(([key, value]: [string, unknown]) => {
-      if (typeof value !== 'number') return [key, value];
-      const format = FORMAT_BY_UNIT.find(([unit]) => unit.test(key))?.[1];
-      return [key, format ? format(f, value) : f.number(value)];
-    }),
-  );
-}
+const seconds = (f: Formatter, ms: number) => f.number(Math.ceil(ms / 1000));
 
-// The code narrows the params at runtime; TS can't correlate the union with its table entry.
-function render(
-  copy: unknown,
-  params: object,
-  { locale, digits }: { locale: Locale; digits: Digits },
+// One entry per code: a new code or param doesn't compile until it says how it is formatted.
+const REJECTION_PARAMS: ParamFormatters<RejectionParamTable> = {
+  TRADING_DISABLED: () => ({}),
+  MARKET_PAUSED: () => ({}),
+  SYMBOL_HALTED: () => ({}),
+  MARKET_CLOSED: () => ({}),
+  CONNECTION_NOT_LIVE: () => ({}),
+  STATUS_LOADING: () => ({}),
+  STALE_QUOTE: ({ ageMs, maxAgeMs }, f) => ({
+    ageMs: seconds(f, ageMs),
+    maxAgeMs: seconds(f, maxAgeMs),
+  }),
+  INVALID_PRICE: ({ field, lastTicks }, f) => ({ field, lastTicks: f.price(lastTicks) }),
+  PRICE_COLLAR: ({ field, minTicks, maxTicks }, f) => ({
+    field,
+    minTicks: f.price(minTicks),
+    maxTicks: f.price(maxTicks),
+  }),
+  MIN_NOTIONAL: ({ field, minCents }, f) => ({ field, minCents: f.money(minCents) }),
+  MAX_NOTIONAL: ({ field, maxCents }, f) => ({ field, maxCents: f.money(maxCents) }),
+  INSUFFICIENT_FUNDS: ({ field, requiredCents, availableCents }, f) => ({
+    field,
+    requiredCents: f.money(requiredCents),
+    availableCents: f.money(availableCents),
+  }),
+  INSUFFICIENT_SHARES: ({ field, sellableMicros }, f) => ({
+    field,
+    sellableMicros: f.shares(sellableMicros),
+  }),
+};
+
+const ALERT_ISSUE_PARAMS: ParamFormatters<AlertIssueParamTable> = {
+  ALREADY_ABOVE: ({ lastTicks }, f) => ({ lastTicks: f.price(lastTicks) }),
+  ALREADY_BELOW: ({ lastTicks }, f) => ({ lastTicks: f.price(lastTicks) }),
+  ALREADY_MOVED: ({ moveBps }, f) => ({ moveBps: f.percent(moveBps, { signed: true }) }),
+  MISSING_THRESHOLD: () => ({}),
+};
+
+// Generic over the code, so the compiler pairs each code's params, formatter and copy.
+function renderRejection<C extends RejectionKey>(
+  code: C,
+  params: RejectionParamTable[C],
+  f: Formatter,
   context: SymbolContext,
 ): Copy {
-  const formatted = formatParams(params, createFormatter({ locale, digits }));
-  return (copy as (params: object) => Copy)({ ...formatted, ...context });
+  return getMessages(f.locale).rejections[code]({
+    ...REJECTION_PARAMS[code](params, f),
+    ...context,
+  });
+}
+
+function renderAlertIssue<C extends AlertIssueCode>(
+  code: C,
+  params: AlertIssueParamTable[C],
+  f: Formatter,
+  context: SymbolContext,
+): Copy {
+  return getMessages(f.locale).alertIssues[code]({
+    ...ALERT_ISSUE_PARAMS[code](params, f),
+    ...context,
+  });
 }
 
 export function rejectionMessage(
-  rejection: Rejection,
+  rejection: Rejection | ClientBlock,
   locale: Locale,
   digits: Digits,
   context: SymbolContext,
 ): Copy {
   const { code, ...params } = rejection;
-  return render(getMessages(locale).rejections[code], params, { locale, digits }, context);
+  return renderRejection(code, params, createFormatter({ locale, digits }), context);
 }
 
 export function alertIssueMessage(
@@ -52,5 +100,5 @@ export function alertIssueMessage(
   context: SymbolContext,
 ): Copy {
   const { code, ...params } = issue;
-  return render(getMessages(locale).alertIssues[code], params, { locale, digits }, context);
+  return renderAlertIssue(code, params, createFormatter({ locale, digits }), context);
 }

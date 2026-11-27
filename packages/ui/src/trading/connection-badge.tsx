@@ -1,14 +1,14 @@
-import { LIVE_STATUS_LABELS, type LiveStatus } from '@sarwa/core';
+import { type LiveStatus } from '@sarwa/core';
 
 import { cn } from '../lib/cn';
 
 export function ConnectionBadge({
   status,
-  label = LIVE_STATUS_LABELS[status],
+  label,
   className,
 }: {
   status: LiveStatus;
-  label?: string;
+  label: string;
   className?: string;
 }) {
   const waiting = status === 'reconnecting' || status === 'connecting';
@@ -16,7 +16,7 @@ export function ConnectionBadge({
     <span
       role="status"
       className={cn(
-        'border-border bg-surface gap-conn-gap pl-conn-start inline-flex h-7 items-center whitespace-nowrap rounded-full border pr-2.5 text-xs font-semibold leading-none',
+        'border-border bg-surface gap-conn-gap ps-conn-start inline-flex h-7 items-center rounded-full border pe-2.5 text-xs leading-none font-semibold whitespace-nowrap',
         status === 'live' && 'text-pos',
         waiting && 'text-warn',
         status === 'offline' && 'text-fg-3',

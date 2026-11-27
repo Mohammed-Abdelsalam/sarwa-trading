@@ -20,6 +20,8 @@ coverage/
 
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 *.log
 npm-debug.log*

@@ -15,9 +15,9 @@ const VARIANT: Record<ButtonVariant, [container: string, label: string]> = {
 
 // Every size keeps the 44 pt touch target; sm only tightens radius and padding.
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-11 rounded-control-sm px-3',
-  md: 'h-11 rounded-md px-4',
-  lg: 'h-12 rounded-control-lg px-5',
+  sm: 'min-h-11 rounded-control-sm px-3',
+  md: 'min-h-11 rounded-md px-4',
+  lg: 'min-h-12 rounded-control-lg px-5',
 };
 
 export function Button({

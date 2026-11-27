@@ -6,12 +6,13 @@ import Animated from 'react-native-reanimated';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import { type Period } from '@sarwa/contracts';
-import { type CandleShape, type ChartType, formatCandleTime, type ScrubPoint } from '@sarwa/core';
+import { type CandleShape, type ChartType, type ScrubPoint } from '@sarwa/core';
 import { layout } from '@sarwa/tokens';
 
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { Text } from '../../components/ui/text';
+import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
 import { usePriceChart } from './use-price-chart';
 
@@ -32,9 +33,10 @@ type PeriodChange = ReturnType<typeof usePriceChart>['periodChange'];
 
 export function ChartSkeleton() {
   const colors = useColors();
+  const { t } = useCopy();
   return (
     <View
-      accessibilityLabel="Loading chart"
+      accessibilityLabel={t.chart.loading}
       className="justify-end gap-2.5 px-5 pb-5 pt-3"
       style={{ height: HEIGHT }}
     >
@@ -56,6 +58,7 @@ export function ChartSkeleton() {
 
 function ChartError({ period, onRetry }: { period: Period; onRetry: () => void }) {
   const colors = useColors();
+  const { t } = useCopy();
   return (
     <View style={{ height: HEIGHT }} className="px-5 pb-3 pt-2">
       <View
@@ -65,9 +68,9 @@ function ChartError({ period, onRetry }: { period: Period; onRetry: () => void }
         <View className="h-11 w-11 items-center justify-center rounded-lg bg-neg-subtle">
           <AlertTriangle size={20} color={colors.neg} />
         </View>
-        <Text variant="h3">Chart unavailable</Text>
+        <Text variant="h3">{t.chart.unavailable}</Text>
         <Text variant="sm" className="max-w-60 text-center text-fg-2">
-          {`We couldn't load ${period} history. Live price above is still updating.`}
+          {t.chart.unavailableBody({ period })}
         </Text>
         <Button
           variant="secondary"
@@ -75,7 +78,7 @@ function ChartError({ period, onRetry }: { period: Period; onRetry: () => void }
           icon={<RefreshCw size={16} color={colors.fg} />}
           onPress={onRetry}
         >
-          Retry
+          {t.common.retry}
         </Button>
       </View>
     </View>
@@ -140,6 +143,7 @@ export function PriceChart({
   footer?: (change: PeriodChange) => ReactNode;
 }) {
   const colors = useColors();
+  const { f } = useCopy();
   const { width } = useWindowDimensions();
   const chart = usePriceChart({ symbol, period, type, width, height: HEIGHT, onScrub });
   const stroke = chart.rising ? colors.pos : colors.neg;
@@ -234,7 +238,7 @@ export function PriceChart({
                 className="text-fg-3"
                 style={{ fontVariant: ['tabular-nums'] }}
               >
-                {candle ? formatCandleTime(candle.t, period) : ''}
+                {candle ? f.chartTime(candle.t, period) : ''}
               </Text>
             ))}
           </View>

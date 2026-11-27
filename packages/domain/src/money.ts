@@ -1,9 +1,24 @@
 // Every amount in the domain is an integer in its smallest unit, so arithmetic is exact and the
 // books balance to the cent. Floats only exist at the edges (display, user input).
-export type Cents = number;
-export type Micros = number;
-export type Ticks = number;
-export type Bps = number;
+// Each unit is a branded number: passing cents where ticks are expected fails to compile, at no
+// runtime cost. Arithmetic on them gives a plain number, re-branded through the constructors below.
+export type Cents = number & { readonly __unit: 'cents' };
+export type Micros = number & { readonly __unit: 'micros' };
+export type Ticks = number & { readonly __unit: 'ticks' };
+export type Bps = number & { readonly __unit: 'bps' };
+
+function integer(value: number): number {
+  if (!Number.isSafeInteger(value)) throw new RangeError(`Not an integer amount: ${String(value)}`);
+  return value;
+}
+
+export const cents = (value: number) => integer(value) as Cents;
+export const micros = (value: number) => integer(value) as Micros;
+export const ticks = (value: number) => integer(value) as Ticks;
+export const bps = (value: number) => integer(value) as Bps;
+// The same amount with the opposite sign, keeping its unit.
+export const negate = <Unit extends Cents | Micros | Ticks | Bps>(value: Unit) =>
+  (0 - value) as Unit;
 
 export const CENTS_PER_DOLLAR = 100;
 export const MICROS_PER_SHARE = 1_000_000;
@@ -43,7 +58,7 @@ export function exactNotional(qty: Micros, price: Ticks): bigint {
 }
 
 export function exactToCents(exact: bigint, rounding: Rounding): Cents {
-  return divide(exact, NOTIONAL_SCALE, rounding);
+  return divide(exact, NOTIONAL_SCALE, rounding) as Cents;
 }
 
 // Buys debit with `up` and sells credit with `down`, so rounding never creates money.
@@ -52,20 +67,26 @@ export function notionalCents(qty: Micros, price: Ticks, rounding: Rounding): Ce
 }
 
 export function sharesForCents(amount: Cents, price: Ticks, rounding: Rounding = 'down'): Micros {
-  return divide(BigInt(amount) * NOTIONAL_SCALE, BigInt(price), rounding);
+  return divide(BigInt(amount) * NOTIONAL_SCALE, BigInt(price), rounding) as Micros;
 }
 
-export function scaleBps(value: number, bps: Bps, rounding: Rounding): number {
-  return divide(BigInt(value) * BigInt(BPS_PER_UNIT + bps), BigInt(BPS_PER_UNIT), rounding);
+// A price moved by a signed number of basis points.
+export function scaleBps(price: Ticks, offset: Bps, rounding: Rounding): Ticks {
+  return divide(
+    BigInt(price) * BigInt(BPS_PER_UNIT + offset),
+    BigInt(BPS_PER_UNIT),
+    rounding,
+  ) as Ticks;
 }
 
-// The share of `whole` that `part` makes, in basis points (0 when there is no whole).
-export function ratioBps(part: number, whole: number): Bps {
-  if (whole === 0) return 0;
-  return divide(BigInt(part) * BigInt(BPS_PER_UNIT), BigInt(whole), 'nearest');
+// The share of `whole` that `part` makes, in basis points (0 when there is no whole). Both sides
+// share one unit, so a ratio of cents to micros does not compile.
+export function ratioBps<Unit extends number>(part: Unit, whole: Unit): Bps {
+  if (whole === 0) return 0 as Bps;
+  return divide(BigInt(part) * BigInt(BPS_PER_UNIT), BigInt(whole), 'nearest') as Bps;
 }
 
-export function changeBps(from: number, to: number): Bps {
+export function changeBps<Unit extends number>(from: Unit, to: Unit): Bps {
   return ratioBps(to - from, from);
 }
 
@@ -75,14 +96,19 @@ function scaleDecimal(value: number, digits: number): number {
   return Math.round(Number.isFinite(shifted) ? shifted : value * 10 ** digits);
 }
 
-export const dollarsToCents = (dollars: number): Cents => scaleDecimal(dollars, 2);
-export const dollarsToTicks = (dollars: number): Ticks => scaleDecimal(dollars, 4);
-export const sharesToMicros = (shares: number): Micros => scaleDecimal(shares, 6);
-export const centsToDollars = (cents: Cents): number => cents / CENTS_PER_DOLLAR;
-export const ticksToDollars = (ticks: Ticks): number => ticks / TICKS_PER_DOLLAR;
-export const microsToShares = (micros: Micros): number => micros / MICROS_PER_SHARE;
-export const ticksToCents = (ticks: Ticks, rounding: Rounding): Cents =>
-  divide(BigInt(ticks), BigInt(TICKS_PER_CENT), rounding);
+export const dollarsToCents = (dollars: number) => scaleDecimal(dollars, 2) as Cents;
+export const dollarsToTicks = (dollars: number) => scaleDecimal(dollars, 4) as Ticks;
+export const sharesToMicros = (shares: number) => scaleDecimal(shares, 6) as Micros;
+export const centsToDollars = (amount: Cents): number => amount / CENTS_PER_DOLLAR;
+export const ticksToDollars = (price: Ticks): number => price / TICKS_PER_DOLLAR;
+export const microsToShares = (qty: Micros): number => qty / MICROS_PER_SHARE;
+// The same amount without its sign, keeping its unit.
+export const absolute = <Unit extends Cents | Micros | Ticks | Bps>(value: Unit) =>
+  Math.abs(value) as Unit;
+// A percent as a float (quotes, charts) → basis points, rounded like the display.
+export const percentToBps = (percent: number) => Math.round(percent * 100) as Bps;
+export const ticksToCents = (price: Ticks, rounding: Rounding) =>
+  divide(BigInt(price), BigInt(TICKS_PER_CENT), rounding) as Cents;
 
 // Keypad and input text → integer units; null when the text is not a valid amount at that precision.
 function parseDecimal(text: string, digits: number): number | null {
@@ -93,6 +119,15 @@ function parseDecimal(text: string, digits: number): number | null {
   return Number.isSafeInteger(value) ? value : null;
 }
 
-export const parseCents = (text: string): Cents | null => parseDecimal(text, 2);
-export const parseTicks = (text: string): Ticks | null => parseDecimal(text, 4);
-export const parseMicros = (text: string): Micros | null => parseDecimal(text, 6);
+export const parseCents = (text: string) => parseDecimal(text, 2) as Cents | null;
+export const parseTicks = (text: string) => parseDecimal(text, 4) as Ticks | null;
+export const parseMicros = (text: string) => parseDecimal(text, 6) as Micros | null;
+
+// A signed percent with up to two decimals: "-5.25" (or "−5.25") is −525 bps.
+export function parsePercentBps(text: string): Bps | null {
+  const trimmed = text.trim();
+  const signed = /^[-+−]/.test(trimmed);
+  const value = parseDecimal(signed ? trimmed.slice(1) : trimmed, 2);
+  if (value === null) return null;
+  return (signed && !trimmed.startsWith('+') ? 0 - value : value) as Bps;
+}

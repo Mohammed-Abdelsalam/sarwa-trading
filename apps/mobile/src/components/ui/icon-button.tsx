@@ -17,6 +17,7 @@ export function IconButton({
   iconSize = 20,
   size = 40,
   solid = false,
+  flip = false,
   className,
   ...props
 }: Omit<PressableProps, 'children'> & {
@@ -25,6 +26,7 @@ export function IconButton({
   iconSize?: number;
   size?: IconButtonSize;
   solid?: boolean;
+  flip?: boolean;
   className?: string;
 }) {
   const colors = useColors();
@@ -41,7 +43,11 @@ export function IconButton({
       )}
       {...props}
     >
-      <Icon size={iconSize} color={colors['fg-2']} />
+      <Icon
+        size={iconSize}
+        color={colors['fg-2']}
+        style={flip ? { transform: [{ scaleX: -1 }] } : undefined}
+      />
     </Pressable>
   );
 }

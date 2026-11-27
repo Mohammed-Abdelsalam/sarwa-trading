@@ -1,32 +1,29 @@
 import {
   type Quote,
   type Sector,
-  SECTOR_LABELS,
   SECTORS,
   type StockDetailResponse,
   type StockWithQuote,
 } from '@sarwa/contracts';
+import { type Messages } from '@sarwa/i18n';
 
-import { changePct, formatCompact, formatMarketCap, formatPrice } from './format';
+import { changePct, formatMarketCap, formatPrice, type Localized } from './format';
 
 export type SectorFilter = Sector | 'all';
 
-export const SECTOR_FILTERS: readonly { id: SectorFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  ...SECTORS.map((id) => ({ id, label: SECTOR_LABELS[id] })),
-];
+export const SECTOR_FILTERS: readonly SectorFilter[] = ['all', ...SECTORS];
 
-export function sectorFilterLabel(id: SectorFilter): string {
-  return id === 'all' ? 'All' : SECTOR_LABELS[id];
+export function sectorFilterLabel(t: Messages, id: SectorFilter): string {
+  return id === 'all' ? t.markets.allSectors : t.sectors[id];
 }
 
 export const SORTS = [
-  { label: 'Name', key: 'name', dir: 1 },
-  { label: 'Name', key: 'name', dir: -1 },
-  { label: 'Price', key: 'price', dir: -1 },
-  { label: 'Price', key: 'price', dir: 1 },
-  { label: '% Change', key: 'change', dir: -1 },
-  { label: '% Change', key: 'change', dir: 1 },
+  { key: 'name', dir: 1 },
+  { key: 'name', dir: -1 },
+  { key: 'price', dir: -1 },
+  { key: 'price', dir: 1 },
+  { key: 'change', dir: -1 },
+  { key: 'change', dir: 1 },
 ] as const;
 
 export type SortOption = (typeof SORTS)[number];
@@ -34,12 +31,18 @@ export type SortKey = SortOption['key'];
 
 export const DEFAULT_SORT: SortOption = SORTS[4];
 
+// A null sort keeps the server order, which is the order the stocks were starred in.
+export function sortLabel(t: Messages, sort: SortOption | null): string {
+  return sort ? t.sort.keys[sort.key] : t.sort.orderAdded;
+}
+
+export function watchLabel(t: Messages, symbol: string, watched: boolean): string {
+  return watched ? t.watchlist.removeSymbol({ symbol }) : t.watchlist.addSymbol({ symbol });
+}
+
 export function nextSort(current: SortOption): SortOption {
   return SORTS[(SORTS.indexOf(current) + 1) % SORTS.length] ?? SORTS[0];
 }
-
-// null keeps the server order, which is the order the stocks were starred in.
-export const WATCHLIST_ORDER_LABEL = 'Order added';
 
 export function nextWatchlistSort(current: SortOption | null): SortOption | null {
   if (current === null) return SORTS[0];
@@ -91,16 +94,27 @@ export interface KeyStat {
   value: string;
 }
 
-export function keyStats({ stock, stats }: StockDetailResponse, quote: Quote): KeyStat[] {
+const WEEKS_PER_YEAR = 52;
+
+export function keyStats(
+  { t, f }: Localized,
+  { stock, stats }: StockDetailResponse,
+  quote: Quote,
+): KeyStat[] {
+  const labels = t.stock.stats;
+  const weeks = f.count(WEEKS_PER_YEAR);
   return [
-    { label: 'Market cap', value: formatMarketCap(stats.marketCap) },
-    { label: 'P/E (TTM)', value: stats.peRatio?.toFixed(1) ?? '—' },
-    { label: '52W high', value: formatPrice(stats.week52High) },
-    { label: '52W low', value: formatPrice(stats.week52Low) },
-    { label: 'Open', value: formatPrice(quote.open) },
-    { label: 'Volume', value: formatCompact(quote.volume) },
-    { label: 'Sector', value: SECTOR_LABELS[stock.sector] },
-    { label: 'Exchange', value: stock.exchange },
+    { label: labels.marketCap, value: formatMarketCap(f, stats.marketCap) },
+    {
+      label: labels.pe,
+      value: stats.peRatio === null ? '—' : f.number(Math.round(stats.peRatio * 10) / 10),
+    },
+    { label: labels.weekHigh(weeks), value: formatPrice(f, stats.week52High) },
+    { label: labels.weekLow(weeks), value: formatPrice(f, stats.week52Low) },
+    { label: labels.open, value: formatPrice(f, quote.open) },
+    { label: labels.volume, value: f.compact(quote.volume) },
+    { label: labels.sector, value: t.sectors[stock.sector] },
+    { label: labels.exchange, value: stock.exchange },
   ];
 }
 

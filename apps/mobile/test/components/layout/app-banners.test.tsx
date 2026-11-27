@@ -1,8 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 
 import { type AppNotice, useAppNotices } from '@sarwa/core';
 
 import { AppBanners } from '../../../src/components/layout/app-banners';
+import { renderScreen } from '../../render';
 
 jest.mock('@sarwa/core', () => ({
   ...jest.requireActual<object>('@sarwa/core'),
@@ -30,27 +31,27 @@ const remote: AppNotice = {
 describe('AppBanners', () => {
   it('renders nothing when there is no notice', async () => {
     mockedNotices.mockReturnValue({ notices: [], dismiss: jest.fn() });
-    await render(<AppBanners />);
+    await renderScreen(<AppBanners />);
 
     expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
   });
 
   it('shows the bold title, the message and the retry count of a connection notice', async () => {
     mockedNotices.mockReturnValue({ notices: [reconnecting], dismiss: jest.fn() });
-    await render(<AppBanners />);
+    await renderScreen(<AppBanners />);
 
     expect(screen.getByText('Reconnecting… ')).toBeOnTheScreen();
     expect(screen.getByText(/Prices may be a few seconds behind\./)).toBeOnTheScreen();
     expect(screen.getByText('try 3')).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: 'Dismiss message' })).not.toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeOnTheScreen();
   });
 
   it('lets the user dismiss a remote message', async () => {
     const dismiss = jest.fn();
     mockedNotices.mockReturnValue({ notices: [remote], dismiss });
-    await render(<AppBanners />);
+    await renderScreen(<AppBanners />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Dismiss message' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Dismiss' }));
     expect(dismiss).toHaveBeenCalledWith(remote);
   });
 });

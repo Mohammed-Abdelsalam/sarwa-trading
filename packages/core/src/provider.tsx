@@ -14,6 +14,7 @@ export interface SarwaClient {
   storage: KeyValueStorage;
   removals: RemovalQueue;
   analytics: AnalyticsProvider;
+  newId: () => string;
 }
 
 const SarwaContext = createContext<SarwaClient | null>(null);

@@ -4,6 +4,7 @@ import {
   type SortKey,
   sortByColumn,
   type SortOption,
+  useI18n,
   useIsStale,
   useUndoableRemove,
   useWatchlistStocks,
@@ -15,6 +16,7 @@ export type WatchlistView = 'table' | 'grid';
 const VIEWS: readonly WatchlistView[] = ['table', 'grid'];
 
 export function useWatchlistPage() {
+  const { t } = useI18n();
   const [sort, setSort] = useState<SortOption | null>(null);
   const { rows, average, isLoading, isError, retry } = useWatchlistStocks({ sort });
   const stale = useIsStale();
@@ -30,6 +32,7 @@ export function useWatchlistPage() {
     view,
     sort,
     removed: removal.pending,
+    dismissLabel: t.common.dismiss,
     actions: {
       retry,
       setView,

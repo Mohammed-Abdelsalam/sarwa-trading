@@ -1,4 +1,11 @@
-import { ALERT_CONDITIONS, ORDER_STATUSES } from '@sarwa/domain';
+import {
+  ALERT_CONDITIONS,
+  cents,
+  ORDER_STATUSES,
+  SESSION_MODES,
+  SESSION_PHASES,
+  SIDES,
+} from '@sarwa/domain';
 
 import { createFormatter, getMessages, type Messages } from '../src';
 
@@ -35,6 +42,15 @@ describe('catalogs', () => {
     for (const status of [...ORDER_STATUSES, 'sending'] as const) {
       expect(en.orderStatus[status]).toBeTruthy();
       expect(ar.orderStatus[status]).toBeTruthy();
+    }
+  });
+
+  it('labels every side, session phase and session mode', () => {
+    for (const messages of [en, ar]) {
+      for (const side of SIDES) expect(messages.common.sides[side]).toBeTruthy();
+      for (const phase of SESSION_PHASES) expect(messages.market.phases[phase]).toBeTruthy();
+      for (const mode of SESSION_MODES)
+        expect(messages.admin.trading.sessionModes[mode]).toBeTruthy();
     }
   });
 
@@ -100,11 +116,36 @@ describe('message functions', () => {
     );
   });
 
+  it('keeps the typed confirmation word inside one sentence per language', () => {
+    expect(en.admin.market.dropConfirmLabel({ word: 'DROP' })).toBe('Type DROP to confirm');
+    expect(ar.admin.market.dropConfirmLabel({ word: 'DROP' })).toBe('اكتب DROP للتأكيد');
+  });
+
   it('uses the Arabic dual and few forms', () => {
     expect(ar.admin.tripsToday(arF.count(2))).toBe('تفعيلان اليوم');
     expect(ar.common.minutes(arF.count(5))).toBe('٥ دقائق');
     expect(ar.ticket.quoteValid(arF.count(7))).toBe('السعر صالح لمدة ٧ ثوانٍ');
     expect(ar.orders.lastDays(arF.count(7))).toBe('آخر ٧ أيام');
+    expect(ar.watchlist.count(arF.count(2))).toBe('سهمان');
+    expect(ar.watchlist.count(arF.count(4))).toBe('٤ أسهم');
+  });
+
+  it('counts watchlist stocks in English', () => {
+    expect(en.watchlist.count(enF.count(1))).toBe('1 stock');
+    expect(en.watchlist.count(enF.count(12))).toBe('12 stocks');
+  });
+
+  it('puts the filled amount in fill notification bodies', () => {
+    const fill = { shares: '2.159827', symbol: 'AAPL', amount: enF.money(cents(50_000)) };
+
+    expect(en.notifications.boughtBody(fill)).toBe('Bought 2.159827 AAPL for $500.00');
+    expect(en.notifications.soldBody(fill)).toBe('Sold 2.159827 AAPL for $500.00');
+  });
+
+  it('fills the digit samples from the formatter, so no digits are hardcoded', () => {
+    const sample = createFormatter({ locale: 'ar', digits: 'arab' }).number(123);
+
+    expect(ar.settings.digitOptions.arab({ sample })).toBe('هندية · ١٢٣');
   });
 
   it('keeps tickers and order ids in Latin inside Arabic copy', () => {

@@ -1,19 +1,50 @@
 import { type z } from 'zod';
 
 import {
+  type Account,
+  AccountSchema,
+  type Alert,
+  AlertResponseSchema,
+  type AlertsResponse,
+  AlertsResponseSchema,
   API_PREFIX,
   type AppConfig,
   AppConfigSchema,
+  type CancelOrderResponse,
+  CancelOrderResponseSchema,
   type CandlesResponse,
   CandlesResponseSchema,
+  type CreateAlertRequest,
   DEVICE_ID_HEADER,
+  type EquityPeriod,
+  type EquityResponse,
+  EquityResponseSchema,
+  IDEMPOTENCY_KEY_HEADER,
+  type ModifyOrderRequest,
+  type NotificationsQuery,
+  type NotificationsResponse,
+  NotificationsResponseSchema,
+  type Order,
+  type OrdersQuery,
+  type OrdersResponse,
+  OrdersResponseSchema,
   type Period,
+  type PlaceOrderRequest,
+  PlaceOrderResponseSchema,
+  type PortfolioResponse,
+  PortfolioResponseSchema,
   type Problem,
   ProblemSchema,
   type StockDetailResponse,
   StockDetailResponseSchema,
   type StocksResponse,
   StocksResponseSchema,
+  type PushTokenRequest,
+  routePath,
+  type TradingStatus,
+  TRADING_ROUTES,
+  TradingStatusSchema,
+  type UpdateAlertRequest,
   type WatchlistResponse,
   WatchlistResponseSchema,
 } from '@sarwa/contracts';
@@ -156,6 +187,37 @@ export interface ApiClient {
   getWatchlist(options?: CallOptions): Promise<WatchlistResponse>;
   addToWatchlist(symbol: string): Promise<void>;
   removeFromWatchlist(symbol: string): Promise<void>;
+  getAccount(options?: CallOptions): Promise<Account>;
+  getPortfolio(options?: CallOptions): Promise<PortfolioResponse>;
+  getEquity(period: EquityPeriod, options?: CallOptions): Promise<EquityResponse>;
+  placeOrder(request: PlaceOrderRequest, idempotencyKey: string): Promise<Order>;
+  listOrders(query?: Partial<OrdersQuery>, options?: CallOptions): Promise<OrdersResponse>;
+  getOrder(id: string, options?: CallOptions): Promise<Order>;
+  cancelOrder(id: string): Promise<CancelOrderResponse>;
+  modifyOrder(id: string, patch: ModifyOrderRequest): Promise<Order>;
+  listAlerts(options?: CallOptions): Promise<AlertsResponse>;
+  createAlert(request: CreateAlertRequest): Promise<Alert>;
+  updateAlert(id: string, patch: UpdateAlertRequest): Promise<Alert>;
+  deleteAlert(id: string): Promise<void>;
+  listNotifications(
+    query?: Partial<NotificationsQuery>,
+    options?: CallOptions,
+  ): Promise<NotificationsResponse>;
+  markNotificationRead(id: string): Promise<void>;
+  markAllNotificationsRead(): Promise<void>;
+  registerPushToken(request: PushTokenRequest): Promise<void>;
+  getTradingStatus(options?: CallOptions): Promise<TradingStatus>;
+}
+
+const R = TRADING_ROUTES;
+
+function queryString(query: Record<string, string | number | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) params.set(key, String(value));
+  }
+  const text = params.toString();
+  return text ? `?${text}` : '';
 }
 
 export function createApiClient({
@@ -180,5 +242,54 @@ export function createApiClient({
     getWatchlist: (options) => request('/watchlist', WatchlistResponseSchema, options),
     addToWatchlist: (symbol) => request(`/watchlist/${symbol}`, null, { method: 'PUT' }),
     removeFromWatchlist: (symbol) => request(`/watchlist/${symbol}`, null, { method: 'DELETE' }),
+    getAccount: (options) => request(routePath(R.account), AccountSchema, options),
+    getPortfolio: (options) => request(routePath(R.portfolio), PortfolioResponseSchema, options),
+    getEquity: (period, options) =>
+      request(`${routePath(R.equity)}?period=${period}`, EquityResponseSchema, options),
+    placeOrder: async (body, idempotencyKey) =>
+      (
+        await request(routePath(R.orders), PlaceOrderResponseSchema, {
+          method: 'POST',
+          body,
+          headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
+        })
+      ).order,
+    listOrders: (query = {}, options) =>
+      request(`${routePath(R.orders)}${queryString(query)}`, OrdersResponseSchema, options),
+    getOrder: async (id, options) =>
+      (await request(routePath(R.order, { id }), PlaceOrderResponseSchema, options)).order,
+    cancelOrder: (id) =>
+      request(routePath(R.cancelOrder, { id }), CancelOrderResponseSchema, { method: 'POST' }),
+    modifyOrder: async (id, body) =>
+      (
+        await request(routePath(R.order, { id }), PlaceOrderResponseSchema, {
+          method: 'PATCH',
+          body,
+        })
+      ).order,
+    listAlerts: (options) => request(routePath(R.alerts), AlertsResponseSchema, options),
+    createAlert: async (body) =>
+      (await request(routePath(R.alerts), AlertResponseSchema, { method: 'POST', body })).alert,
+    updateAlert: async (id, body) =>
+      (
+        await request(routePath(R.alert, { id }), AlertResponseSchema, {
+          method: 'PATCH',
+          body,
+        })
+      ).alert,
+    deleteAlert: (id) => request(routePath(R.alert, { id }), null, { method: 'DELETE' }),
+    listNotifications: (query = {}, options) =>
+      request(
+        `${routePath(R.notifications)}${queryString(query)}`,
+        NotificationsResponseSchema,
+        options,
+      ),
+    markNotificationRead: (id) =>
+      request(routePath(R.notificationRead, { id }), null, { method: 'POST' }),
+    markAllNotificationsRead: () =>
+      request(routePath(R.notificationsReadAll), null, { method: 'POST' }),
+    registerPushToken: (body) => request(routePath(R.pushTokens), null, { method: 'POST', body }),
+    getTradingStatus: (options) =>
+      request(routePath(R.tradingStatus), TradingStatusSchema, options),
   };
 }

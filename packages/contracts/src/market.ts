@@ -21,6 +21,11 @@ export const StockSchema = z.object({
 export const QuoteSchema = z.object({
   symbol: SymbolSchema,
   price: z.number().positive(),
+  // Simulated top of book around the last trade; sizes are shares shown at each side.
+  bid: z.number().positive(),
+  ask: z.number().positive(),
+  bidSize: z.number().int().nonnegative(),
+  askSize: z.number().int().nonnegative(),
   prevClose: z.number().positive(),
   open: z.number().positive(),
   dayHigh: z.number().positive(),

@@ -7,10 +7,9 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
-    "lint": "eslint .",
+    "lint": "next typegen && eslint .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "jest",
-    "e2e": "playwright test"
+    "test": "jest"
   },
   "dependencies": {
     "@sarwa/contracts": "workspace:*",
@@ -24,7 +23,6 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.65.1",
     "@sarwa/eslint-config": "workspace:*",
     "@sarwa/jest-config": "workspace:*",
     "@sarwa/tsconfig": "workspace:*",

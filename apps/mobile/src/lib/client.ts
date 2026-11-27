@@ -24,15 +24,14 @@ function resolveApiUrl(): string {
 export const API_URL = resolveApiUrl();
 
 const store = createLiveStore();
+const getDeviceId = createDeviceIdGetter(AsyncStorage, randomUUID);
 
 export const client: SarwaClient = {
   store,
-  api: createApiClient({
-    baseUrl: API_URL,
-    getDeviceId: createDeviceIdGetter(AsyncStorage, randomUUID),
-  }),
-  market: createMarketSocket({ url: API_URL, store }),
+  api: createApiClient({ baseUrl: API_URL, getDeviceId }),
+  market: createMarketSocket({ url: API_URL, store, getDeviceId }),
   storage: AsyncStorage,
   removals: createRemovalQueue(),
   analytics: noopAnalytics,
+  newId: randomUUID,
 };

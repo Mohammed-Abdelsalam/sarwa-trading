@@ -1,3 +1,4 @@
+import { cva } from 'class-variance-authority';
 import { ChevronRight, TrendingUp } from 'lucide-react';
 import { type ComponentProps, type ComponentType, type ReactNode } from 'react';
 
@@ -16,7 +17,7 @@ export function Logo({ showName = true, className }: { showName?: boolean; class
     <span className={cn('type-logo text-fg inline-flex items-center gap-2.5', className)}>
       <span
         aria-hidden
-        className="bg-brand text-on-brand rounded-mark size-7.5 grid place-items-center"
+        className="bg-brand text-on-brand rounded-mark grid size-7.5 place-items-center"
       >
         <TrendingUp className="size-4" />
       </span>
@@ -58,7 +59,7 @@ export function Breadcrumbs({
                   {item.label}
                 </Link>
               )}
-              {last ? null : <ChevronRight aria-hidden className="size-3.5" />}
+              {last ? null : <ChevronRight aria-hidden className="size-3.5 rtl:-scale-x-100" />}
             </li>
           );
         })}
@@ -67,14 +68,20 @@ export function Breadcrumbs({
   );
 }
 
-export function Kbd({ className, ...props }: ComponentProps<'kbd'>) {
-  return (
-    <kbd
-      className={cn(
-        'type-kbd border-border-strong bg-surface text-fg-3 rounded-sm border px-1.5 py-1',
-        className,
-      )}
-      {...props}
-    />
-  );
+const kbdVariants = cva('type-kbd rounded-sm border px-1.5 py-1', {
+  variants: {
+    variant: {
+      default: 'border-border-strong bg-surface text-fg-3',
+      inverse: 'border-on-brand/40 text-on-brand bg-transparent',
+    },
+  },
+  defaultVariants: { variant: 'default' },
+});
+
+export function Kbd({
+  variant,
+  className,
+  ...props
+}: ComponentProps<'kbd'> & { variant?: 'default' | 'inverse' }) {
+  return <kbd className={cn(kbdVariants({ variant }), className)} {...props} />;
 }

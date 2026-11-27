@@ -2,8 +2,9 @@ import { EventEmitter } from 'node:events';
 
 import { type SubscribeAck } from '@sarwa/contracts';
 
-import { createMarketSocket } from '../src/market-socket';
+import { createMarketSocket, type SocketAuthProvider } from '../src/market-socket';
 import { createLiveStore } from '../src/store';
+import { makeOrder } from './trading-fixtures';
 import { makeQuote } from './utils';
 
 class FakeSocket extends EventEmitter {
@@ -11,13 +12,18 @@ class FakeSocket extends EventEmitter {
   active = false;
   io = new EventEmitter();
   sent: { event: string; symbols: string[] }[] = [];
+  rejectSubscribe = false;
 
   override emit(event: string, ...args: unknown[]): boolean {
     if (event === 'subscribe' || event === 'unsubscribe') {
       const { symbols } = args[0] as { symbols: string[] };
       this.sent.push({ event, symbols });
       const ack = args[1] as ((res: SubscribeAck) => void) | undefined;
-      ack?.({ ok: true, quotes: symbols.map((symbol) => makeQuote({ symbol })) });
+      ack?.(
+        this.rejectSubscribe
+          ? { ok: false, error: { code: 'TOO_MANY_SYMBOLS', message: 'Too many' } }
+          : { ok: true, quotes: symbols.map((symbol) => makeQuote({ symbol })) },
+      );
       return true;
     }
     return super.emit(event, ...args);
@@ -47,16 +53,27 @@ class FakeSocket extends EventEmitter {
   }
 }
 
-function setup() {
+const DEVICE_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+
+function setup(getDeviceId = () => Promise.resolve(DEVICE_ID)) {
   jest.useFakeTimers();
   const fake = new FakeSocket();
   const store = createLiveStore();
+  let auth: SocketAuthProvider | undefined;
   const market = createMarketSocket({
     url: 'http://api',
     store,
-    createSocket: () => fake as never,
+    getDeviceId,
+    createSocket: (_url, provider) => {
+      auth = provider;
+      return fake as never;
+    },
   });
-  return { fake, store, market };
+  const handshake = () =>
+    new Promise((resolve) => {
+      auth?.(resolve);
+    });
+  return { fake, store, market, handshake };
 }
 
 afterEach(() => {
@@ -64,6 +81,27 @@ afterEach(() => {
 });
 
 describe('market socket', () => {
+  it('uses WebSocket only unless the app asks for polling first', () => {
+    const createSocket = jest.fn(() => new FakeSocket() as never);
+    const options = {
+      url: 'http://api',
+      store: createLiveStore(),
+      getDeviceId: () => Promise.resolve(DEVICE_ID),
+      createSocket,
+    };
+
+    createMarketSocket(options);
+    createMarketSocket({ ...options, transports: ['polling', 'websocket'] });
+
+    expect(createSocket).toHaveBeenNthCalledWith(1, 'http://api/market', expect.any(Function), [
+      'websocket',
+    ]);
+    expect(createSocket).toHaveBeenNthCalledWith(2, 'http://api/market', expect.any(Function), [
+      'polling',
+      'websocket',
+    ]);
+  });
+
   it('subscribes once per symbol, batched after a short delay', () => {
     const { fake, market } = setup();
     market.connect();
@@ -73,6 +111,34 @@ describe('market socket', () => {
     jest.advanceTimersByTime(200);
 
     expect(fake.sent).toEqual([{ event: 'subscribe', symbols: ['AAPL', 'TSLA'] }]);
+  });
+
+  it('subscribes in chunks the server accepts', () => {
+    const { fake, market } = setup();
+    market.connect();
+    const symbols = Array.from({ length: 60 }, (_, i) => `S${String(i)}`);
+
+    market.acquire(symbols);
+    jest.advanceTimersByTime(200);
+
+    expect(fake.sent.map((sent) => sent.symbols.length)).toEqual([50, 10]);
+    expect(market.subscribedSymbols()).toHaveLength(60);
+  });
+
+  it('does not count symbols the server refused as subscribed, and retries them', () => {
+    const { fake, market } = setup();
+    market.connect();
+    fake.rejectSubscribe = true;
+
+    market.acquire(['AAPL']);
+    jest.advanceTimersByTime(200);
+    expect(market.subscribedSymbols()).toEqual([]);
+
+    fake.rejectSubscribe = false;
+    market.acquire(['TSLA']);
+    jest.advanceTimersByTime(200);
+    expect(fake.sent.at(-1)).toEqual({ event: 'subscribe', symbols: ['AAPL', 'TSLA'] });
+    expect(market.subscribedSymbols()).toEqual(['AAPL', 'TSLA']);
   });
 
   it('unsubscribes only when the last user of a symbol releases it', () => {
@@ -218,5 +284,92 @@ describe('market socket', () => {
     market.connect();
     market.disconnect();
     expect(store.getState().connection.status).toBe('offline');
+  });
+
+  it('sends the device id in the handshake auth', async () => {
+    const { handshake } = setup();
+
+    await expect(handshake()).resolves.toEqual({ deviceId: DEVICE_ID });
+  });
+
+  it('sends an empty handshake when the device id cannot be read', async () => {
+    const { handshake } = setup(() => Promise.reject(new Error('storage down')));
+
+    await expect(handshake()).resolves.toEqual({});
+  });
+});
+
+describe('market socket trading events', () => {
+  it('passes a valid v1 event to every listener right away', () => {
+    const { fake, market } = setup();
+    const listener = jest.fn();
+    market.onTradingEvent(listener);
+    const payload = { v: 1, order: makeOrder() };
+
+    fake.emit('order.updated', payload);
+
+    expect(listener).toHaveBeenCalledWith({ name: 'order.updated', payload });
+  });
+
+  it('drops events that are malformed or of an unknown version', () => {
+    const { fake, market } = setup();
+    const listener = jest.fn();
+    market.onTradingEvent(listener);
+
+    fake.emit('order.updated', { v: 2, order: makeOrder() });
+    fake.emit('order.updated', { v: 1, order: { ...makeOrder(), status: 'exploded' } });
+    fake.emit('symbol.resumed', { v: 1, symbol: 'aapl', at: 1 });
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('relays every trading event name', () => {
+    const { fake, market } = setup();
+    const names: string[] = [];
+    market.onTradingEvent((event) => {
+      names.push(event.name);
+    });
+    const halt = { symbol: 'AAPL', source: 'admin', message: 'News', since: 1, resumesAt: null };
+
+    fake.emit('alert.triggered', {
+      v: 1,
+      alert: {
+        id: 'al-1',
+        symbol: 'AAPL',
+        condition: 'price_above',
+        thresholdTicks: 1,
+        thresholdBps: null,
+        repeat: 'once',
+        enabled: true,
+        armed: false,
+        lastFiredAt: 1,
+        createdAt: 1,
+      },
+      lastTicks: 2,
+    });
+    fake.emit('notification', {
+      v: 1,
+      notification: {
+        id: 'n-1',
+        payload: { kind: 'market_notice', message: 'Hi' },
+        readAt: null,
+        createdAt: 1,
+      },
+    });
+    fake.emit('symbol.halted', { v: 1, halt });
+    fake.emit('symbol.resumed', { v: 1, symbol: 'AAPL', at: 2 });
+
+    expect(names).toEqual(['alert.triggered', 'notification', 'symbol.halted', 'symbol.resumed']);
+  });
+
+  it('stops calling a listener once it unsubscribes', () => {
+    const { fake, market } = setup();
+    const listener = jest.fn();
+    const unsubscribe = market.onTradingEvent(listener);
+
+    unsubscribe();
+    fake.emit('order.updated', { v: 1, order: makeOrder() });
+
+    expect(listener).not.toHaveBeenCalled();
   });
 });

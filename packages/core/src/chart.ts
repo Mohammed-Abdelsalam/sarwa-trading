@@ -1,14 +1,11 @@
 import { type Candle, type Period, PERIODS, type Quote } from '@sarwa/contracts';
+import { absolute, percentToBps } from '@sarwa/domain';
 
-import { direction, formatPrice } from './format';
+import { direction, formatPrice, type Localized } from './format';
 import { type KeyStat } from './markets';
 
-export type ChartType = 'area' | 'candle';
-
-export const CHART_TYPES = [
-  { value: 'area', label: 'Area' },
-  { value: 'candle', label: 'Candlestick' },
-] as const satisfies readonly { value: ChartType; label: string }[];
+export const CHART_TYPES = ['area', 'candle'] as const;
+export type ChartType = (typeof CHART_TYPES)[number];
 
 export function parseChartType(value: string | null): ChartType {
   return value === 'candle' ? 'candle' : 'area';
@@ -112,24 +109,24 @@ export function percentChange(from: number, to: number): number {
   return ((to - from) / from) * 100;
 }
 
-const DIRECTION_WORD = { up: 'up', down: 'down', flat: 'flat' } as const;
-
 // The text alternative for a chart: overall move plus the range, read once instead of every tick.
 export function describeChart(
+  { t, f }: Localized,
   symbol: string,
   period: Period,
   candles: readonly Candle[],
   baseline: number | null,
 ): string {
   const last = candles.at(-1);
-  if (!last || baseline === null) return `${symbol} price chart, ${period}`;
+  if (!last || baseline === null) return t.chart.empty({ symbol, period });
   const pct = percentChange(baseline, last.c);
-  const dir = direction(pct);
-  const move = dir === 'flat' ? 'flat' : `${DIRECTION_WORD[dir]} ${Math.abs(pct).toFixed(2)}%`;
-  const when = period === '1D' ? 'today' : `over ${period}`;
-  const low = Math.min(...candles.map((c) => c.l));
-  const high = Math.max(...candles.map((c) => c.h));
-  return `${symbol} ${move} ${when}, low ${formatPrice(low)}, high ${formatPrice(high)}`;
+  return t.chart.summary[direction(pct)]({
+    symbol,
+    pct: f.percent(absolute(percentToBps(pct))),
+    when: period === '1D' ? t.chart.today : t.chart.over({ period }),
+    low: formatPrice(f, Math.min(...candles.map((c) => c.l))),
+    high: formatPrice(f, Math.max(...candles.map((c) => c.h))),
+  });
 }
 
 export interface CandleShape {
@@ -205,11 +202,11 @@ export function periodChange(
   return { value: last.c - baseline, pct: percentChange(baseline, last.c) };
 }
 
-export function ohlc(candle: Candle): KeyStat[] {
+export function ohlc({ t, f }: Localized, candle: Candle): KeyStat[] {
   return [
-    { label: 'Open', value: formatPrice(candle.o) },
-    { label: 'High', value: formatPrice(candle.h) },
-    { label: 'Low', value: formatPrice(candle.l) },
-    { label: 'Close', value: formatPrice(candle.c) },
+    { label: t.chart.ohlc.open, value: formatPrice(f, candle.o) },
+    { label: t.chart.ohlc.high, value: formatPrice(f, candle.h) },
+    { label: t.chart.ohlc.low, value: formatPrice(f, candle.l) },
+    { label: t.chart.ohlc.close, value: formatPrice(f, candle.c) },
   ];
 }

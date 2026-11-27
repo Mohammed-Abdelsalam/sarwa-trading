@@ -1,10 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { type ReactElement } from 'react';
 
 import { type StockRowProps } from '../../../src/components/trading/stock-row';
 import { useWatchlistPage } from '../../../src/features/watchlist/use-watchlist-page';
 import { WatchlistPage } from '../../../src/features/watchlist/watchlist-page';
+import { providers } from '../../copy';
 import { makeStock } from '../../fixtures';
+
+const render = (ui: ReactElement, options?: Parameters<typeof providers>[0]) =>
+  rtlRender(ui, { wrapper: providers(options).wrapper });
 
 jest.mock('../../../src/features/watchlist/use-watchlist-page');
 jest.mock('../../../src/components/trading/stock-row', () => ({
@@ -31,6 +36,7 @@ function viewModel(
     view: 'table',
     sort: null,
     removed: null,
+    dismissLabel: 'Dismiss',
     actions: {
       retry: jest.fn(),
       setView: jest.fn(),
@@ -50,7 +56,10 @@ describe('WatchlistPage', () => {
     render(<WatchlistPage />);
 
     expect(screen.getByRole('heading', { name: 'Your watchlist is empty' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Browse markets' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Browse markets' })).toHaveAttribute(
+      'href',
+      '/markets',
+    );
   });
 
   it('shows an error with retry instead of the empty state when loading fails', async () => {
@@ -85,5 +94,16 @@ describe('WatchlistPage', () => {
 
     expect(model.actions.undo).toHaveBeenCalledTimes(1);
     expect(model.actions.dismissUndo).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the count and average move in Arabic with Arabic-Indic digits', () => {
+    mockedHook.mockReturnValue(
+      viewModel({ rows: [makeStock('AAPL'), makeStock('NVDA')], average: 1.24 }),
+    );
+    render(<WatchlistPage />, { locale: 'ar', digits: 'arab' });
+
+    expect(screen.getByRole('heading', { name: 'المفضلة' })).toBeInTheDocument();
+    expect(screen.getByText(/سهمان/)).toHaveTextContent('المتوسط اليوم');
+    expect(screen.getByText('▲ ⁦+١٫٢٤٪⁩')).toBeInTheDocument();
   });
 });

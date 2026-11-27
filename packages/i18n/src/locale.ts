@@ -16,13 +16,24 @@ export const DEFAULT_DIGITS: Digits = 'latn';
 
 export const INTL_LOCALE: Record<Locale, string> = { en: 'en-US', ar: 'ar-EG' };
 
-export type PluralForms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string };
+export type PluralCategory = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other';
+export type PluralForms = Partial<Record<PluralCategory, string>> & { other: string };
 
-const pluralRules = {
-  en: new Intl.PluralRules('en'),
-  ar: new Intl.PluralRules('ar'),
-} satisfies Record<Locale, Intl.PluralRules>;
+// CLDR cardinal rules, written out because Hermes (React Native on Android) has no Intl.PluralRules.
+const pluralRules: Record<Locale, (count: number) => PluralCategory> = {
+  en: (n) => (n === 1 ? 'one' : 'other'),
+  ar: (n) => {
+    if (!Number.isInteger(n)) return 'other';
+    const mod100 = Math.abs(n) % 100;
+    if (n === 0) return 'zero';
+    if (n === 1) return 'one';
+    if (n === 2) return 'two';
+    if (mod100 >= 3 && mod100 <= 10) return 'few';
+    if (mod100 >= 11) return 'many';
+    return 'other';
+  },
+};
 
 export function plural(locale: Locale, count: number, forms: PluralForms): string {
-  return forms[pluralRules[locale].select(count)] ?? forms.other;
+  return forms[pluralRules[locale](count)] ?? forms.other;
 }

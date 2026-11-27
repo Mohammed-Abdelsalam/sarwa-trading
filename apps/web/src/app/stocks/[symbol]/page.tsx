@@ -2,7 +2,7 @@ import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query
 import { type Metadata } from 'next';
 import { Suspense } from 'react';
 
-import { formatPrice, isNotFound, queryKeys } from '@sarwa/core/server';
+import { createFormatter, formatPrice, isNotFound, queryKeys } from '@sarwa/core/server';
 
 import { RemovedStockPage } from '../../../features/stock-detail/removed-stock-page';
 import { StockDetailPage } from '../../../features/stock-detail/stock-detail-page';
@@ -16,7 +16,7 @@ export async function generateMetadata({
     const { stock, quote } = await getStockDetail(symbol);
     return {
       title: `${symbol} · ${stock.name}`,
-      description: `${stock.name} (${symbol}) live price ${formatPrice(quote.price)}, chart and key statistics.`,
+      description: `${stock.name} (${symbol}) live price ${formatPrice(createFormatter({ locale: 'en' }), quote.price)}, chart and key statistics.`,
     };
   } catch (error) {
     return isNotFound(error)

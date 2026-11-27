@@ -1,14 +1,16 @@
 import {
   type AlertCondition,
   type AlertRepeat,
-  type ExecutionRules,
   type OrderStatus,
   type OrderType,
+  type SessionPhase,
+  type Side,
   type TimeInForce,
 } from '@sarwa/domain';
 
 import { type AlertIssueCopy, type Count, type RejectionCopy } from '../copy';
 import { plural } from '../locale';
+import { adminEn } from './admin-en';
 
 const rejections: RejectionCopy = {
   TRADING_DISABLED: () => ({
@@ -60,6 +62,15 @@ const rejections: RejectionCopy = {
     reason: 'Insufficient buying power',
     explanation: `This order needs ${requiredCents} but you have ${availableCents} of buying power.`,
   }),
+  CONNECTION_NOT_LIVE: () => ({
+    reason: 'Waiting for live prices',
+    explanation:
+      "Orders open again as soon as the price stream reconnects. We won't trade on old prices.",
+  }),
+  STATUS_LOADING: () => ({
+    reason: 'Loading…',
+    explanation: 'Checking whether trading is open for this stock.',
+  }),
   INSUFFICIENT_SHARES: ({ sellableMicros }) => ({
     reason: 'Not enough shares',
     explanation: `You can sell up to ${sellableMicros} sh. Shares reserved by open sell orders can't be sold twice.`,
@@ -109,6 +120,231 @@ export const en = {
     minutesAgo: ({ n }: Count) => `${n} min ago`,
     hoursAgo: ({ n }: Count) => `${n} h ago`,
     minutes: ({ n }: Count) => `${n} min`,
+    sides: { buy: 'BUY', sell: 'SELL' } satisfies Record<Side, string>,
+    sharesShort: ({ shares }: { shares: string }) => `${shares} sh`,
+    loadErrorBody: 'Check your connection and try again.',
+    undo: 'Undo',
+    share: 'Share',
+    equity: 'Equity',
+  },
+  sectors: {
+    tech: 'Technology',
+    fin: 'Finance',
+    energy: 'Energy',
+    health: 'Healthcare',
+    consumer: 'Consumer',
+    media: 'Media',
+  },
+  markets: {
+    title: 'Markets',
+    stocks: 'Stocks',
+    summary: ({ n }: Count) => `${n} stocks · US equities · USD`,
+    summaryShort: ({ n }: Count) => `${n} stocks · prices in USD`,
+    searchLabel: 'Search stocks',
+    clearSearch: 'Clear search',
+    sector: 'Sector',
+    allSectors: 'All',
+    loading: 'Loading stocks',
+    updating: 'Updating prices…',
+    loadError: "Couldn't load markets",
+    loadErrorBody:
+      "We couldn't reach the price server. Check your connection — we'll keep trying in the background.",
+    noMatchesBody: ({ sector }: { sector: string }) =>
+      `Try a ticker like AAPL or a company name like “Netflix”. Sector filter: ${sector}.`,
+    detail: ({ symbol }: { symbol: string }) => `${symbol} detail`,
+    openFullPage: 'Open full page',
+  },
+  sort: {
+    label: 'Sort',
+    keys: { name: 'Name', price: 'Price', change: '% Change' },
+    orderAdded: 'Order added',
+    ascending: 'ascending',
+    descending: 'descending',
+    clickToChange: ({ label, order }: { label: string; order: string }) =>
+      `Sort by ${label}, ${order}. Click to change`,
+    tapToChange: ({ label }: { label: string }) => `Sort by ${label}, tap to change`,
+  },
+  watchlist: {
+    title: 'Watchlist',
+    count: ({ count, n }: Count) =>
+      `${n} ${plural('en', count, { one: 'stock', other: 'stocks' })}`,
+    averageToday: 'average today',
+    avgToday: 'avg today',
+    view: 'View',
+    tableView: 'Table view',
+    gridView: 'Grid view',
+    loadError: "Couldn't load your watchlist",
+    loadErrorBody: "We couldn't reach the price server. Check your connection and try again.",
+    removed: ({ symbol }: { symbol: string }) => `${symbol} removed from Watchlist`,
+    remove: 'Remove',
+    addSymbol: ({ symbol }: { symbol: string }) => `Add ${symbol} to watchlist`,
+    removeSymbol: ({ symbol }: { symbol: string }) => `Remove ${symbol} from watchlist`,
+    addAction: 'Add to watchlist',
+    removeAction: 'Remove from watchlist',
+    swipeHint: 'Swipe left on a row to remove',
+    emptyTitle: 'Your watchlist is empty',
+    emptyBody: 'Tap the star on any stock to follow its live price here.',
+    emptyKeyHint: {
+      before: 'Star any stock in Markets — or press',
+      after: 'on a focused row — and it shows up here with live prices.',
+    },
+    browse: 'Browse markets',
+    columns: {
+      stock: 'Stock',
+      price: 'Price',
+      change: 'Change',
+      changePct: '% Change',
+      today: 'Today',
+      dayRange: 'Day range',
+      marketCap: 'Market cap',
+      actions: 'Actions',
+    },
+  },
+  stock: {
+    alert: 'Alert',
+    watch: 'Watch',
+    watching: 'Watching',
+    quoteLabel: {
+      up: ({ price, pct }: { price: string; pct: string }) => `${price}, up ${pct} today`,
+      down: ({ price, pct }: { price: string; pct: string }) => `${price}, down ${pct} today`,
+      flat: ({ price }: { price: string; pct: string }) => `${price}, unchanged today`,
+    },
+    rowLabel: {
+      up: ({ name, symbol, price, pct }: Record<'name' | 'symbol' | 'price' | 'pct', string>) =>
+        `${name}, ${symbol}. ${price}. Up ${pct} today.`,
+      down: ({ name, symbol, price, pct }: Record<'name' | 'symbol' | 'price' | 'pct', string>) =>
+        `${name}, ${symbol}. ${price}. Down ${pct} today.`,
+      flat: ({ name, symbol, price }: Record<'name' | 'symbol' | 'price' | 'pct', string>) =>
+        `${name}, ${symbol}. ${price}. Unchanged today.`,
+    },
+    inWatchlist: 'In watchlist.',
+    shareMessage: ({
+      symbol,
+      name,
+      price,
+      pct,
+    }: Record<'symbol' | 'name' | 'price' | 'pct', string>) =>
+      `${symbol} · ${name} ${price}, ${pct} today`,
+    today: ({ time }: { time: string }) => `Today · ${time}`,
+    keyStats: 'Key statistics',
+    simulated: 'Simulated data',
+    stats: {
+      marketCap: 'Market cap',
+      pe: 'P/E (TTM)',
+      weekHigh: ({ n }: Count) => `${n}W high`,
+      weekLow: ({ n }: Count) => `${n}W low`,
+      open: 'Open',
+      volume: 'Volume',
+      sector: 'Sector',
+      exchange: 'Exchange',
+    },
+    range: ({ n }: Count) => `${n}-week range`,
+    rangeLabel: ({ n }: Count) => `Price within the ${n}-week range`,
+    rangeValue: ({ pct, low, high }: Record<'pct' | 'low' | 'high', string>) =>
+      `${pct} of the way from ${low} to ${high}`,
+    loadError: ({ symbol }: { symbol: string }) => `Couldn't load ${symbol}`,
+    moreIn: ({ sector }: { sector: string }) => `More in ${sector}`,
+    moreInSector: 'More in this sector',
+    removedTitle: 'This stock is no longer available',
+    removedBody: ({ symbol }: { symbol: string }) =>
+      `${symbol} was removed from Mini Trading. You opened an old link — prices for it are no longer streaming.`,
+    backToMarkets: 'Back to Markets',
+    removeFromWatchlist: 'Remove from Watchlist',
+  },
+  chart: {
+    label: ({ symbol }: { symbol: string }) => `${symbol} price chart`,
+    empty: ({ symbol, period }: { symbol: string; period: string }) =>
+      `${symbol} price chart, ${period}`,
+    summary: {
+      up: ({
+        symbol,
+        pct,
+        when,
+        low,
+        high,
+      }: Record<'symbol' | 'pct' | 'when' | 'low' | 'high', string>) =>
+        `${symbol} up ${pct} ${when}, low ${low}, high ${high}`,
+      down: ({
+        symbol,
+        pct,
+        when,
+        low,
+        high,
+      }: Record<'symbol' | 'pct' | 'when' | 'low' | 'high', string>) =>
+        `${symbol} down ${pct} ${when}, low ${low}, high ${high}`,
+      flat: ({
+        symbol,
+        when,
+        low,
+        high,
+      }: Record<'symbol' | 'pct' | 'when' | 'low' | 'high', string>) =>
+        `${symbol} flat ${when}, low ${low}, high ${high}`,
+    },
+    today: 'today',
+    over: ({ period }: { period: string }) => `over ${period}`,
+    thisPeriod: 'this period',
+    type: 'Chart type',
+    types: { area: 'Area', candle: 'Candlestick' },
+    period: 'Chart period',
+    loading: 'Loading chart',
+    unavailable: 'Chart unavailable',
+    unavailableBody: ({ period }: { period: string }) =>
+      `We couldn't load ${period} history. Live price above is still updating.`,
+    ohlc: { open: 'Open', high: 'High', low: 'Low', close: 'Close' },
+  },
+  notices: {
+    offlineTitle: "You're offline",
+    offline: '— showing cached prices.',
+    offlineSince: ({ time }: { time: string }) => `— showing cached prices from ${time}.`,
+    reconnecting: 'Prices may be a few seconds behind.',
+    attempt: ({ n }: Count) => `try ${n}`,
+    paused: ({ time }: { time: string }) =>
+      `— prices are frozen at ${time} and will resume automatically.`,
+  },
+  settings: {
+    title: 'Settings',
+    appearance: 'Appearance',
+    theme: 'Theme',
+    themes: { light: 'Light', dark: 'Dark', system: 'Follows system' },
+    languageRegion: 'Language & numbers',
+    language: 'Language',
+    languages: { en: 'English', ar: 'العربية' },
+    digits: 'Digits',
+    digitOptions: {
+      latn: ({ sample }: { sample: string }) => `Western · ${sample}`,
+      arab: ({ sample }: { sample: string }) => `Arabic-Indic · ${sample}`,
+    },
+  },
+  search: {
+    title: 'Search',
+    placeholder: 'Search symbol or company',
+    recent: 'Recent searches',
+    clearRecent: 'Clear',
+    trending: 'Trending',
+    noMatches: ({ query }: { query: string }) => `No matches for “${query}”`,
+  },
+  csv: {
+    portfolio: {
+      symbol: 'Symbol',
+      shares: 'Shares',
+      avgCost: 'Avg cost',
+      last: 'Last',
+      marketValue: 'Market value',
+      today: 'Today',
+      unrealized: 'Unrealized P&L',
+      totalReturn: 'Total return',
+      weight: 'Weight',
+    },
+    orders: {
+      id: 'Order ID',
+      side: 'Side',
+      symbol: 'Symbol',
+      type: 'Type',
+      size: 'Qty / amount',
+      status: 'Status',
+      detail: 'Detail',
+      time: 'Time',
+    },
   },
   nav: {
     home: 'Home',
@@ -124,6 +360,7 @@ export const en = {
   paper: {
     badge: 'Paper · virtual $',
     tag: 'PAPER',
+    account: 'Paper account',
     disclosure: 'Simulated prices · virtual money · not investment advice',
     tradingDisclosure: 'Paper trading · simulated prices · not investment advice',
     orderNote:
@@ -142,6 +379,24 @@ export const en = {
     resumesAt: ({ time }: { time: string }) => `Trading resumes at ${time}`,
     closesEarlyTitle: 'Markets close early today',
     closesEarlyBody: ({ time }: { time: string }) => `at ${time} — open Day orders expire then.`,
+    states: {
+      open: 'Open',
+      closed: 'Closed',
+      pre: 'Pre-market',
+      post: 'After hours',
+      halted: 'Halted',
+      reconnecting: 'Reconnecting…',
+      offline: 'Offline',
+      connecting: 'Connecting…',
+      paused: 'Market paused',
+      live: 'Live',
+    },
+    phases: {
+      pre: 'Pre-market',
+      regular: 'Regular session',
+      post: 'After hours',
+      closed: 'Closed',
+    } satisfies Record<SessionPhase, string>,
   },
   ticket: {
     a11yLabel: 'Order ticket',
@@ -252,6 +507,17 @@ export const en = {
     weight: 'Weight',
     viewPosition: 'View position',
     setAlert: 'Set alert',
+    stopHintBuy: ({ price }: { price: string }) =>
+      `becomes a market buy if the price reaches ${price}`,
+    stopHintSell: ({ price }: { price: string }) =>
+      `becomes a market sell if the price falls to ${price}`,
+    quantityShares: ({ shares }: { shares: string }) => `${shares} shares`,
+    quoteValidityA11y: 'Quote validity',
+    largeOrderToggle: 'I understand, this is a large order',
+    placedTitle: 'Order placed',
+    placedBody: 'Your order is working on the book. You can track it in Orders.',
+    sendFailed: "Couldn't send the order",
+    sendFailedBody: 'Your order was not confirmed. Retrying is safe — it can never fill twice.',
   },
   orderStatus: {
     sending: 'Sending…',
@@ -436,20 +702,16 @@ export const en = {
     settings: 'Notification settings',
     empty: "You're all caught up.",
     orderFilled: 'Order filled',
-    boughtBody: ({
-      shares,
-      symbol,
-      price,
-      amount,
-    }: Record<'shares' | 'symbol' | 'price' | 'amount', string>) =>
-      `Bought ${shares} ${symbol} at ${price} · ${amount}`,
-    soldBody: ({
-      shares,
-      symbol,
-      price,
-      amount,
-    }: Record<'shares' | 'symbol' | 'price' | 'amount', string>) =>
-      `Sold ${shares} ${symbol} at ${price} · ${amount}`,
+    orderPartiallyFilled: 'Order partially filled',
+    boughtBody: ({ shares, symbol, amount }: Record<'shares' | 'symbol' | 'amount', string>) =>
+      `Bought ${shares} ${symbol} for ${amount}`,
+    soldBody: ({ shares, symbol, amount }: Record<'shares' | 'symbol' | 'amount', string>) =>
+      `Sold ${shares} ${symbol} for ${amount}`,
+    orderLabel: ({ side, symbol }: { side: string; symbol: string }) => `${side} ${symbol}`,
+    orderCanceled: 'Order canceled',
+    orderCanceledBody: ({ order }: { order: string }) => `${order} was canceled.`,
+    symbolHalted: ({ symbol }: { symbol: string }) => `${symbol} halted`,
+    marketNotice: 'Market notice',
     orderRejected: 'Order rejected',
     orderRejectedBody: ({ order, reason }: { order: string; reason: string }) =>
       `${order} — ${reason}.`,
@@ -462,122 +724,7 @@ export const en = {
     marketClosesEarly: 'Markets close early today',
     marketClosesEarlyBody: ({ time }: { time: string }) => `Regular session ends at ${time}.`,
   },
-  admin: {
-    tradingControls: 'Trading controls',
-    tradingControlsSub:
-      'Paper-trading engine · rules apply to every client on the next request · every change is audited',
-    tradingEnabled: 'Trading enabled',
-    killSwitchHint:
-      'Kill switch. Off = clients keep live prices but Buy/Sell show “Trading paused by operator”; open orders keep working.',
-    lastChanged: ({ who, time }: { who: string; time: string }) =>
-      `Last changed by ${who} · ${time}`,
-    circuitBreaker: 'Circuit breaker',
-    circuitBreakerRule: ({ move, window, halt }: { move: string; window: string; halt: string }) =>
-      `Auto-halt a symbol that moves ≥ ${move} within ${window}, for ${halt}`,
-    tripsToday: ({ count, n }: Count) =>
-      `${n} ${plural('en', count, { one: 'trip', other: 'trips' })} today`,
-    session: 'Session',
-    sessionNow: 'Now',
-    sessionNext: 'Next',
-    sessionNote: 'Day orders expire at close · market orders after close are queued for the open',
-    halts: 'Halts',
-    haltSymbol: 'Halt a symbol',
-    haltColumns: {
-      symbol: 'Symbol',
-      reason: 'Reason',
-      since: 'Since',
-      resumes: 'Resumes',
-      actions: 'Actions',
-    },
-    haltedBadge: 'HALTED',
-    offBadge: 'OFF',
-    resumeNow: 'Resume now',
-    manual: 'Manual',
-    auto: '(auto)',
-    circuitBreakerReason: ({ move, duration }: { move: string; duration: string }) =>
-      `Circuit breaker · ${move} in ${duration}`,
-    haltsNote:
-      'Halted symbols: prices keep streaming, new orders are rejected with SYMBOL_HALTED, open orders are paused (not canceled).',
-    haltTitle: ({ symbol }: { symbol: string }) => `Halt ${symbol}`,
-    haltBody: 'New orders are rejected; open orders pause; prices keep streaming.',
-    haltReasonLabel: 'Reason (shown to users)',
-    haltUsersSee: ({ symbol, reason }: { symbol: string; reason: string }) =>
-      `Users see: “${symbol} is halted — ${reason}”.`,
-    haltDuration: 'Duration',
-    untilClose: 'Until close',
-    haltNotify: ({ n }: Count) => `Notify ${n} holders & watchers`,
-    haltOpenOrders: ({ count, n, symbol }: Count & { symbol: string }) =>
-      `${n} open ${symbol} ${plural('en', count, { one: 'order', other: 'orders' })} will pause. Day orders still expire at close.`,
-    haltConfirm: ({ symbol, duration }: { symbol: string; duration: string }) =>
-      `Halt ${symbol} for ${duration}`,
-    haltConfirmUntilClose: ({ symbol }: { symbol: string }) => `Halt ${symbol} until close`,
-    executionRules: 'Execution rules',
-    saveRules: 'Save rules',
-    rules: {
-      spreadBps: { label: 'Bid/ask spread', hint: 'Applied around last price' },
-      maxSlippageBps: { label: 'Max slippage (market)', hint: 'Random within this band' },
-      collarBps: { label: 'Limit price collar', hint: 'Reject limits further than this from last' },
-      staleQuoteMs: { label: 'Quote staleness', hint: 'Reject orders on older quotes' },
-      minNotionalCents: { label: 'Min order notional', hint: 'Smallest order accepted' },
-      maxNotionalCents: { label: 'Max order notional', hint: 'Per order, per account' },
-      closedMarketBufferBps: {
-        label: 'Closed-market buffer',
-        hint: 'Extra cash reserved for queued market buys',
-      },
-      queueWhenClosed: {
-        label: 'Queue orders while closed',
-        hint: 'Off = market orders are rejected outside the session',
-      },
-    } satisfies Record<keyof ExecutionRules, { label: string; hint: string }>,
-    marketCalendar: 'Market calendar',
-    editSchedule: 'Edit schedule',
-    earlyCloseAt: ({ time }: { time: string }) => `Early close ${time}`,
-    closedFor: ({ holiday }: { holiday: string }) => `Closed · ${holiday}`,
-    calendarToday: 'Today',
-    calendarScheduled: 'Scheduled',
-    calendarHoliday: 'Holiday',
-    ordersMonitor: 'Orders monitor',
-    ordersMonitorSub: 'Live across all paper accounts · streaming',
-    allStatuses: 'All statuses',
-    pauseStream: 'Pause stream',
-    vsYesterday: 'vs yesterday',
-    monitorColumns: {
-      time: 'Time',
-      account: 'Account',
-      order: 'Order',
-      notional: 'Notional',
-      status: 'Status',
-      latency: 'Latency',
-    },
-    kpis: {
-      ordersToday: 'Orders today',
-      fillRate: 'Fill rate',
-      rejected: 'Rejected',
-      notionalTraded: 'Notional traded',
-      activeTraders: 'Active traders',
-    },
-    rejectionsByReason: 'Rejections by reason · today',
-    orderMix: 'Order mix',
-    fractional: 'Fractional ($)',
-    accounts: 'Accounts',
-    accountsSub: ({ n, start }: Count & { start: string }) =>
-      `${n} paper accounts · ${start} virtual start · read-only except Reset`,
-    accountColumns: {
-      equity: 'Equity',
-      cash: 'Cash',
-      today: 'Today',
-      allTime: 'All-time',
-      positions: 'Positions',
-      openOrders: 'Open orders',
-      lastTrade: 'Last trade',
-    },
-    searchAccounts: 'Search by email',
-    accountsNote: "Admins see balances and orders but can't place or edit trades for a user.",
-    resetAccount: 'Reset account',
-    resetBody: ({ start }: { start: string }) =>
-      `Reset closes positions at last price, cancels open orders and restores ${start}. It is audited as account.reset.`,
-    resetConfirmLabel: ({ email }: { email: string }) => `Type ${email} to confirm`,
-  },
+  admin: adminEn,
   rejections,
   alertIssues,
 };

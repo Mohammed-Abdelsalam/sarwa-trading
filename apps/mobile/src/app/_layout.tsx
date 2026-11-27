@@ -32,12 +32,19 @@ function RootNavigator() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="stock/[symbol]" />
+      <Stack.Screen name="order/new" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="orders/index" />
+      <Stack.Screen name="orders/[id]" />
+      <Stack.Screen name="alerts" />
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="search" />
+      <Stack.Screen name="settings" />
     </Stack>
   );
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -46,11 +53,14 @@ export default function RootLayout() {
     Manrope_800ExtraBold,
   });
 
-  useEffect(() => {
-    if (fontsLoaded) void SplashScreen.hideAsync();
-  }, [fontsLoaded]);
+  // A font that fails to load falls back to the system font rather than keeping the splash up.
+  const ready = fontsLoaded || fontError !== null;
 
-  if (!fontsLoaded) return null;
+  useEffect(() => {
+    if (ready) void SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
   return (
     <AppProviders>
       <StatusBar style="auto" />

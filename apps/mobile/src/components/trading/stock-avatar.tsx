@@ -16,6 +16,7 @@ const SECTOR_CLASSES: Record<Sector, [bg: string, fg: string]> = {
 };
 
 const SIZE: Record<AvatarSize, [box: string, text: TextVariant]> = {
+  24: ['h-6 w-6 rounded-sm', 'avatar-sm'],
   32: ['h-8 w-8 rounded-md', 'avatar-sm'],
   40: ['h-10 w-10 rounded-control-lg', 'avatar'],
   56: ['h-14 w-14 rounded-avatar-lg', 'avatar-lg'],
@@ -27,10 +28,10 @@ export function StockAvatar({
   size = 40,
 }: {
   symbol: string;
-  sector: Sector;
+  sector?: Sector;
   size?: AvatarSize;
 }) {
-  const [bg, fg] = SECTOR_CLASSES[sector];
+  const [bg, fg] = sector ? SECTOR_CLASSES[sector] : ['bg-surface-3', 'text-fg-2'];
   const [box, text] = SIZE[size];
   return (
     <View

@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { Button } from '../../components/ui/button';
 import { Text } from '../../components/ui/text';
+import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
 
 // Deep link to a stock that was disabled or removed (X-A11y): explain it instead of a generic 404.
@@ -17,6 +18,7 @@ export function RemovedStock({
   onRemove: () => void;
 }) {
   const colors = useColors();
+  const { t } = useCopy();
   return (
     <View className="flex-1 items-center justify-center gap-4 px-9 pb-24">
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -25,7 +27,7 @@ export function RemovedStock({
             {symbol.charAt(0)}
           </Text>
         </View>
-        <View className="absolute -bottom-1 -right-1 h-9 w-9 items-center justify-center rounded-full bg-neg">
+        <View className="absolute -bottom-1 -end-1 h-9 w-9 items-center justify-center rounded-full bg-neg">
           <Ban size={16} color={colors['on-brand']} />
         </View>
       </View>
@@ -33,19 +35,17 @@ export function RemovedStock({
         stock/{symbol}
       </Text>
       <Text variant="h2" className="text-center">
-        This stock is no longer available
+        {t.stock.removedTitle}
       </Text>
-      <Text className="text-center text-fg-2">
-        {`${symbol} was removed from Mini Trading. You opened an old link — prices for it are no longer streaming.`}
-      </Text>
+      <Text className="text-center text-fg-2">{t.stock.removedBody({ symbol })}</Text>
       <View className="mt-2 w-full gap-2.5">
         <Button
           size="lg"
           onPress={() => {
-            router.navigate('/');
+            router.navigate('/markets');
           }}
         >
-          Back to Markets
+          {t.stock.backToMarkets}
         </Button>
         {watched ? (
           <Button
@@ -54,7 +54,7 @@ export function RemovedStock({
             icon={<Star size={16} color={colors.fg} />}
             onPress={onRemove}
           >
-            Remove from Watchlist
+            {t.stock.removeFromWatchlist}
           </Button>
         ) : null}
       </View>

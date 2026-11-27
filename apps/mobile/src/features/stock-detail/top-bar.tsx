@@ -7,6 +7,7 @@ import { type LiveStatus } from '@sarwa/core';
 import { ConnectionBadge } from '../../components/trading/connection-badge';
 import { StarButton } from '../../components/trading/star-button';
 import { IconButton } from '../../components/ui/icon-button';
+import { useCopy } from '../../lib/i18n';
 
 export function TopBar({
   symbol,
@@ -21,20 +22,22 @@ export function TopBar({
   onToggleWatch: () => void;
   onShare: () => void;
 }) {
+  const { t, dir } = useCopy();
   return (
     <View className="flex-row items-center justify-between px-2 pb-1">
       <IconButton
-        label="Back"
+        label={t.common.back}
         icon={ChevronLeft}
         iconSize={24}
         size={44}
+        flip={dir === 'rtl'}
         onPress={() => {
           router.back();
         }}
       />
       <ConnectionBadge status={status} />
       <View className="flex-row items-center">
-        <IconButton label="Share" icon={Share2} size={44} onPress={onShare} />
+        <IconButton label={t.common.share} icon={Share2} size={44} onPress={onShare} />
         <StarButton symbol={symbol} watched={watched} onToggle={onToggleWatch} />
       </View>
     </View>

@@ -73,13 +73,18 @@ export function useMarketConnection({
   );
 }
 
-// Admin stock changes (enable, disable, add, delete) refresh the lists right away instead of after staleTime.
+// Admin stock changes (enable, disable, add, delete) refresh the list and details right away
+// instead of after staleTime; the charts share the key prefix but don't change with them.
 export function useSyncStocksOnChange(): void {
   const { store } = useSarwa();
   const queryClient = useQueryClient();
   const changedAt = useStore(store, (state) => state.stocksChangedAt);
 
   useEffect(() => {
-    if (changedAt !== null) void queryClient.invalidateQueries({ queryKey: queryKeys.stocks });
+    if (changedAt === null) return;
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.stocks,
+      predicate: (query) => query.queryKey.length <= queryKeys.stock('').length,
+    });
   }, [changedAt, queryClient]);
 }

@@ -1,10 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { type ReactElement } from 'react';
 
 import { type Candle } from '@sarwa/contracts';
-import { formatCandleDate, formatPrice, useChartSeries } from '@sarwa/core';
+import { createFormatter, formatPrice, useChartSeries } from '@sarwa/core';
 
 import { PriceChart } from '../../../src/features/stock-detail/price-chart';
+import { providers } from '../../copy';
+
+const render = (ui: ReactElement, options?: Parameters<typeof providers>[0]) =>
+  rtlRender(ui, { wrapper: providers(options).wrapper });
 
 jest.mock('@sarwa/core', () => ({
   ...jest.requireActual<object>('@sarwa/core'),
@@ -33,7 +38,8 @@ function mockSeries(overrides: Partial<ReturnType<typeof useChartSeries>> = {}) 
 }
 
 function pointText(candle: Candle) {
-  return `${formatCandleDate(candle.t, '1D')}, ${formatPrice(candle.c)}`;
+  const f = createFormatter({ locale: 'en' });
+  return `${f.chartDate(candle.t, '1D')}, ${formatPrice(f, candle.c)}`;
 }
 
 describe('PriceChart', () => {
@@ -87,5 +93,29 @@ describe('PriceChart', () => {
     }
     // Candle 2 opened and bottomed at $10.00; only its OHLC rows show that value.
     expect(screen.getAllByText('$10.00')).toHaveLength(2);
+  });
+
+  it('prints prices and the axis in the Arabic locale and digits', async () => {
+    mockSeries();
+    render(<PriceChart symbol="AAPL" period="1D" type="candle" />, {
+      locale: 'ar',
+      digits: 'arab',
+    });
+
+    screen.getByRole('slider', { name: 'رسم سعر AAPL' }).focus();
+    await userEvent.keyboard('{ArrowLeft}');
+
+    expect(screen.getByText('افتتاح')).toBeInTheDocument();
+    expect(screen.getAllByText('⁦$١٠٫٠٠⁩')).toHaveLength(2);
+    expect(screen.queryByText('$10.00')).not.toBeInTheDocument();
+  });
+
+  it('keeps the plot and its time axis left to right in RTL, so labels line up', () => {
+    mockSeries();
+    render(<PriceChart symbol="AAPL" period="1D" />, { locale: 'ar' });
+
+    // The direction is an attribute on an ancestor; Testing Library has no query for it.
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(screen.getByRole('slider').closest('[dir]')).toHaveAttribute('dir', 'ltr');
   });
 });

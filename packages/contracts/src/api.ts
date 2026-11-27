@@ -30,6 +30,9 @@ export const WatchlistResponseSchema = z.object({ symbols: z.array(SymbolSchema)
 export const HealthResponseSchema = z.object({
   status: z.literal('ok'),
   uptimeSeconds: z.number().nonnegative(),
+  // package.json version and the short git sha of the running build ("dev" when unknown).
+  version: z.string().min(1),
+  commit: z.string().min(1),
 });
 
 export const ProblemSchema = z.object({

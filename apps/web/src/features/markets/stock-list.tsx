@@ -36,6 +36,7 @@ function onRowKeyDown(
 }
 
 export function StockList({
+  label,
   rows,
   watched,
   selected,
@@ -45,6 +46,7 @@ export function StockList({
   onOpen,
   onToggleWatch,
 }: {
+  label: string;
   rows: StockWithQuote[];
   watched: ReadonlySet<string>;
   selected?: string;
@@ -55,7 +57,7 @@ export function StockList({
   onToggleWatch: (symbol: string, watched: boolean) => void;
 }) {
   return (
-    <div role="list" aria-label="Stocks" className="border-border flex-1 overflow-y-auto border-t">
+    <div role="list" aria-label={label} className="border-border flex-1 overflow-y-auto border-t">
       {rows.map((stock) => (
         <StockRow
           key={stock.symbol}

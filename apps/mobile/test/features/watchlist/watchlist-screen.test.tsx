@@ -1,10 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import { Text as MockText } from 'react-native';
 
 import { type StockWithQuote } from '@sarwa/contracts';
 
 import { useWatchlistScreen } from '../../../src/features/watchlist/use-watchlist-screen';
 import { WatchlistScreen } from '../../../src/features/watchlist/watchlist-screen';
+import { renderScreen } from '../../render';
 
 jest.mock('../../../src/features/watchlist/use-watchlist-screen');
 jest.mock('../../../src/components/layout/app-banners', () => ({ AppBanners: () => null }));
@@ -49,6 +50,10 @@ function stock(symbol: string): StockWithQuote {
       symbol,
       price: 10,
       prevClose: 9,
+      bid: 9.99,
+      ask: 10.01,
+      bidSize: 300,
+      askSize: 200,
       open: 9,
       dayHigh: 10,
       dayLow: 9,
@@ -84,7 +89,7 @@ function viewModel(
 describe('WatchlistScreen', () => {
   it('invites the user to browse markets when nothing is starred', async () => {
     mockedHook.mockReturnValue(viewModel());
-    await render(<WatchlistScreen />);
+    await renderScreen(<WatchlistScreen />);
 
     expect(screen.getByText('Your watchlist is empty')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Browse markets' })).toBeOnTheScreen();
@@ -93,7 +98,7 @@ describe('WatchlistScreen', () => {
   it('shows an error with retry instead of the empty state when loading fails', async () => {
     const model = viewModel({ isError: true });
     mockedHook.mockReturnValue(model);
-    await render(<WatchlistScreen />);
+    await renderScreen(<WatchlistScreen />);
 
     expect(screen.queryByText('Your watchlist is empty')).not.toBeOnTheScreen();
     expect(screen.getByText("Couldn't load your watchlist")).toBeOnTheScreen();
@@ -103,7 +108,7 @@ describe('WatchlistScreen', () => {
 
   it('lists starred stocks with the average change', async () => {
     mockedHook.mockReturnValue(viewModel({ rows: [stock('AAPL'), stock('NVDA')], average: 1.5 }));
-    await render(<WatchlistScreen />);
+    await renderScreen(<WatchlistScreen />);
 
     expect(screen.getByText('AAPL')).toBeOnTheScreen();
     expect(screen.getByText('NVDA')).toBeOnTheScreen();
@@ -114,7 +119,7 @@ describe('WatchlistScreen', () => {
   it('removes a stock from its swipe action', async () => {
     const model = viewModel({ rows: [stock('AAPL')] });
     mockedHook.mockReturnValue(model);
-    await render(<WatchlistScreen />);
+    await renderScreen(<WatchlistScreen />);
 
     await fireEvent.press(screen.getByRole('button', { name: 'Remove AAPL from watchlist' }));
     expect(model.actions.remove).toHaveBeenCalledWith('AAPL');
@@ -123,7 +128,7 @@ describe('WatchlistScreen', () => {
   it('offers undo in a snackbar while the removal is pending, even on an empty list', async () => {
     const model = viewModel({ removed: 'AAPL' });
     mockedHook.mockReturnValue(model);
-    await render(<WatchlistScreen />);
+    await renderScreen(<WatchlistScreen />);
 
     expect(screen.getByText('AAPL removed from Watchlist')).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'Undo' }));
@@ -136,7 +141,7 @@ describe('WatchlistScreen', () => {
   it('cycles the sort, starting from the order stocks were added in', async () => {
     const model = viewModel({ rows: [stock('AAPL')] });
     mockedHook.mockReturnValue(model);
-    await render(<WatchlistScreen />);
+    await renderScreen(<WatchlistScreen />);
 
     await fireEvent.press(
       screen.getByRole('button', { name: 'Sort by Order added, tap to change' }),

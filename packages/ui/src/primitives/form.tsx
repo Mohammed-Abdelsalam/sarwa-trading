@@ -1,5 +1,6 @@
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
+import { ChevronDown } from 'lucide-react';
 import { type ComponentProps, type ReactNode, useId } from 'react';
 
 import { type InputSize } from '@sarwa/tokens';
@@ -14,30 +15,55 @@ const inputBase = [
   'disabled:cursor-not-allowed disabled:opacity-50',
 ];
 
-export interface InputProps extends ComponentProps<'input'> {
+export interface InputProps extends Omit<ComponentProps<'input'>, 'prefix'> {
   icon?: ReactNode;
+  prefix?: ReactNode;
+  suffix?: ReactNode;
   inputSize?: InputSize;
 }
 
-export function Input({ icon, inputSize = 'md', className, ...props }: InputProps) {
+const affix = 'text-fg-3 pointer-events-none absolute [&>svg]:size-4';
+
+export function Input({ icon, prefix, suffix, inputSize = 'md', className, ...props }: InputProps) {
+  const lead = icon ?? prefix;
   const input = (
     <input
       className={cn(
         inputBase,
         inputSize === 'lg' && 'rounded-control-lg type-body h-11',
-        icon !== undefined && 'pl-10',
+        icon !== undefined ? 'ps-10' : prefix !== undefined && 'ps-7',
+        suffix !== undefined && 'pe-8',
         className,
       )}
       {...props}
     />
   );
-  if (icon === undefined) return input;
+  if (lead === undefined && suffix === undefined) return input;
   return (
     <div className="relative flex w-full items-center">
-      <span className="text-fg-3 pointer-events-none absolute left-3 [&>svg]:size-4" aria-hidden>
-        {icon}
-      </span>
+      {lead === undefined ? null : (
+        <span className={cn(affix, 'start-3')} aria-hidden>
+          {lead}
+        </span>
+      )}
       {input}
+      {suffix === undefined ? null : (
+        <span className={cn(affix, 'end-3')} aria-hidden>
+          {suffix}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function Select({ className, ...props }: ComponentProps<'select'>) {
+  return (
+    <div className="relative inline-flex items-center">
+      <select
+        className={cn(inputBase, 'cursor-pointer appearance-none pe-9', className)}
+        {...props}
+      />
+      <ChevronDown aria-hidden className="text-fg-3 pointer-events-none absolute end-3 size-4" />
     </div>
   );
 }
@@ -91,7 +117,7 @@ export function Switch({ className, ...props }: ComponentProps<typeof SwitchPrim
       )}
       {...props}
     >
-      <SwitchPrimitive.Thumb className="ease-standard shadow-e1 translate-x-0.75 data-[state=checked]:translate-x-5.25 block size-5 rounded-full bg-white transition-transform duration-200" />
+      <SwitchPrimitive.Thumb className="ease-standard shadow-e1 block size-5 translate-x-0.75 rounded-full bg-white transition-transform duration-200 data-[state=checked]:translate-x-5.25 rtl:-translate-x-0.75 rtl:data-[state=checked]:-translate-x-5.25" />
     </SwitchPrimitive.Root>
   );
 }
@@ -100,7 +126,7 @@ export function Slider({ className, ...props }: ComponentProps<typeof SliderPrim
   return (
     <SliderPrimitive.Root
       className={cn(
-        'relative flex h-7 w-full touch-none select-none items-center data-[disabled]:opacity-40',
+        'relative flex h-7 w-full touch-none items-center select-none data-[disabled]:opacity-40',
         className,
       )}
       {...props}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 
 import { ChangePill } from '../../src/components/trading/change-pill';
@@ -6,13 +6,14 @@ import { ConnectionBadge } from '../../src/components/trading/connection-badge';
 import { PeriodTabs } from '../../src/components/trading/period-tabs';
 import { StarButton } from '../../src/components/trading/star-button';
 import { StockListSkeleton } from '../../src/components/trading/stock-row';
+import { renderScreen } from '../render';
 
 jest.mock('expo-router', () => ({ Link: () => null }));
 
 describe('StarButton', () => {
   it('announces the action and gives haptic feedback only when adding', async () => {
     const onToggle = jest.fn();
-    const { rerender } = await render(
+    const { rerender } = await renderScreen(
       <StarButton symbol="AAPL" watched={false} onToggle={onToggle} />,
     );
 
@@ -28,7 +29,7 @@ describe('StarButton', () => {
 
 describe('ChangePill', () => {
   it('pairs the colour with an arrow', async () => {
-    await render(<ChangePill value={1.24} label="+1.24%" />);
+    await renderScreen(<ChangePill value={1.24} label="+1.24%" />);
     expect(screen.getByText('▲')).toBeOnTheScreen();
     expect(screen.getByText('+1.24%')).toBeOnTheScreen();
   });
@@ -36,7 +37,7 @@ describe('ChangePill', () => {
 
 describe('ConnectionBadge', () => {
   it('describes the connection in words', async () => {
-    await render(<ConnectionBadge status="paused" />);
+    await renderScreen(<ConnectionBadge status="paused" />);
     expect(screen.getByLabelText('Market paused')).toBeOnTheScreen();
   });
 });
@@ -44,7 +45,7 @@ describe('ConnectionBadge', () => {
 describe('PeriodTabs', () => {
   it('disables periods turned off in the admin config', async () => {
     const onChange = jest.fn();
-    await render(<PeriodTabs value="1D" onChange={onChange} enabled={['1D', '1W']} />);
+    await renderScreen(<PeriodTabs value="1D" onChange={onChange} enabled={['1D', '1W']} />);
 
     expect(screen.getByRole('tab', { name: 'ALL' })).toBeDisabled();
     await fireEvent.press(screen.getByRole('tab', { name: '1W' }));
@@ -54,7 +55,7 @@ describe('PeriodTabs', () => {
 
 describe('StockListSkeleton', () => {
   it('announces one "Loading stocks" element with the requested number of rows', async () => {
-    await render(<StockListSkeleton rows={4} />);
+    await renderScreen(<StockListSkeleton rows={4} />);
 
     expect(screen.getAllByLabelText('Loading stocks')).toHaveLength(1);
     expect(screen.getByRole('progressbar', { name: 'Loading stocks' })).toBeOnTheScreen();

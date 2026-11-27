@@ -261,6 +261,8 @@ export const AlertSchema = z.object({
   createdAt: Timestamp,
 });
 
+export const AlertResponseSchema = z.object({ alert: AlertSchema });
+
 export const AlertsResponseSchema = z.object({
   items: z.array(AlertSchema),
   activeCount: z.number().int().nonnegative(),
@@ -276,6 +278,8 @@ export const NotificationPayloadSchema = z.discriminatedUnion('kind', [
     side: SideSchema,
     qtyMicros: Micros,
     priceTicks: Ticks.nullable(),
+    // Value of this fill (partially filled) or of everything filled so far (the other kinds).
+    notionalCents: Cents,
   }),
   z.object({
     kind: z.literal('order_rejected'),
@@ -309,8 +313,13 @@ export const NotificationSchema = z.object({
   createdAt: Timestamp,
 });
 
+export const NotificationsQuerySchema = z.object({
+  cursor: Id.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+});
 export const NotificationsResponseSchema = z.object({
   items: z.array(NotificationSchema),
+  nextCursor: Id.nullable(),
   unreadCount: z.number().int().nonnegative(),
 });
 
@@ -394,9 +403,11 @@ export type EquityResponse = z.infer<typeof EquityResponseSchema>;
 export type CreateAlertRequest = z.infer<typeof CreateAlertRequestSchema>;
 export type UpdateAlertRequest = z.infer<typeof UpdateAlertRequestSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
+export type AlertResponse = z.infer<typeof AlertResponseSchema>;
 export type AlertsResponse = z.infer<typeof AlertsResponseSchema>;
 export type NotificationPayload = z.infer<typeof NotificationPayloadSchema>;
 export type Notification = z.infer<typeof NotificationSchema>;
+export type NotificationsQuery = z.infer<typeof NotificationsQuerySchema>;
 export type NotificationsResponse = z.infer<typeof NotificationsResponseSchema>;
 export type PushTokenRequest = z.infer<typeof PushTokenRequestSchema>;
 export type ExecutionRulesWire = z.infer<typeof ExecutionRulesSchema>;

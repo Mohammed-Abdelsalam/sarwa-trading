@@ -1,11 +1,14 @@
 import {
   type Bps,
+  cents,
   type Cents,
   divide,
   MICROS_PER_SHARE,
+  micros,
   type Micros,
   notionalCents,
   ratioBps,
+  ticks,
   type Ticks,
   TICKS_PER_DOLLAR,
   CENTS_PER_DOLLAR,
@@ -28,12 +31,14 @@ export interface Hold {
 }
 
 export function averageCostTicks(position: Pick<Position, 'qtyMicros' | 'costBasisCents'>): Ticks {
-  if (position.qtyMicros === 0) return 0;
+  if (position.qtyMicros === 0) return ticks(0);
   const ticksPerCent = BigInt(TICKS_PER_DOLLAR / CENTS_PER_DOLLAR);
-  return divide(
-    BigInt(position.costBasisCents) * ticksPerCent * BigInt(MICROS_PER_SHARE),
-    BigInt(position.qtyMicros),
-    'nearest',
+  return ticks(
+    divide(
+      BigInt(position.costBasisCents) * ticksPerCent * BigInt(MICROS_PER_SHARE),
+      BigInt(position.qtyMicros),
+      'nearest',
+    ),
   );
 }
 
@@ -42,20 +47,22 @@ export function marketValueCents(qty: Micros, lastTicks: Ticks): Cents {
 }
 
 export function reservedCents(holds: readonly Hold[]): Cents {
-  return holds.filter((hold) => hold.side === 'buy').reduce((sum, hold) => sum + hold.heldCents, 0);
+  return cents(
+    holds.filter((hold) => hold.side === 'buy').reduce((sum, hold) => sum + hold.heldCents, 0),
+  );
 }
 
 // Cash itself never moves when an order is placed; open buys only earmark part of it.
 export function buyingPowerCents(cashCents: Cents, holds: readonly Hold[]): Cents {
-  return cashCents - reservedCents(holds);
+  return cents(cashCents - reservedCents(holds));
 }
 
 export function sellableMicros(position: Position | null, holds: readonly Hold[]): Micros {
-  if (!position) return 0;
+  if (!position) return micros(0);
   const reserved = holds
     .filter((hold) => hold.side === 'sell' && hold.symbol === position.symbol)
     .reduce((sum, hold) => sum + hold.heldMicros, 0);
-  return Math.max(0, position.qtyMicros - reserved);
+  return micros(Math.max(0, position.qtyMicros - reserved));
 }
 
 export interface PositionInput {
@@ -117,11 +124,11 @@ export interface PortfolioSummary {
 function positionToday(input: PositionInput, marketValue: Cents): Cents {
   const today = input.today ?? {
     qtyAtOpenMicros: input.position.qtyMicros,
-    boughtCents: 0,
-    soldCents: 0,
+    boughtCents: cents(0),
+    soldCents: cents(0),
   };
   const carried = marketValueCents(today.qtyAtOpenMicros, input.prevCloseTicks);
-  return marketValue - (carried + today.boughtCents - today.soldCents);
+  return cents(marketValue - (carried + today.boughtCents - today.soldCents));
 }
 
 export function summarizePortfolio(input: PortfolioInput): PortfolioSummary {
@@ -134,24 +141,25 @@ export function summarizePortfolio(input: PortfolioInput): PortfolioSummary {
       averageCostTicks: averageCostTicks(p.position),
       lastTicks: p.lastTicks,
       marketValueCents: marketValue,
-      unrealizedCents: marketValue - p.position.costBasisCents,
+      unrealizedCents: cents(marketValue - p.position.costBasisCents),
       totalReturnBps: ratioBps(marketValue - p.position.costBasisCents, p.position.costBasisCents),
       todayCents: positionToday(p, marketValue),
     };
   });
-  const investedCents = rows.reduce((sum, row) => sum + row.marketValueCents, 0);
-  const equityCents = input.cashCents + investedCents;
+  const investedCents = cents(rows.reduce((sum, row) => sum + row.marketValueCents, 0));
+  const equityCents = cents(input.cashCents + investedCents);
   const reserved = reservedCents(input.holds);
   const positionsToday = rows.reduce((sum, row) => sum + row.todayCents, 0);
-  const todayCents =
+  const todayCents = cents(
     input.equityAtLastCloseCents === null
       ? positionsToday
-      : equityCents - input.equityAtLastCloseCents;
+      : equityCents - input.equityAtLastCloseCents,
+  );
   const todayBase = input.equityAtLastCloseCents ?? equityCents - todayCents;
 
   const bySector = new Map<string, Cents>();
   for (const row of rows)
-    bySector.set(row.sector, (bySector.get(row.sector) ?? 0) + row.marketValueCents);
+    bySector.set(row.sector, cents((bySector.get(row.sector) ?? 0) + row.marketValueCents));
   const allocation = [...bySector, ['cash', input.cashCents] as const]
     .map(([key, cents]) => ({ key, cents, weightBps: ratioBps(cents, equityCents) }))
     .filter((slice) => slice.cents > 0)
@@ -161,13 +169,13 @@ export function summarizePortfolio(input: PortfolioInput): PortfolioSummary {
     equityCents,
     cashCents: input.cashCents,
     reservedCents: reserved,
-    buyingPowerCents: input.cashCents - reserved,
+    buyingPowerCents: cents(input.cashCents - reserved),
     investedCents,
-    unrealizedCents: rows.reduce((sum, row) => sum + row.unrealizedCents, 0),
+    unrealizedCents: cents(rows.reduce((sum, row) => sum + row.unrealizedCents, 0)),
     realizedYtdCents: input.realizedYtdCents,
     todayCents,
     todayBps: ratioBps(todayCents, todayBase),
-    allTimeCents: equityCents - input.startingCashCents,
+    allTimeCents: cents(equityCents - input.startingCashCents),
     allTimeBps: ratioBps(equityCents - input.startingCashCents, input.startingCashCents),
     positions: rows
       .map((row) => ({ ...row, weightBps: ratioBps(row.marketValueCents, equityCents) }))

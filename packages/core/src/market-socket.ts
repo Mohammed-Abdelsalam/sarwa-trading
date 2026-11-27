@@ -1,60 +1,108 @@
 import { io, type Socket } from 'socket.io-client';
+import { type z } from 'zod';
 
 import {
+  AlertTriggeredEventSchema,
   AppConfigSchema,
   type ClientToServerEvents,
   MARKET_NAMESPACE,
   MarketStatusSchema,
+  MAX_SUBSCRIBE_SYMBOLS,
+  NotificationEventSchema,
+  OrderUpdatedEventSchema,
   type Quote,
   QuotesEventSchema,
   type ServerToClientEvents,
+  type SocketAuth,
   StocksChangedEventSchema,
+  SymbolHaltedEventSchema,
+  SymbolResumedEventSchema,
+  type TradingServerToClientEvents,
+  TradingStatusEventSchema,
 } from '@sarwa/contracts';
 
 import { type ConnectionState, type LiveStore } from './store';
 
-type MarketIo = Socket<ServerToClientEvents, ClientToServerEvents>;
+type MarketIo = Socket<ServerToClientEvents & TradingServerToClientEvents, ClientToServerEvents>;
+
+export type SocketAuthProvider = (callback: (auth: Partial<SocketAuth>) => void) => void;
+
+export type TradingEvent = {
+  [Name in keyof TradingServerToClientEvents]: {
+    name: Name;
+    payload: Parameters<TradingServerToClientEvents[Name]>[0];
+  };
+}[keyof TradingServerToClientEvents];
+
+export type TradingEventListener = (event: TradingEvent) => void;
 
 export interface MarketSocketOptions {
   url: string;
   store: LiveStore;
+  getDeviceId: () => Promise<string>;
   flushMs?: number;
   syncDelayMs?: number;
   reconnectJitterMs?: number;
-  createSocket?: (url: string) => MarketIo;
+  // The admin dashboard passes ['polling', 'websocket'] because its Next rewrite can't proxy a WebSocket.
+  transports?: SocketTransport[];
+  createSocket?: (url: string, auth: SocketAuthProvider, transports: SocketTransport[]) => MarketIo;
 }
+
+export type SocketTransport = 'polling' | 'websocket';
 
 export interface MarketSocket {
   connect(): void;
   disconnect(): void;
   acquire(symbols: string[]): () => void;
   subscribedSymbols(): string[];
+  onTradingEvent(listener: TradingEventListener): () => void;
 }
 
-const defaultCreateSocket = (url: string): MarketIo =>
+const defaultCreateSocket = (
+  url: string,
+  auth: SocketAuthProvider,
+  transports: SocketTransport[],
+): MarketIo =>
   io(url, {
-    transports: ['websocket'],
+    transports,
     autoConnect: false,
     reconnectionDelay: 500,
     reconnectionDelayMax: 15_000,
     randomizationFactor: 0.5,
+    auth,
   });
 
 export function createMarketSocket({
   url,
   store,
+  getDeviceId,
   flushMs = 100,
   syncDelayMs = 200,
   reconnectJitterMs = 1_000,
+  transports = ['websocket'],
   createSocket = defaultCreateSocket,
 }: MarketSocketOptions): MarketSocket {
-  const socket = createSocket(`${url.replace(/\/$/, '')}${MARKET_NAMESPACE}`);
+  // Resolved on every (re)connect, so the handshake always carries the stored device id.
+  const auth: SocketAuthProvider = (callback) => {
+    getDeviceId().then(
+      (deviceId) => {
+        callback({ deviceId });
+      },
+      () => {
+        callback({});
+      },
+    );
+  };
+  const socket = createSocket(`${url.replace(/\/$/, '')}${MARKET_NAMESPACE}`, auth, transports);
+  const tradingListeners = new Set<TradingEventListener>();
   const refCounts = new Map<string, number>();
   const subscribed = new Set<string>();
   const buffer = new Map<string, Quote>();
   let flushTimer: ReturnType<typeof setInterval> | undefined;
   let syncTimer: ReturnType<typeof setTimeout> | undefined;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  // Acks from an earlier connection must not touch the current subscriptions.
+  let connections = 0;
   const setConnection = (connection: ConnectionState) => {
     store.getState().setConnection(connection);
   };
@@ -66,12 +114,17 @@ export function createMarketSocket({
     buffer.clear();
   };
 
+  // A refused chunk leaves `subscribed`, so the next sync asks for it again.
   const subscribe = (symbols: string[]) => {
-    if (symbols.length === 0) return;
-    for (const symbol of symbols) subscribed.add(symbol);
-    socket.emit('subscribe', { symbols }, (ack) => {
-      if (ack.ok) store.getState().applyQuotes(ack.quotes);
-    });
+    const connection = connections;
+    for (let i = 0; i < symbols.length; i += MAX_SUBSCRIBE_SYMBOLS) {
+      const chunk = symbols.slice(i, i + MAX_SUBSCRIBE_SYMBOLS);
+      for (const symbol of chunk) subscribed.add(symbol);
+      socket.emit('subscribe', { symbols: chunk }, (ack) => {
+        if (ack.ok) store.getState().applyQuotes(ack.quotes);
+        else if (connection === connections) for (const symbol of chunk) subscribed.delete(symbol);
+      });
+    }
   };
 
   const sync = () => {
@@ -91,6 +144,7 @@ export function createMarketSocket({
   };
 
   socket.on('connect', () => {
+    connections += 1;
     setConnection({ status: 'open' });
     subscribed.clear();
     subscribe([...refCounts.keys()]);
@@ -131,6 +185,42 @@ export function createMarketSocket({
     if (parsed.success) store.getState().setStocksChangedAt(parsed.data.at);
   });
 
+  // Each event is checked against its v1 schema; a shape this client doesn't know is dropped.
+  const relay =
+    <T>(schema: z.ZodType<T>, toEvent: (payload: T) => TradingEvent) =>
+    (payload: unknown) => {
+      const parsed = schema.safeParse(payload);
+      if (!parsed.success) return;
+      const event = toEvent(parsed.data);
+      tradingListeners.forEach((listener) => {
+        listener(event);
+      });
+    };
+  socket.on(
+    'order.updated',
+    relay(OrderUpdatedEventSchema, (payload) => ({ name: 'order.updated', payload })),
+  );
+  socket.on(
+    'alert.triggered',
+    relay(AlertTriggeredEventSchema, (payload) => ({ name: 'alert.triggered', payload })),
+  );
+  socket.on(
+    'notification',
+    relay(NotificationEventSchema, (payload) => ({ name: 'notification', payload })),
+  );
+  socket.on(
+    'symbol.halted',
+    relay(SymbolHaltedEventSchema, (payload) => ({ name: 'symbol.halted', payload })),
+  );
+  socket.on(
+    'symbol.resumed',
+    relay(SymbolResumedEventSchema, (payload) => ({ name: 'symbol.resumed', payload })),
+  );
+  socket.on(
+    'trading.status',
+    relay(TradingStatusEventSchema, (payload) => ({ name: 'trading.status', payload })),
+  );
+
   return {
     connect() {
       clearTimeout(reconnectTimer);
@@ -162,5 +252,11 @@ export function createMarketSocket({
       };
     },
     subscribedSymbols: () => [...subscribed],
+    onTradingEvent(listener) {
+      tradingListeners.add(listener);
+      return () => {
+        tradingListeners.delete(listener);
+      };
+    },
   };
 }

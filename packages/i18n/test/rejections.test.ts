@@ -1,8 +1,12 @@
 import {
   type AlertIssue,
+  bps,
+  cents,
+  micros,
   type Rejection,
   REJECTION_CODES,
   type RejectionCode,
+  ticks,
 } from '@sarwa/domain';
 
 import {
@@ -19,23 +23,32 @@ const REJECTIONS: Record<RejectionCode, Rejection> = {
   SYMBOL_HALTED: { code: 'SYMBOL_HALTED' },
   MARKET_CLOSED: { code: 'MARKET_CLOSED' },
   STALE_QUOTE: { code: 'STALE_QUOTE', ageMs: 8_400, maxAgeMs: 5_000 },
-  INVALID_PRICE: { code: 'INVALID_PRICE', field: 'stop', lastTicks: 2_314_800 },
-  PRICE_COLLAR: { code: 'PRICE_COLLAR', field: 'limit', minTicks: 2_235_200, maxTicks: 2_731_900 },
-  MIN_NOTIONAL: { code: 'MIN_NOTIONAL', field: 'size', minCents: 100 },
-  MAX_NOTIONAL: { code: 'MAX_NOTIONAL', field: 'size', maxCents: 25_000_000 },
+  INVALID_PRICE: { code: 'INVALID_PRICE', field: 'stop', lastTicks: ticks(2_314_800) },
+  PRICE_COLLAR: {
+    code: 'PRICE_COLLAR',
+    field: 'limit',
+    minTicks: ticks(2_235_200),
+    maxTicks: ticks(2_731_900),
+  },
+  MIN_NOTIONAL: { code: 'MIN_NOTIONAL', field: 'size', minCents: cents(100) },
+  MAX_NOTIONAL: { code: 'MAX_NOTIONAL', field: 'size', maxCents: cents(25_000_000) },
   INSUFFICIENT_FUNDS: {
     code: 'INSUFFICIENT_FUNDS',
     field: 'size',
-    requiredCents: 5_846_000,
-    availableCents: 312_000,
+    requiredCents: cents(5_846_000),
+    availableCents: cents(312_000),
   },
-  INSUFFICIENT_SHARES: { code: 'INSUFFICIENT_SHARES', field: 'size', sellableMicros: 25_000_000 },
+  INSUFFICIENT_SHARES: {
+    code: 'INSUFFICIENT_SHARES',
+    field: 'size',
+    sellableMicros: micros(25_000_000),
+  },
 };
 
 const ALERT_ISSUES: Record<AlertIssueCode, AlertIssue> = {
-  ALREADY_ABOVE: { code: 'ALREADY_ABOVE', lastTicks: 2_314_800 },
-  ALREADY_BELOW: { code: 'ALREADY_BELOW', lastTicks: 2_314_800 },
-  ALREADY_MOVED: { code: 'ALREADY_MOVED', moveBps: 520 },
+  ALREADY_ABOVE: { code: 'ALREADY_ABOVE', lastTicks: ticks(2_314_800) },
+  ALREADY_BELOW: { code: 'ALREADY_BELOW', lastTicks: ticks(2_314_800) },
+  ALREADY_MOVED: { code: 'ALREADY_MOVED', moveBps: bps(520) },
   MISSING_THRESHOLD: { code: 'MISSING_THRESHOLD' },
 };
 
@@ -86,8 +99,8 @@ describe('rejectionMessage', () => {
     const stop: Rejection = {
       code: 'PRICE_COLLAR',
       field: 'stop',
-      minTicks: 2_235_200,
-      maxTicks: 2_731_900,
+      minTicks: ticks(2_235_200),
+      maxTicks: ticks(2_731_900),
     };
 
     expect(rejectionMessage(stop, 'en', 'latn', context).reason).toBe(
@@ -96,6 +109,39 @@ describe('rejectionMessage', () => {
     expect(rejectionMessage(stop, 'ar', 'latn', context).reason).toBe(
       'سعر الإيقاف بعيد جدًا عن السوق',
     );
+  });
+});
+
+describe('client-only blocks', () => {
+  it.each(LOCALES)('has %s copy for a dropped price stream', (locale) => {
+    const copy = rejectionMessage({ code: 'CONNECTION_NOT_LIVE' }, locale, 'latn', context);
+
+    expect(copy).toEqual(complete);
+  });
+
+  it.each(LOCALES)('has %s copy while the trading status loads', (locale) => {
+    const copy = rejectionMessage({ code: 'STATUS_LOADING' }, locale, 'latn', context);
+
+    expect(copy).toEqual(complete);
+  });
+
+  it('says Loading… on the button', () => {
+    expect(rejectionMessage({ code: 'STATUS_LOADING' }, 'en', 'latn', context).reason).toBe(
+      'Loading…',
+    );
+  });
+});
+
+describe('param formatting per code', () => {
+  it('formats each param by its unit in the chosen digits', () => {
+    const funds = rejectionMessage(REJECTIONS.INSUFFICIENT_FUNDS, 'ar', 'arab', context);
+    const stale = rejectionMessage(REJECTIONS.STALE_QUOTE, 'en', 'latn', context);
+    const moved = alertIssueMessage(ALERT_ISSUES.ALREADY_MOVED, 'en', 'latn', context);
+
+    expect(funds.explanation).toContain('⁦$٥٨٬٤٦٠٫٠٠⁩');
+    expect(funds.explanation).toContain('⁦$٣٬١٢٠٫٠٠⁩');
+    expect(stale.reason).toBe('Quote is 9 s old');
+    expect(moved.reason).toBe('Already moved +5.20% today');
   });
 });
 

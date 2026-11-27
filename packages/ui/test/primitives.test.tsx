@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Button, IconButton } from '../src/primitives/button';
 import { Chip, SegmentedControl } from '../src/primitives/controls';
 import { Banner, StateView, Toast } from '../src/primitives/feedback';
-import { Field, Input } from '../src/primitives/form';
+import { Field, Input, Select } from '../src/primitives/form';
 import { Breadcrumbs } from '../src/primitives/navigation';
 
 describe('Button', () => {
@@ -20,6 +20,15 @@ describe('Button', () => {
     const button = screen.getByRole('button', { name: 'Saving…' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('stays disabled while loading even when disabled is passed as false', () => {
+    render(
+      <Button loading disabled={false}>
+        Create alert
+      </Button>,
+    );
+    expect(screen.getByRole('button', { name: 'Create alert' })).toBeDisabled();
   });
 
   it('renders its child element when asChild is set', () => {
@@ -56,7 +65,7 @@ describe('Banner', () => {
     expect(screen.queryByRole('button', { name: 'Dismiss message' })).not.toBeInTheDocument();
 
     rerender(
-      <Banner tone="brand" onDismiss={onDismiss}>
+      <Banner tone="brand" onDismiss={onDismiss} dismissLabel="Dismiss message">
         Markets close early today
       </Banner>,
     );
@@ -118,6 +127,44 @@ describe('SegmentedControl', () => {
     await userEvent.keyboard('{ArrowRight}');
     expect(onChange).toHaveBeenLastCalledWith('candle');
   });
+
+  it('follows the reading direction with the left and right arrows in RTL', async () => {
+    const onChange = jest.fn();
+    render(
+      <div dir="rtl">
+        <SegmentedControl
+          label="Chart type"
+          options={[...options, { value: 'line', label: 'Line' }]}
+          value="area"
+          onChange={onChange}
+        />
+      </div>,
+    );
+
+    screen.getByRole('radio', { name: 'Area' }).focus();
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(onChange).toHaveBeenLastCalledWith('candle');
+  });
+
+  it('ignores clicks and keys while disabled', async () => {
+    const onChange = jest.fn();
+    render(
+      <SegmentedControl
+        label="Chart type"
+        options={options}
+        value="area"
+        onChange={onChange}
+        disabled
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Candlestick' }));
+    screen.getByRole('radio', { name: 'Area' }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('radio', { name: 'Area' })).toBeDisabled();
+  });
 });
 
 describe('Chip', () => {
@@ -155,11 +202,36 @@ describe('Toast', () => {
         title="KO removed from Watchlist"
         action={<button type="button">Undo</button>}
         onDismiss={onDismiss}
+        dismissLabel="Dismiss"
       />,
     );
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Select', () => {
+  it('is a labelled native select that reports its error', async () => {
+    const onChange = jest.fn();
+    render(
+      <Field label="Sector" error="Required">
+        {(props) => (
+          <Select {...props} value="" onChange={onChange}>
+            <option value="">Select sector</option>
+            <option value="tech">Technology</option>
+          </Select>
+        )}
+      </Field>,
+    );
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sector' }), 'tech');
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('combobox', { name: 'Sector' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
   });
 });

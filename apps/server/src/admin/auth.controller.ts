@@ -14,10 +14,11 @@ import { Throttle } from '@nestjs/throttler';
 import { type AdminUser as AdminUserRow } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { type Request, type Response } from 'express';
+import { type z } from 'zod';
 
 import {
+  ADMIN_ROUTES,
   ADMIN_SESSION_COOKIE,
-  type LoginRequest,
   LoginRequestSchema,
   type SessionResponse,
 } from '@sarwa/contracts';
@@ -26,11 +27,17 @@ import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { env } from '../env';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from './audit.service';
-import { AdminGuard, CurrentAdmin, SESSION_TTL_SECONDS, toAdminUser } from './auth';
+import {
+  AdminGuard,
+  CurrentAdmin,
+  REMEMBER_TTL_SECONDS,
+  SESSION_TTL_SECONDS,
+  toAdminUser,
+} from './auth';
 
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 10);
 
-@Controller('admin/auth')
+@Controller()
 export class AuthController {
   constructor(
     private readonly prisma: PrismaService,
@@ -40,10 +47,11 @@ export class AuthController {
 
   // Brute-force protection: 5 login attempts per minute per IP.
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @Post('login')
+  @Post(ADMIN_ROUTES.login)
   @HttpCode(200)
   async login(
-    @Body(new ZodValidationPipe(LoginRequestSchema)) { email, password }: LoginRequest,
+    @Body(new ZodValidationPipe(LoginRequestSchema))
+    { email, password, remember }: z.output<typeof LoginRequestSchema>,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<SessionResponse> {
@@ -59,12 +67,13 @@ export class AuthController {
       where: { id: user.id },
       data: { lastActiveAt: new Date() },
     });
-    const token = await this.jwt.signAsync({ sub: user.id }, { expiresIn: SESSION_TTL_SECONDS });
+    const ttlSeconds = remember ? REMEMBER_TTL_SECONDS : SESSION_TTL_SECONDS;
+    const token = await this.jwt.signAsync({ sub: user.id }, { expiresIn: ttlSeconds });
     response.cookie(ADMIN_SESSION_COOKIE, token, {
       httpOnly: true,
       sameSite: 'strict',
       secure: env.NODE_ENV === 'production',
-      maxAge: SESSION_TTL_SECONDS * 1000,
+      maxAge: ttlSeconds * 1000,
       path: '/',
     });
     await this.audit.log({
@@ -76,13 +85,13 @@ export class AuthController {
     return { user: toAdminUser(updated) };
   }
 
-  @Post('logout')
+  @Post(ADMIN_ROUTES.logout)
   @HttpCode(204)
   logout(@Res({ passthrough: true }) response: Response): void {
     response.clearCookie(ADMIN_SESSION_COOKIE, { path: '/' });
   }
 
-  @Get('me')
+  @Get(ADMIN_ROUTES.me)
   @UseGuards(AdminGuard)
   me(@CurrentAdmin() admin: AdminUserRow): SessionResponse {
     return { user: toAdminUser(admin) };

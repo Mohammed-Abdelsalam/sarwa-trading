@@ -2,8 +2,8 @@
 
 import { ArrowDown, ArrowUp, ArrowUpDown, RefreshCw, Search, WifiOff } from 'lucide-react';
 
-import { SECTOR_FILTERS } from '@sarwa/core';
-import { Button, Chip, StateView } from '@sarwa/ui';
+import { SECTOR_FILTERS, sectorFilterLabel, sortLabel, useI18n } from '@sarwa/core';
+import { Button, Chip, Input, Kbd, StateView } from '@sarwa/ui';
 
 import { StockListSkeleton } from '../../components/trading/stock-row';
 import { StockList } from './stock-list';
@@ -11,52 +11,78 @@ import { StockPreview } from './stock-preview';
 import { useMarketsPage } from './use-markets-page';
 
 export function MarketsPage() {
+  const { t, f } = useI18n();
   const page = useMarketsPage();
   const { filters, actions } = page;
   const SortIcon = filters.sort.dir > 0 ? ArrowUp : ArrowDown;
+  const sort = sortLabel(t, filters.sort);
 
   return (
     <div className="flex min-h-0 flex-1">
       <section
-        aria-label="Stocks"
-        className="bg-surface border-border flex w-full min-w-0 flex-col lg:w-110 lg:min-w-95 lg:shrink-0 lg:border-r"
+        aria-label={t.markets.stocks}
+        className="bg-surface border-border flex w-full min-w-0 flex-col lg:w-110 lg:min-w-95 lg:shrink-0 lg:border-e"
       >
         <div className="flex flex-col gap-3.5 px-4 pt-4 pb-3 md:px-5 md:pt-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="type-h2">Markets</h1>
+              <h1 className="type-h2">{t.markets.title}</h1>
               <p className="type-caption text-fg-3 tabular-nums">
-                {page.rows.length} stocks · US equities · USD
+                {t.markets.summary(f.count(page.rows.length))}
               </p>
             </div>
             <Button
               variant="secondary"
               size="sm"
-              aria-label={`Sort by ${filters.sort.label}, ${filters.sort.dir > 0 ? 'ascending' : 'descending'}. Click to change`}
+              aria-label={t.sort.clickToChange({
+                label: sort,
+                order: filters.sort.dir > 0 ? t.sort.ascending : t.sort.descending,
+              })}
               icon={<ArrowUpDown aria-hidden className="text-fg-3 size-4" />}
               onClick={actions.cycleSort}
             >
-              {filters.sort.label}
+              {sort}
               <SortIcon aria-hidden className="text-fg-3 size-3.5" />
             </Button>
           </div>
+          <form
+            role="search"
+            className="relative"
+            onSubmit={(event) => {
+              event.preventDefault();
+            }}
+          >
+            <Input
+              id="markets-search"
+              icon={<Search />}
+              value={page.search}
+              onChange={(event) => {
+                actions.setQuery(event.target.value);
+              }}
+              placeholder={t.search.placeholder}
+              aria-label={t.search.title}
+              autoComplete="off"
+              className="pe-10"
+            />
+            <Kbd className="absolute end-2 top-1/2 -translate-y-1/2">/</Kbd>
+          </form>
           <div
             role="tablist"
-            aria-label="Sector"
+            aria-label={t.markets.sector}
             className="flex gap-2 overflow-x-auto max-md:-mx-4 max-md:px-4 md:flex-wrap"
           >
-            {SECTOR_FILTERS.map((chip) => (
+            {SECTOR_FILTERS.map((sector) => (
               <Chip
-                key={chip.id}
+                key={sector}
                 role="tab"
-                aria-selected={chip.id === filters.sector}
-                active={chip.id === filters.sector}
+                aria-selected={sector === filters.sector}
+                active={sector === filters.sector}
                 className="h-8"
                 onClick={() => {
-                  actions.setSector(chip.id);
+                  actions.setSector(sector);
                 }}
               >
-                {chip.label}
+                {sectorFilterLabel(t, sector)}
               </Chip>
             ))}
           </div>
@@ -68,31 +94,32 @@ export function MarketsPage() {
           <StateView
             tone="neg"
             icon={<WifiOff />}
-            title="Couldn't load markets"
-            description="We couldn't reach the price server. Check your connection — we'll keep trying in the background."
+            title={t.markets.loadError}
+            description={t.markets.loadErrorBody}
             action={
               <Button
                 size="lg"
                 icon={<RefreshCw aria-hidden className="size-4" />}
                 onClick={actions.refresh}
               >
-                Retry
+                {t.common.retry}
               </Button>
             }
           />
         ) : page.rows.length === 0 ? (
           <StateView
             icon={<Search />}
-            title={`No matches for “${filters.query}”`}
-            description={`Try a ticker like AAPL or a company name like “Netflix”. Sector filter: ${filters.sectorLabel}.`}
+            title={t.search.noMatches({ query: filters.query })}
+            description={t.markets.noMatchesBody({ sector: filters.sectorLabel })}
             action={
               <Button variant="secondary" onClick={actions.clearFilters}>
-                Clear search
+                {t.markets.clearSearch}
               </Button>
             }
           />
         ) : (
           <StockList
+            label={t.markets.stocks}
             rows={page.rows}
             watched={page.watched}
             selected={page.selected}

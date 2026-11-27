@@ -6,7 +6,9 @@ const { join } = require('node:path');
 module.exports = () => {
   const root = join(__dirname, '..');
   rmSync(join(root, 'prisma', 'test.db'), { force: true });
-  rmSync(join(root, 'prisma', 'test.db-journal'), { force: true });
+  for (const suffix of ['-journal', '-wal', '-shm']) {
+    rmSync(join(root, 'prisma', `test.db${suffix}`), { force: true });
+  }
 
   const options = {
     cwd: root,

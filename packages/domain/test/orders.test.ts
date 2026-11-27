@@ -1,3 +1,4 @@
+import { bps, cents, micros, ticks } from '../src/money';
 import {
   collarRange,
   estimateOrder,
@@ -22,13 +23,13 @@ const NOW = 1_000_000;
 const SHARE = 1_000_000;
 
 // $100.00 last, 2 bps spread → bid $99.99, ask $100.01.
-function quote(lastTicks = 1_000_000, overrides: Partial<TradeQuote> = {}): TradeQuote {
+function quote(lastTicks = ticks(1_000_000), overrides: Partial<TradeQuote> = {}): TradeQuote {
   return {
     lastTicks,
     ...spreadAround(lastTicks, DEFAULT_EXECUTION_RULES.spreadBps),
     prevCloseTicks: lastTicks,
-    bidSizeMicros: 100 * SHARE,
-    askSizeMicros: 100 * SHARE,
+    bidSizeMicros: micros(100 * SHARE),
+    askSizeMicros: micros(100 * SHARE),
     ts: NOW,
     ...overrides,
   };
@@ -51,18 +52,18 @@ function ctx(overrides: Partial<OrderContext> = {}): OrderContext {
     tradingEnabled: true,
     marketPaused: false,
     halted: false,
-    buyingPowerCents: 10_000_000,
-    sellableMicros: 0,
+    buyingPowerCents: cents(10_000_000),
+    sellableMicros: micros(0),
     now: NOW,
     ...overrides,
   };
 }
 
-const marketBuy = (micros: number): OrderDraft => ({
+const marketBuy = (qty: number): OrderDraft => ({
   side: 'buy',
   type: 'market',
   tif: 'day',
-  size: { kind: 'shares', micros },
+  size: { kind: 'shares', micros: micros(qty) },
 });
 
 const codes = (draft: OrderDraft, context: OrderContext) =>
@@ -80,6 +81,8 @@ describe('estimateOrder', () => {
       // 10 × $100.01 × 1.0005 = $1,000.601 → rounded up.
       holdCents: 100_061,
       holdMicros: 0,
+      // $100.01 × 1.0005 rounded up to the tick: each fill releases its share of the hold at this price.
+      holdPriceTicks: 1_000_601,
       executesNow: true,
       queued: false,
     });
@@ -95,7 +98,11 @@ describe('estimateOrder', () => {
   });
 
   it('holds a stop buy at the stop price plus the closed-market buffer even while open', () => {
-    const draft: OrderDraft = { ...marketBuy(10 * SHARE), type: 'stop', stopTicks: 1_050_000 };
+    const draft: OrderDraft = {
+      ...marketBuy(10 * SHARE),
+      type: 'stop',
+      stopTicks: ticks(1_050_000),
+    };
 
     const estimate = estimateOrder(draft, ctx());
 
@@ -106,7 +113,11 @@ describe('estimateOrder', () => {
   });
 
   it('holds exactly qty × limit for a limit buy', () => {
-    const draft: OrderDraft = { ...marketBuy(10 * SHARE), type: 'limit', limitTicks: 990_000 };
+    const draft: OrderDraft = {
+      ...marketBuy(10 * SHARE),
+      type: 'limit',
+      limitTicks: ticks(990_000),
+    };
 
     const estimate = estimateOrder(draft, ctx());
 
@@ -115,7 +126,7 @@ describe('estimateOrder', () => {
   });
 
   it('executes a marketable limit now', () => {
-    const draft: OrderDraft = { ...marketBuy(SHARE), type: 'limit', limitTicks: 1_000_100 };
+    const draft: OrderDraft = { ...marketBuy(SHARE), type: 'limit', limitTicks: ticks(1_000_100) };
 
     expect(estimateOrder(draft, ctx()).executesNow).toBe(true);
     expect(estimateOrder(draft, ctx({ session: CLOSED })).executesNow).toBe(false);
@@ -128,7 +139,7 @@ describe('estimateOrder', () => {
   });
 
   it('holds exactly the amount for a dollar market buy', () => {
-    const draft: OrderDraft = { ...marketBuy(0), size: { kind: 'amount', cents: 100_000 } };
+    const draft: OrderDraft = { ...marketBuy(0), size: { kind: 'amount', cents: cents(100_000) } };
 
     const estimate = estimateOrder(draft, ctx());
 
@@ -140,8 +151,8 @@ describe('estimateOrder', () => {
     const draft: OrderDraft = {
       ...marketBuy(0),
       type: 'limit',
-      limitTicks: 990_000,
-      size: { kind: 'amount', cents: 100_000 },
+      limitTicks: ticks(990_000),
+      size: { kind: 'amount', cents: cents(100_000) },
     };
 
     const estimate = estimateOrder(draft, ctx());
@@ -151,9 +162,9 @@ describe('estimateOrder', () => {
   });
 
   it('estimates $1 at $3,000 a share as 333 micros', () => {
-    const draft: OrderDraft = { ...marketBuy(0), size: { kind: 'amount', cents: 100 } };
+    const draft: OrderDraft = { ...marketBuy(0), size: { kind: 'amount', cents: cents(100) } };
 
-    const estimate = estimateOrder(draft, ctx({ quote: quote(30_000_000) }));
+    const estimate = estimateOrder(draft, ctx({ quote: quote(ticks(30_000_000)) }));
 
     expect(estimate).toMatchObject({ qtyMicros: 333, notionalCents: 100, holdCents: 100 });
   });
@@ -161,7 +172,7 @@ describe('estimateOrder', () => {
   it('sells everything sellable at the bid, rounding proceeds down', () => {
     const draft: OrderDraft = { side: 'sell', type: 'market', tif: 'day', size: { kind: 'all' } };
 
-    const estimate = estimateOrder(draft, ctx({ sellableMicros: 3_333_333 }));
+    const estimate = estimateOrder(draft, ctx({ sellableMicros: micros(3_333_333) }));
 
     // 3.333333 × $99.99 = $333.29997 → down.
     expect(estimate).toMatchObject({
@@ -178,11 +189,11 @@ describe('estimateOrder', () => {
       side: 'sell',
       type: 'market',
       tif: 'day',
-      size: { kind: 'amount', cents: 50_000 },
+      size: { kind: 'amount', cents: cents(50_000) },
     };
 
-    const roomy = estimateOrder(draft, ctx({ sellableMicros: 10 * SHARE }));
-    const tight = estimateOrder(draft, ctx({ sellableMicros: 5_001_000 }));
+    const roomy = estimateOrder(draft, ctx({ sellableMicros: micros(10 * SHARE) }));
+    const tight = estimateOrder(draft, ctx({ sellableMicros: micros(5_001_000) }));
 
     // $500 / ($99.99 × 0.9995 → $99.94) rounded up.
     expect(roomy.holdMicros).toBe(5_003_002);
@@ -195,11 +206,13 @@ describe('estimateOrder', () => {
       side: 'sell',
       type: 'limit',
       tif: 'gtc',
-      limitTicks: 1_050_000,
-      size: { kind: 'shares', micros: 2 * SHARE },
+      limitTicks: ticks(1_050_000),
+      size: { kind: 'shares', micros: micros(2 * SHARE) },
     };
 
-    expect(estimateOrder(draft, ctx({ sellableMicros: 5 * SHARE })).holdMicros).toBe(2 * SHARE);
+    expect(estimateOrder(draft, ctx({ sellableMicros: micros(5 * SHARE) })).holdMicros).toBe(
+      2 * SHARE,
+    );
   });
 });
 
@@ -231,12 +244,12 @@ describe('validateOrder', () => {
         side,
         type,
         tif: 'day',
-        size: { kind: 'shares', micros: SHARE },
-        limitTicks: 1_000_000,
-        stopTicks: side === 'buy' ? 1_010_000 : 990_000,
+        size: { kind: 'shares', micros: micros(SHARE) },
+        limitTicks: ticks(1_000_000),
+        stopTicks: ticks(side === 'buy' ? 1_010_000 : 990_000),
       };
 
-      const result = codes(draft, ctx({ tradingEnabled: false, sellableMicros: SHARE }));
+      const result = codes(draft, ctx({ tradingEnabled: false, sellableMicros: micros(SHARE) }));
 
       expect(result).toEqual(['TRADING_DISABLED']);
     },
@@ -260,9 +273,9 @@ describe('validateOrder', () => {
   });
 
   it('lists the order reasons in precedence order', () => {
-    const draft: OrderDraft = { ...marketBuy(1), type: 'limit', limitTicks: 1_200_000 };
+    const draft: OrderDraft = { ...marketBuy(1), type: 'limit', limitTicks: ticks(1_200_000) };
 
-    const result = codes(draft, ctx({ now: NOW + 6_000, buyingPowerCents: 0 }));
+    const result = codes(draft, ctx({ now: NOW + 6_000, buyingPowerCents: cents(0) }));
 
     expect(result).toEqual(['STALE_QUOTE', 'PRICE_COLLAR', 'MIN_NOTIONAL', 'INSUFFICIENT_FUNDS']);
   });
@@ -272,8 +285,8 @@ describe('validateOrder', () => {
       side: 'sell',
       type: 'stop',
       tif: 'day',
-      stopTicks: 1_200_000,
-      size: { kind: 'shares', micros: SHARE },
+      stopTicks: ticks(1_200_000),
+      size: { kind: 'shares', micros: micros(SHARE) },
     };
 
     expect(codes(draft, ctx())).toEqual(['INVALID_PRICE', 'INSUFFICIENT_SHARES']);
@@ -293,7 +306,7 @@ describe('validateOrder', () => {
     });
 
     it('lets a limit order rest while closed even when queueing is off', () => {
-      const draft: OrderDraft = { ...marketBuy(SHARE), type: 'limit', limitTicks: 990_000 };
+      const draft: OrderDraft = { ...marketBuy(SHARE), type: 'limit', limitTicks: ticks(990_000) };
 
       expect(validateOrder(draft, ctx({ session: CLOSED, rules: noQueue }))).toEqual([]);
     });
@@ -313,8 +326,12 @@ describe('validateOrder', () => {
     });
 
     it('ignores staleness for a resting limit, a queued market order and a stop', () => {
-      const resting: OrderDraft = { ...marketBuy(SHARE), type: 'limit', limitTicks: 990_000 };
-      const stop: OrderDraft = { ...marketBuy(SHARE), type: 'stop', stopTicks: 1_050_000 };
+      const resting: OrderDraft = {
+        ...marketBuy(SHARE),
+        type: 'limit',
+        limitTicks: ticks(990_000),
+      };
+      const stop: OrderDraft = { ...marketBuy(SHARE), type: 'stop', stopTicks: ticks(1_050_000) };
 
       expect(validateOrder(resting, ctx(stale))).toEqual([]);
       expect(validateOrder(marketBuy(SHARE), ctx({ ...stale, session: CLOSED }))).toEqual([]);
@@ -327,10 +344,10 @@ describe('validateOrder', () => {
       side,
       type: 'stop',
       tif: 'day',
-      stopTicks,
-      size: { kind: 'shares', micros: SHARE },
+      stopTicks: ticks(stopTicks),
+      size: { kind: 'shares', micros: micros(SHARE) },
     });
-    const holding = ctx({ sellableMicros: 10 * SHARE });
+    const holding = ctx({ sellableMicros: micros(10 * SHARE) });
 
     it('rejects a buy stop at or below the last trade', () => {
       expect(validateOrder(stop('buy', 1_000_000), holding)).toEqual([
@@ -349,7 +366,7 @@ describe('validateOrder', () => {
     const limit = (limitTicks: number): OrderDraft => ({
       ...marketBuy(SHARE),
       type: 'limit',
-      limitTicks,
+      limitTicks: ticks(limitTicks),
     });
 
     it('accepts a limit exactly on the collar edge', () => {
@@ -363,7 +380,7 @@ describe('validateOrder', () => {
     });
 
     it('rejects a stop outside the collar on the stop field', () => {
-      const draft: OrderDraft = { ...marketBuy(SHARE), type: 'stop', stopTicks: 1_100_001 };
+      const draft: OrderDraft = { ...marketBuy(SHARE), type: 'stop', stopTicks: ticks(1_100_001) };
 
       expect(validateOrder(draft, ctx())).toEqual([
         { code: 'PRICE_COLLAR', field: 'stop', minTicks: 900_000, maxTicks: 1_100_000 },
@@ -371,7 +388,7 @@ describe('validateOrder', () => {
     });
 
     it('keeps the collar inside ±collar when it does not divide evenly', () => {
-      expect(collarRange(1_000_001, { collarBps: 1_000 })).toEqual({
+      expect(collarRange(ticks(1_000_001), { collarBps: bps(1_000) })).toEqual({
         minTicks: 900_001,
         maxTicks: 1_100_001,
       });
@@ -379,9 +396,9 @@ describe('validateOrder', () => {
   });
 
   describe('notional limits', () => {
-    const amount = (cents: number): OrderDraft => ({
+    const amount = (value: number): OrderDraft => ({
       ...marketBuy(0),
-      size: { kind: 'amount', cents },
+      size: { kind: 'amount', cents: cents(value) },
     });
 
     it('rejects below the minimum and accepts the minimum', () => {
@@ -392,21 +409,24 @@ describe('validateOrder', () => {
     });
 
     it('rejects above the maximum', () => {
-      const result = validateOrder(amount(25_000_001), ctx({ buyingPowerCents: 30_000_000 }));
+      const result = validateOrder(
+        amount(25_000_001),
+        ctx({ buyingPowerCents: cents(30_000_000) }),
+      );
 
       expect(result).toEqual([{ code: 'MAX_NOTIONAL', field: 'size', maxCents: 25_000_000 }]);
     });
   });
 
   describe('INSUFFICIENT_FUNDS', () => {
-    const amount: OrderDraft = { ...marketBuy(0), size: { kind: 'amount', cents: 100_000 } };
+    const amount: OrderDraft = { ...marketBuy(0), size: { kind: 'amount', cents: cents(100_000) } };
 
     it('accepts a hold equal to buying power', () => {
-      expect(validateOrder(amount, ctx({ buyingPowerCents: 100_000 }))).toEqual([]);
+      expect(validateOrder(amount, ctx({ buyingPowerCents: cents(100_000) }))).toEqual([]);
     });
 
     it('rejects a hold above buying power', () => {
-      expect(validateOrder(amount, ctx({ buyingPowerCents: 99_999 }))).toEqual([
+      expect(validateOrder(amount, ctx({ buyingPowerCents: cents(99_999) }))).toEqual([
         {
           code: 'INSUFFICIENT_FUNDS',
           field: 'size',
@@ -417,7 +437,10 @@ describe('validateOrder', () => {
     });
 
     it('checks the slippage-padded hold, not the notional, for a share buy', () => {
-      const result = validateOrder(marketBuy(10 * SHARE), ctx({ buyingPowerCents: 100_060 }));
+      const result = validateOrder(
+        marketBuy(10 * SHARE),
+        ctx({ buyingPowerCents: cents(100_060) }),
+      );
 
       expect(result).toEqual([
         {
@@ -431,18 +454,20 @@ describe('validateOrder', () => {
   });
 
   describe('INSUFFICIENT_SHARES', () => {
-    const sell = (micros: number): OrderDraft => ({
+    const sell = (qty: number): OrderDraft => ({
       side: 'sell',
       type: 'market',
       tif: 'day',
-      size: { kind: 'shares', micros },
+      size: { kind: 'shares', micros: micros(qty) },
     });
 
     it('rejects selling more than is sellable', () => {
-      expect(validateOrder(sell(3 * SHARE), ctx({ sellableMicros: 2 * SHARE }))).toEqual([
-        { code: 'INSUFFICIENT_SHARES', field: 'size', sellableMicros: 2 * SHARE },
+      expect(validateOrder(sell(3 * SHARE), ctx({ sellableMicros: micros(2 * SHARE) }))).toEqual([
+        { code: 'INSUFFICIENT_SHARES', field: 'size', sellableMicros: micros(2 * SHARE) },
       ]);
-      expect(validateOrder(sell(2 * SHARE), ctx({ sellableMicros: 2 * SHARE }))).toEqual([]);
+      expect(validateOrder(sell(2 * SHARE), ctx({ sellableMicros: micros(2 * SHARE) }))).toEqual(
+        [],
+      );
     });
 
     it('rejects selling all when nothing is sellable', () => {
@@ -455,26 +480,26 @@ describe('validateOrder', () => {
 
 describe('helpers', () => {
   it('asks to confirm only above 25% of equity', () => {
-    expect(needsLargeOrderConfirm(250_000, 1_000_000)).toBe(false);
-    expect(needsLargeOrderConfirm(250_001, 1_000_000)).toBe(true);
-    expect(needsLargeOrderConfirm(1, 0)).toBe(false);
+    expect(needsLargeOrderConfirm(cents(250_000), cents(1_000_000))).toBe(false);
+    expect(needsLargeOrderConfirm(cents(250_001), cents(1_000_000))).toBe(true);
+    expect(needsLargeOrderConfirm(cents(1), cents(0))).toBe(false);
   });
 
   it('signs slippage so positive is worse for the trader', () => {
-    expect(slippageBps('buy', 1_000_000, 1_000_500)).toBe(5);
-    expect(slippageBps('buy', 1_000_000, 999_500)).toBe(-5);
-    expect(slippageBps('sell', 1_000_000, 999_500)).toBe(5);
-    expect(slippageBps('sell', 1_000_000, 1_000_500)).toBe(-5);
-    expect(slippageBps('buy', 1_000_000, 1_000_050)).toBe(1);
+    expect(slippageBps('buy', ticks(1_000_000), ticks(1_000_500))).toBe(5);
+    expect(slippageBps('buy', ticks(1_000_000), ticks(999_500))).toBe(-5);
+    expect(slippageBps('sell', ticks(1_000_000), ticks(999_500))).toBe(5);
+    expect(slippageBps('sell', ticks(1_000_000), ticks(1_000_500))).toBe(-5);
+    expect(slippageBps('buy', ticks(1_000_000), ticks(1_000_050))).toBe(1);
   });
 
   it('treats a limit as marketable when the opposite side reaches it', () => {
     const q = quote();
 
-    expect(isMarketable('buy', 1_000_100, q)).toBe(true);
-    expect(isMarketable('buy', 1_000_099, q)).toBe(false);
-    expect(isMarketable('sell', 999_900, q)).toBe(true);
-    expect(isMarketable('sell', 999_901, q)).toBe(false);
+    expect(isMarketable('buy', ticks(1_000_100), q)).toBe(true);
+    expect(isMarketable('buy', ticks(1_000_099), q)).toBe(false);
+    expect(isMarketable('sell', ticks(999_900), q)).toBe(true);
+    expect(isMarketable('sell', ticks(999_901), q)).toBe(false);
   });
 
   it('marks filled, canceled, rejected and expired as terminal', () => {
@@ -491,8 +516,8 @@ describe('zero prices', () => {
       side: 'buy',
       type: 'limit',
       tif: 'day',
-      limitTicks: 0,
-      size: { kind: 'amount', cents: 1_000 },
+      limitTicks: ticks(0),
+      size: { kind: 'amount', cents: cents(1_000) },
     };
 
     expect(validateOrder(draft, ctx())[0]).toEqual({

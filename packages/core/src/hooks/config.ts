@@ -6,10 +6,12 @@ import { type AppConfig, type Period, PERIODS } from '@sarwa/contracts';
 
 import { useSarwa } from '../provider';
 import { type AppNotice, appNotices } from '../status';
+import { useI18n } from './i18n';
 import { queryKeys } from './keys';
 import { useConnection, useMarketStatus } from './live';
 
 export function useAppNotices(): { notices: AppNotice[]; dismiss: (notice: AppNotice) => void } {
+  const i18n = useI18n();
   const connection = useConnection();
   const market = useMarketStatus();
   const banner = useAppConfig()?.banner;
@@ -17,7 +19,7 @@ export function useAppNotices(): { notices: AppNotice[]; dismiss: (notice: AppNo
   const cachedAt = useQueryClient().getQueryState(queryKeys.stocks)?.dataUpdatedAt;
 
   return {
-    notices: appNotices({
+    notices: appNotices(i18n, {
       connection,
       market,
       banner: banner?.message === dismissed ? null : banner,

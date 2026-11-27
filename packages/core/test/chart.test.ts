@@ -18,6 +18,9 @@ import {
   scrubPoint,
   withLiveQuote,
 } from '../src/chart';
+import { localized } from './utils';
+
+const en = localized();
 
 const candle = (t: number, c: number): Candle => ({ t, o: c, h: c + 1, l: c - 1, c, v: 1 });
 
@@ -132,16 +135,25 @@ describe('percentChange', () => {
 describe('describeChart', () => {
   it('summarises the move and the range instead of reading every point', () => {
     const candles = [candle(1, 100), candle(2, 104)];
-    expect(describeChart('AAPL', '1D', candles, 100)).toBe(
+    expect(describeChart(en, 'AAPL', '1D', candles, 100)).toBe(
       'AAPL up 4.00% today, low $99.00, high $105.00',
     );
-    expect(describeChart('AAPL', '1M', candles, 104)).toBe(
+    expect(describeChart(en, 'AAPL', '1M', candles, 104)).toBe(
       'AAPL flat over 1M, low $99.00, high $105.00',
+    );
+    expect(describeChart(en, 'AAPL', '1W', [candle(1, 104), candle(2, 100)], 104)).toBe(
+      'AAPL down 3.85% over 1W, low $99.00, high $105.00',
     );
   });
 
   it('falls back to a plain label without data', () => {
-    expect(describeChart('AAPL', '1W', [], null)).toBe('AAPL price chart, 1W');
+    expect(describeChart(en, 'AAPL', '1W', [], null)).toBe('AAPL price chart, 1W');
+  });
+
+  it('describes the chart in Arabic with Arabic-Indic digits', () => {
+    expect(describeChart(localized('ar', 'arab'), 'AAPL', '1D', [candle(1, 100)], 96)).toBe(
+      'AAPL ارتفع ⁦٤٫١٧٪⁩ اليوم، الأدنى ⁦$٩٩٫٠٠⁩، الأعلى ⁦$١٠١٫٠٠⁩',
+    );
   });
 });
 
@@ -217,7 +229,7 @@ describe('periodChange', () => {
 
 describe('ohlc', () => {
   it('formats open, high, low and close', () => {
-    expect(ohlc({ t: 1, o: 10, h: 12, l: 9, c: 11, v: 1 })).toEqual([
+    expect(ohlc(en, { t: 1, o: 10, h: 12, l: 9, c: 11, v: 1 })).toEqual([
       { label: 'Open', value: '$10.00' },
       { label: 'High', value: '$12.00' },
       { label: 'Low', value: '$9.00' },

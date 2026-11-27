@@ -7,47 +7,55 @@ import {
   changePct,
   direction,
   formatChange,
-  formatMarketTime,
   formatPct,
   formatPrice,
   formatQuoteLabel,
   type KeyStat,
+  useI18n,
   useQuote,
 } from '@sarwa/core';
 import { ChangePill, cn, PriceFlash, Skeleton, Sparkline, StockAvatar } from '@sarwa/ui';
 
 // No live region: the price ticks several times a second and would never stop being read.
 export function PriceSummary({ quote, live }: { quote: Quote | undefined; live: boolean }) {
+  const i18n = useI18n();
+  const { t, f } = i18n;
   if (!quote) return <Skeleton className="h-15 w-72" />;
   const delta = change(quote);
   return (
     <div
       className="flex flex-wrap items-end gap-4"
       role="group"
-      aria-label={formatQuoteLabel(quote)}
+      aria-label={formatQuoteLabel(i18n, quote)}
     >
-      <PriceFlash price={quote.price} size="display-web" className="max-md:type-display" />
+      <PriceFlash
+        price={quote.price}
+        format={(price) => formatPrice(f, price)}
+        size="display-web"
+        className="max-md:type-display"
+      />
       <ChangePill
         value={delta}
-        label={`${formatChange(delta)} (${formatPct(changePct(quote))})`}
+        label={`${formatChange(f, delta)} (${formatPct(f, changePct(quote))})`}
         size="lg"
         className="mb-2"
       />
       <span className="type-sm text-fg-3 mb-3">
-        Today · {formatMarketTime(quote.ts)}
-        {live ? ' · Live' : ''}
+        {t.stock.today({ time: f.time(quote.ts) })}
+        {live ? ` · ${t.common.live}` : ''}
       </span>
     </div>
   );
 }
 
 export function KeyStats({ stats, layout }: { stats: KeyStat[]; layout: 'grid' | 'list' }) {
+  const { t } = useI18n();
   if (layout === 'list') {
     return (
       <section className="border-border bg-surface overflow-hidden rounded-lg border">
         <div className="border-border flex items-baseline justify-between border-b px-4.5 py-3.5">
-          <h2 className="type-h3">Key statistics</h2>
-          <span className="type-caption text-fg-3">Simulated data</span>
+          <h2 className="type-h3">{t.stock.keyStats}</h2>
+          <span className="type-caption text-fg-3">{t.stock.simulated}</span>
         </div>
         <dl>
           {stats.map(({ label, value }) => (
@@ -84,12 +92,16 @@ export function RangeCard({
   high: number;
   position: number;
 }) {
+  const { t, f } = useI18n();
+  const weeks = f.count(52);
   return (
     <section className="border-border bg-surface flex flex-col gap-2.5 rounded-lg border px-4.5 py-4">
-      <h2 className="type-overline text-fg-3">52-week range</h2>
+      <h2 className="type-overline text-fg-3">{t.stock.range(weeks)}</h2>
+      {/* A price scale runs low to high left to right in every locale, like the chart. */}
       <div
+        dir="ltr"
         role="meter"
-        aria-label="Price within the 52-week range"
+        aria-label={t.stock.rangeLabel(weeks)}
         aria-valuemin={low}
         aria-valuemax={high}
         aria-valuenow={low + (high - low) * position}
@@ -105,15 +117,16 @@ export function RangeCard({
           style={{ left: `${String(position * 100)}%` }}
         />
       </div>
-      <div className="type-num-sm text-fg-2 flex justify-between">
-        <span>{formatPrice(low)}</span>
-        <span>{formatPrice(high)}</span>
+      <div dir="ltr" className="type-num-sm text-fg-2 flex justify-between">
+        <span>{formatPrice(f, low)}</span>
+        <span>{formatPrice(f, high)}</span>
       </div>
     </section>
   );
 }
 
 function SimilarCard({ stock }: { stock: StockWithQuote }) {
+  const { f } = useI18n();
   const quote = useQuote(stock.symbol) ?? stock.quote;
   const pct = changePct(quote);
   return (
@@ -130,8 +143,8 @@ function SimilarCard({ stock }: { stock: StockWithQuote }) {
       </span>
       <Sparkline values={stock.sparkline} direction={direction(pct)} className="h-8 w-full" />
       <span className="flex items-center justify-between">
-        <span className="type-num-md">{formatPrice(quote.price)}</span>
-        <ChangePill value={pct} label={formatPct(pct)} size="sm" />
+        <span className="type-num-md">{formatPrice(f, quote.price)}</span>
+        <ChangePill value={pct} label={formatPct(f, pct)} size="sm" />
       </span>
     </Link>
   );

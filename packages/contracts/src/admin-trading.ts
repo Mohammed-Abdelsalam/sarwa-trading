@@ -123,3 +123,20 @@ export type AdminAccount = z.infer<typeof AdminAccountSchema>;
 export type AdminAccountsQuery = z.input<typeof AdminAccountsQuerySchema>;
 export type AdminAccountsResponse = z.infer<typeof AdminAccountsResponseSchema>;
 export type ResetAccount = z.infer<typeof ResetAccountSchema>;
+
+// The admin socket namespace is authenticated with the admin session cookie.
+export const ADMIN_NAMESPACE = '/admin';
+
+export const AdminSocketEvent = {
+  Order: 'admin.order',
+  TradingStatus: 'admin.trading',
+} as const;
+
+export const AdminOrderEventSchema = z.object({ v: z.literal(1), order: AdminOrderSchema });
+
+export type AdminOrderEvent = z.infer<typeof AdminOrderEventSchema>;
+
+export interface AdminServerToClientEvents {
+  'admin.order': (event: AdminOrderEvent) => void;
+  'admin.trading': (event: { v: 1; trading: AdminTrading }) => void;
+}

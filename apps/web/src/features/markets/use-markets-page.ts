@@ -7,6 +7,7 @@ import {
   nextSort,
   sectorFilterLabel,
   type SectorFilter,
+  useI18n,
   useIsStale,
   useLiveSymbols,
   useMarketList,
@@ -18,6 +19,7 @@ import { breakpoints } from '@sarwa/tokens';
 import { replaceSearchParam, useMediaQuery, useSearchParam } from '../../lib/browser';
 
 export function useMarketsPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const query = useSearchParam('q') ?? '';
   const requested = useSearchParam('symbol');
@@ -50,15 +52,19 @@ export function useMarketsPage() {
     stale,
     isLoading,
     isError,
+    search: query,
     filters: {
       query: searchedQuery,
       sector,
-      sectorLabel: sectorFilterLabel(sector),
+      sectorLabel: sectorFilterLabel(t, sector),
       sort,
     },
     rowHref: (symbol: string): Route =>
-      twoPane ? (`/?symbol=${symbol}` as Route) : (`/stocks/${symbol}` as Route),
+      twoPane ? (`/markets?symbol=${symbol}` as Route) : (`/stocks/${symbol}` as Route),
     actions: {
+      setQuery: (value: string) => {
+        replaceSearchParam('q', value || null);
+      },
       setSector,
       cycleSort: () => {
         setSort(nextSort);

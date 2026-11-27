@@ -1,3 +1,3 @@
-import { MarketsScreen } from '../../features/markets/markets-screen';
+import { HomeScreen } from '../../features/home/home-screen';
 
-export default MarketsScreen;
+export default HomeScreen;

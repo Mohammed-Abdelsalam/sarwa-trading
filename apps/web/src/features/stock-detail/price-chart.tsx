@@ -2,14 +2,7 @@ import { RefreshCw, TriangleAlert } from 'lucide-react';
 import { Fragment, type ReactNode, useId } from 'react';
 
 import { type Period } from '@sarwa/contracts';
-import {
-  type ChartType,
-  formatCandleDate,
-  formatCandleTime,
-  formatPct,
-  formatPrice,
-  ohlc,
-} from '@sarwa/core';
+import { type ChartType, formatPct, formatPrice, ohlc, useI18n } from '@sarwa/core';
 import { layout } from '@sarwa/tokens';
 import { Button, ChangePill, cn, Skeleton } from '@sarwa/ui';
 
@@ -31,6 +24,8 @@ export function PriceChart({
   height?: number;
   toolbar?: (change: ReturnType<typeof usePriceChart>['periodChange']) => ReactNode;
 }) {
+  const i18n = useI18n();
+  const { t, f } = i18n;
   const gradientId = useId();
   const chart = usePriceChart({ symbol, period, type, height });
   const tone = chart.rising ? 'pos' : 'neg';
@@ -41,7 +36,7 @@ export function PriceChart({
       {toolbar ? <div className="px-4 pb-3">{toolbar(chart.periodChange)}</div> : null}
 
       {chart.state === 'loading' ? (
-        <div aria-label="Loading chart" className="flex flex-col gap-2.5 px-4" style={{ height }}>
+        <div aria-label={t.chart.loading} className="flex flex-col gap-2.5 px-4" style={{ height }}>
           <Skeleton className="flex-1 rounded-md" />
           <Skeleton className="h-2.5" />
         </div>
@@ -54,26 +49,25 @@ export function PriceChart({
           <span className="bg-neg-subtle text-neg grid size-11 place-items-center rounded-lg">
             <TriangleAlert aria-hidden className="size-5" />
           </span>
-          <p className="type-h3">Chart unavailable</p>
-          <p className="type-sm text-fg-2 max-w-60">
-            We couldn&apos;t load {period} history. Live price above is still updating.
-          </p>
+          <p className="type-h3">{t.chart.unavailable}</p>
+          <p className="type-sm text-fg-2 max-w-60">{t.chart.unavailableBody({ period })}</p>
           <Button
             variant="secondary"
             size="sm"
             icon={<RefreshCw aria-hidden className="size-4" />}
             onClick={chart.retry}
           >
-            Retry
+            {t.common.retry}
           </Button>
         </div>
       ) : (
-        <>
+        // Time runs left to right in every locale, so the plot, axes and labels stay LTR together.
+        <div dir="ltr">
           <div className="relative mr-18 max-md:mr-0" style={{ height }}>
             <div
               role="slider"
               tabIndex={0}
-              aria-label={`${symbol} price chart`}
+              aria-label={t.chart.label({ symbol })}
               aria-valuemin={0}
               aria-valuemax={chart.slider.max}
               aria-valuenow={chart.slider.now}
@@ -191,17 +185,17 @@ export function PriceChart({
                   }
                 >
                   <span className="type-caption text-fg-3">
-                    {formatCandleDate(cross.candle.t, period)}
+                    {f.chartDate(cross.candle.t, period)}
                   </span>
-                  <span className="type-num-lg">{formatPrice(cross.candle.c)}</span>
+                  <span className="type-num-lg">{formatPrice(f, cross.candle.c)}</span>
                   <ChangePill
                     value={cross.changePct}
-                    label={formatPct(cross.changePct)}
+                    label={formatPct(f, cross.changePct)}
                     variant="inline"
                   />
                   {type === 'candle' ? (
                     <dl className="type-num-sm mt-1 grid grid-cols-[auto_1fr] gap-x-3">
-                      {ohlc(cross.candle).map(({ label, value }) => (
+                      {ohlc(i18n, cross.candle).map(({ label, value }) => (
                         <Fragment key={label}>
                           <dt className="text-fg-3">{label}</dt>
                           <dd className="text-right">{value}</dd>
@@ -215,14 +209,14 @@ export function PriceChart({
                   className="bg-fg text-bg type-num-sm pointer-events-none absolute -right-17 -mt-2.75 rounded-sm px-1.5 py-0.5 max-md:hidden"
                   style={{ top: `${String(cross.yPct)}%` }}
                 >
-                  {formatPrice(cross.candle.c)}
+                  {formatPrice(f, cross.candle.c)}
                 </span>
               </>
             ) : null}
 
             <div className="type-caption text-fg-3 absolute top-0 -right-16 bottom-0 flex flex-col justify-between tabular-nums max-md:hidden">
               {chart.ticks.map((tick) => (
-                <span key={tick}>{formatPrice(tick)}</span>
+                <span key={tick}>{formatPrice(f, tick)}</span>
               ))}
             </div>
           </div>
@@ -248,10 +242,10 @@ export function PriceChart({
           </svg>
           <div className="type-caption text-fg-3 flex justify-between pt-1.5 pr-22 pl-4 tabular-nums max-md:pr-4">
             {chart.axisCandles.map((candle, i) => (
-              <span key={candle?.t ?? i}>{candle ? formatCandleTime(candle.t, period) : ''}</span>
+              <span key={candle?.t ?? i}>{candle ? f.chartTime(candle.t, period) : ''}</span>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

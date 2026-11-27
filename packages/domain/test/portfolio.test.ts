@@ -1,3 +1,4 @@
+import { cents, micros, ticks } from '../src/money';
 import {
   averageCostTicks,
   buyingPowerCents,
@@ -13,30 +14,40 @@ import { POLICY } from '../src/rules';
 
 const SHARE = 1_000_000;
 const START = POLICY.startingCashCents;
+const shares = (count: number) => micros(count * SHARE);
 
-const hold = (overrides: Partial<Hold>): Hold => ({
-  side: 'buy',
-  symbol: 'AAA',
-  heldCents: 0,
-  heldMicros: 0,
-  ...overrides,
+const hold = (
+  overrides: Partial<Pick<Hold, 'side' | 'symbol'>> & { cents?: number; shares?: number },
+): Hold => ({
+  side: overrides.side ?? 'buy',
+  symbol: overrides.symbol ?? 'AAA',
+  heldCents: cents(overrides.cents ?? 0),
+  heldMicros: shares(overrides.shares ?? 0),
 });
 
 function row(
   symbol: string,
   sector: string,
-  shares: number,
+  count: number,
   basisCents: number,
   lastTicks: number,
   prevCloseTicks: number,
-  today?: PositionInput['today'],
+  today?: { qtyAtOpenMicros: number; boughtCents: number; soldCents: number },
 ): PositionInput {
   return {
-    position: { symbol, qtyMicros: shares * SHARE, costBasisCents: basisCents },
+    position: { symbol, qtyMicros: shares(count), costBasisCents: cents(basisCents) },
     sector,
-    lastTicks,
-    prevCloseTicks,
-    ...(today ? { today } : {}),
+    lastTicks: ticks(lastTicks),
+    prevCloseTicks: ticks(prevCloseTicks),
+    ...(today
+      ? {
+          today: {
+            qtyAtOpenMicros: micros(today.qtyAtOpenMicros),
+            boughtCents: cents(today.boughtCents),
+            soldCents: cents(today.soldCents),
+          },
+        }
+      : {}),
   };
 }
 
@@ -46,7 +57,7 @@ function input(overrides: Partial<PortfolioInput> = {}): PortfolioInput {
     startingCashCents: START,
     holds: [],
     positions: [],
-    realizedYtdCents: 0,
+    realizedYtdCents: cents(0),
     equityAtLastCloseCents: START,
     ...overrides,
   };
@@ -54,43 +65,45 @@ function input(overrides: Partial<PortfolioInput> = {}): PortfolioInput {
 
 describe('position math', () => {
   it('derives the average cost from the stored basis', () => {
-    expect(averageCostTicks({ qtyMicros: 3 * SHARE, costBasisCents: 30_003 })).toBe(1_000_100);
-    expect(averageCostTicks({ qtyMicros: 3 * SHARE, costBasisCents: 10_000 })).toBe(333_333);
+    expect(averageCostTicks({ qtyMicros: shares(3), costBasisCents: cents(30_003) })).toBe(
+      1_000_100,
+    );
+    expect(averageCostTicks({ qtyMicros: shares(3), costBasisCents: cents(10_000) })).toBe(333_333);
   });
 
   it('has no average cost without shares', () => {
-    expect(averageCostTicks({ qtyMicros: 0, costBasisCents: 0 })).toBe(0);
+    expect(averageCostTicks({ qtyMicros: micros(0), costBasisCents: cents(0) })).toBe(0);
   });
 
   it('values a position to the nearest cent', () => {
-    expect(marketValueCents(3 * SHARE, 1_000_050)).toBe(30_002);
-    expect(marketValueCents(3 * SHARE, 1_000_030)).toBe(30_001);
+    expect(marketValueCents(shares(3), ticks(1_000_050))).toBe(30_002);
+    expect(marketValueCents(shares(3), ticks(1_000_030))).toBe(30_001);
   });
 });
 
 describe('holds', () => {
   it('subtracts buy holds from cash for buying power', () => {
-    const holds = [hold({ heldCents: 5_000 }), hold({ symbol: 'BBB', heldCents: 2_500 })];
+    const holds = [hold({ cents: 5_000 }), hold({ symbol: 'BBB', cents: 2_500 })];
 
     expect(reservedCents(holds)).toBe(7_500);
-    expect(buyingPowerCents(10_000, holds)).toBe(2_500);
+    expect(buyingPowerCents(cents(10_000), holds)).toBe(2_500);
   });
 
   it('subtracts only this symbol’s sell holds from the position', () => {
-    const position = { symbol: 'AAA', qtyMicros: 10 * SHARE, costBasisCents: 100_000 };
+    const position = { symbol: 'AAA', qtyMicros: shares(10), costBasisCents: cents(100_000) };
     const holds = [
-      hold({ side: 'sell', heldMicros: 3 * SHARE }),
-      hold({ side: 'sell', symbol: 'BBB', heldMicros: 2 * SHARE }),
-      hold({ heldCents: 1_000, heldMicros: 4 * SHARE }),
+      hold({ side: 'sell', shares: 3 }),
+      hold({ side: 'sell', symbol: 'BBB', shares: 2 }),
+      hold({ cents: 1_000, shares: 4 }),
     ];
 
     expect(sellableMicros(position, holds)).toBe(7 * SHARE);
   });
 
   it('never reports negative sellable shares', () => {
-    const position = { symbol: 'AAA', qtyMicros: SHARE, costBasisCents: 100 };
+    const position = { symbol: 'AAA', qtyMicros: shares(1), costBasisCents: cents(100) };
 
-    expect(sellableMicros(position, [hold({ side: 'sell', heldMicros: 2 * SHARE })])).toBe(0);
+    expect(sellableMicros(position, [hold({ side: 'sell', shares: 2 })])).toBe(0);
     expect(sellableMicros(null, [])).toBe(0);
   });
 });
@@ -98,13 +111,13 @@ describe('holds', () => {
 describe('summarizePortfolio', () => {
   // $100k start, $20k invested: 100 AAA at $150 (now $160) and 50 XOM at $100 (now $110).
   const invested = input({
-    cashCents: 8_000_000,
-    holds: [hold({ heldCents: 100_000 })],
+    cashCents: cents(8_000_000),
+    holds: [hold({ cents: 100_000 })],
     positions: [
       row('XOM', 'Energy', 50, 500_000, 1_100_000, 1_000_000),
       row('AAA', 'Technology', 100, 1_500_000, 1_600_000, 1_550_000),
     ],
-    equityAtLastCloseCents: 10_050_000,
+    equityAtLastCloseCents: cents(10_050_000),
   });
 
   it('adds cash and market value into equity', () => {
@@ -159,7 +172,7 @@ describe('summarizePortfolio', () => {
 
   it('merges a sector and drops empty slices', () => {
     const allIn = input({
-      cashCents: 0,
+      cashCents: cents(0),
       positions: [
         row('AAA', 'Technology', 10, 100_000, 1_000_000, 1_000_000),
         row('BBB', 'Technology', 10, 100_000, 1_000_000, 1_000_000),
@@ -174,7 +187,7 @@ describe('summarizePortfolio', () => {
 
   it('measures a position opened today against what was paid, for an account opened today', () => {
     const opened = input({
-      cashCents: START - 155_000,
+      cashCents: cents(START - 155_000),
       positions: [
         row('AAA', 'Technology', 10, 155_000, 1_600_000, 1_500_000, {
           qtyAtOpenMicros: 0,
@@ -194,7 +207,7 @@ describe('summarizePortfolio', () => {
 
   it('counts today’s trades on top of the shares carried from the last close', () => {
     const mixed = input({
-      cashCents: START - 152_000 + 10_400,
+      cashCents: cents(START - 152_000 + 10_400),
       positions: [
         row('AAA', 'Technology', 14, 140_000, 1_050_000, 1_000_000, {
           qtyAtOpenMicros: 10 * SHARE,

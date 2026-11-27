@@ -8,24 +8,25 @@ import {
   moveTodayBps,
   validateAlert,
 } from '../src/alerts';
+import { bps, ticks } from '../src/money';
 import { POLICY } from '../src/rules';
 
-const PREV = 1_000_000;
-const px = (lastTicks: number) => ({ lastTicks, prevCloseTicks: PREV });
-const above = (thresholdTicks: number | null): AlertRule => ({
+const PREV = ticks(1_000_000);
+const px = (lastTicks: number) => ({ lastTicks: ticks(lastTicks), prevCloseTicks: PREV });
+const above = (threshold: number | null): AlertRule => ({
   condition: 'price_above',
-  thresholdTicks,
+  thresholdTicks: threshold === null ? null : ticks(threshold),
   thresholdBps: null,
 });
-const below = (thresholdTicks: number | null): AlertRule => ({
+const below = (threshold: number | null): AlertRule => ({
   condition: 'price_below',
-  thresholdTicks,
+  thresholdTicks: threshold === null ? null : ticks(threshold),
   thresholdBps: null,
 });
-const moved = (thresholdBps: number | null): AlertRule => ({
+const moved = (threshold: number | null): AlertRule => ({
   condition: 'move_today',
   thresholdTicks: null,
-  thresholdBps,
+  thresholdBps: threshold === null ? null : bps(threshold),
 });
 const armed = (repeat: AlertState['repeat']): AlertState => ({
   repeat,
@@ -61,7 +62,11 @@ describe('validateAlert', () => {
   it.each(ALERT_CONDITIONS.flatMap((condition) => [null, 0].map((v) => [condition, v] as const)))(
     'rejects a %s alert with a %p threshold',
     (condition, value) => {
-      const rule: AlertRule = { condition, thresholdTicks: value, thresholdBps: value };
+      const rule: AlertRule = {
+        condition,
+        thresholdTicks: value === null ? null : ticks(value),
+        thresholdBps: value === null ? null : bps(value),
+      };
 
       expect(validateAlert(rule, px(PREV))).toEqual({ code: 'MISSING_THRESHOLD' });
     },

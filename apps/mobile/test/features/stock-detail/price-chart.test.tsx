@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react-native';
+import { screen } from '@testing-library/react-native';
 import { type ReactNode } from 'react';
 import { Text } from 'react-native';
 
 import { PriceChart } from '../../../src/features/stock-detail/price-chart';
 import { usePriceChart } from '../../../src/features/stock-detail/use-price-chart';
+import { renderScreen } from '../../render';
 
 jest.mock('../../../src/features/stock-detail/use-price-chart', () => ({
   usePriceChart: jest.fn(),
@@ -52,7 +53,7 @@ function chart(
 describe('PriceChart', () => {
   it('draws one body per candle in candlestick mode', async () => {
     mockedHook.mockReturnValue(chart());
-    await render(<PriceChart symbol="AAPL" period="1M" type="candle" onScrub={jest.fn()} />);
+    await renderScreen(<PriceChart symbol="AAPL" period="1M" type="candle" onScrub={jest.fn()} />);
 
     expect(screen.getAllByTestId('candle')).toHaveLength(2);
     expect(screen.getByLabelText('AAPL up 1.00% today')).toBeOnTheScreen();
@@ -60,14 +61,14 @@ describe('PriceChart', () => {
 
   it('draws the area line, not candles, in area mode', async () => {
     mockedHook.mockReturnValue(chart());
-    await render(<PriceChart symbol="AAPL" period="1M" type="area" onScrub={jest.fn()} />);
+    await renderScreen(<PriceChart symbol="AAPL" period="1M" type="area" onScrub={jest.fn()} />);
 
     expect(screen.queryAllByTestId('candle')).toHaveLength(0);
   });
 
   it('keeps the toolbar below the chart while it loads', async () => {
     mockedHook.mockReturnValue(chart({ state: 'loading' }));
-    await render(
+    await renderScreen(
       <PriceChart
         symbol="AAPL"
         period="1M"

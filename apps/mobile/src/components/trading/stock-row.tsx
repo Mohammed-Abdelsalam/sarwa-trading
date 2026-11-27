@@ -13,6 +13,7 @@ import {
 } from '@sarwa/core';
 import { layout } from '@sarwa/tokens';
 
+import { useCopy } from '../../lib/i18n';
 import { cx, useLargeText } from '../../lib/theme';
 import { Skeleton } from '../ui/skeleton';
 import { Text } from '../ui/text';
@@ -36,6 +37,8 @@ export const StockRow = memo(function StockRow({
   onToggleWatch,
   stale = false,
 }: StockRowProps) {
+  const copy = useCopy();
+  const { t, f } = copy;
   const quote = useQuote(stock.symbol) ?? stock.quote;
   const largeText = useLargeText();
   const pct = changePct(quote);
@@ -51,9 +54,14 @@ export const StockRow = memo(function StockRow({
         !largeText && (withStar ? 'w-price-col' : 'w-price-col-wide'),
       )}
     >
-      <PriceFlash price={quote.price} format={formatListPrice} muted={stale} />
+      <PriceFlash
+        key={stock.symbol}
+        price={quote.price}
+        format={(value) => formatListPrice(f, value)}
+        muted={stale}
+      />
       <View className={stale ? 'opacity-70' : undefined}>
-        <ChangePill value={pct} label={formatPct(pct)} />
+        <ChangePill value={pct} label={formatPct(f, pct)} />
       </View>
     </View>
   );
@@ -62,7 +70,7 @@ export const StockRow = memo(function StockRow({
     <Link href={`/stock/${stock.symbol}`} asChild>
       <Pressable
         accessibilityRole="link"
-        accessibilityLabel={formatStockLabel({
+        accessibilityLabel={formatStockLabel(copy, {
           symbol: stock.symbol,
           name: stock.name,
           quote,
@@ -73,15 +81,15 @@ export const StockRow = memo(function StockRow({
             ? [
                 {
                   name: 'toggleWatch',
-                  label: watched ? 'Remove from watchlist' : 'Add to watchlist',
+                  label: watched ? t.watchlist.removeAction : t.watchlist.addAction,
                 },
               ]
             : undefined
         }
         onAccessibilityAction={toggle}
         className={cx(
-          'min-h-16 flex-row items-center pl-4 active:bg-surface-3',
-          withStar ? 'gap-2.5 py-2 pr-1.5' : 'gap-3 py-2.5 pr-4',
+          'min-h-16 flex-row items-center ps-4 active:bg-surface-3',
+          withStar ? 'gap-2.5 py-2 pe-1.5' : 'gap-3 py-2.5 pe-4',
         )}
       >
         <StockAvatar symbol={stock.symbol} sector={stock.sector} />
@@ -115,10 +123,7 @@ export const StockRow = memo(function StockRow({
 
 export function StockRowSkeleton() {
   return (
-    <View
-      testID="stock-row-skeleton"
-      className="min-h-16 flex-row items-center gap-2.5 py-2 pl-4 pr-4"
-    >
+    <View testID="stock-row-skeleton" className="min-h-16 flex-row items-center gap-2.5 px-4 py-2">
       <Skeleton className="h-10 w-10 rounded-control-lg" />
       <View className="flex-1 gap-1.5">
         <Skeleton className="h-3.5 w-14" />
@@ -137,8 +142,9 @@ export function StockRowSkeleton() {
 }
 
 export function StockListSkeleton({ rows }: { rows: number }) {
+  const { t } = useCopy();
   return (
-    <View accessible accessibilityRole="progressbar" accessibilityLabel="Loading stocks">
+    <View accessible accessibilityRole="progressbar" accessibilityLabel={t.markets.loading}>
       {Array.from({ length: rows }, (_, i) => (
         <StockRowSkeleton key={i} />
       ))}
