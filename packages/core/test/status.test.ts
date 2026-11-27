@@ -1,4 +1,4 @@
-import { appNotices, LIVE_STATUS_LABELS, liveStatus } from '../src/status';
+import { appNotices, isStale, LIVE_STATUS_LABELS, liveStatus } from '../src/status';
 
 const open = { status: 'open' } as const;
 const paused = { state: 'paused', volatility: 1, since: Date.UTC(2026, 10, 26, 19, 41) } as const;
@@ -67,5 +67,14 @@ describe('appNotices', () => {
     });
 
     expect(notice?.tone).toBe('warn');
+  });
+});
+
+describe('isStale', () => {
+  it('marks prices stale only while offline or paused', () => {
+    expect(isStale('offline')).toBe(true);
+    expect(isStale('paused')).toBe(true);
+    expect(isStale('live')).toBe(false);
+    expect(isStale('reconnecting')).toBe(false);
   });
 });

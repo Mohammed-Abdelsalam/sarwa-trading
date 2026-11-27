@@ -4,16 +4,14 @@ import { type Period, SECTOR_LABELS } from '@sarwa/contracts';
 import {
   resolvePeriod,
   useEnabledPeriods,
-  useIsWatched,
   useLiveStatus,
   useStockDetail,
-  useToggleWatchlist,
+  useWatchToggle,
 } from '@sarwa/core';
 
 export function useStockPreview(symbol: string) {
   const detail = useStockDetail(symbol);
-  const watched = useIsWatched(symbol);
-  const { mutate: toggle } = useToggleWatchlist();
+  const { watched, toggle } = useWatchToggle(symbol);
   const status = useLiveStatus();
   const enabledPeriods = useEnabledPeriods();
   const [period, setPeriod] = useState<Period>('1D');
@@ -26,8 +24,6 @@ export function useStockPreview(symbol: string) {
     period: resolvePeriod(enabledPeriods, period),
     enabledPeriods,
     setPeriod,
-    toggleWatch: () => {
-      toggle({ symbol, watched });
-    },
+    toggleWatch: toggle,
   };
 }

@@ -16,6 +16,10 @@ export const SECTOR_FILTERS: readonly { id: SectorFilter; label: string }[] = [
   ...SECTORS.map((id) => ({ id, label: SECTOR_LABELS[id] })),
 ];
 
+export function sectorFilterLabel(id: SectorFilter): string {
+  return id === 'all' ? 'All' : SECTOR_LABELS[id];
+}
+
 export const SORTS = [
   { label: 'Name', key: 'name', dir: 1 },
   { label: 'Name', key: 'name', dir: -1 },
@@ -34,6 +38,14 @@ export function nextSort(current: SortOption): SortOption {
   return SORTS[(SORTS.indexOf(current) + 1) % SORTS.length] ?? SORTS[0];
 }
 
+// null keeps the server order, which is the order the stocks were starred in.
+export const WATCHLIST_ORDER_LABEL = 'Order added';
+
+export function nextWatchlistSort(current: SortOption | null): SortOption | null {
+  if (current === null) return SORTS[0];
+  return SORTS[SORTS.indexOf(current) + 1] ?? null;
+}
+
 const SORT_VALUE = {
   name: (s: StockWithQuote) => s.symbol,
   price: (s: StockWithQuote) => s.quote.price,
@@ -47,19 +59,25 @@ export interface MarketFilter {
 }
 
 // Sorts on the REST snapshot, not live ticks, so rows don't jump around while the user reads.
+export function sortStocks(stocks: readonly StockWithQuote[], sort: SortOption): StockWithQuote[] {
+  const value = SORT_VALUE[sort.key];
+  return [...stocks].sort((a, b) => {
+    const [x, y] = [value(a), value(b)];
+    return (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
+  });
+}
+
 export function filterAndSort(
   stocks: readonly StockWithQuote[],
   { query, sector, sort }: MarketFilter,
 ): StockWithQuote[] {
   const q = query.trim().toLowerCase();
-  const value = SORT_VALUE[sort.key];
-  return stocks
-    .filter((s) => sector === 'all' || s.sector === sector)
-    .filter((s) => !q || s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
-    .sort((a, b) => {
-      const [x, y] = [value(a), value(b)];
-      return (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
-    });
+  return sortStocks(
+    stocks
+      .filter((s) => sector === 'all' || s.sector === sector)
+      .filter((s) => !q || s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)),
+    sort,
+  );
 }
 
 export function averageChangePct(quotes: readonly Quote[]): number | null {

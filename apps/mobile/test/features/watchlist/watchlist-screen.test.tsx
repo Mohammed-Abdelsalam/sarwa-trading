@@ -68,8 +68,15 @@ function viewModel(
     stale: false,
     isLoading: false,
     isError: false,
-    retry: jest.fn(),
-    remove: jest.fn(),
+    sort: null,
+    removed: null,
+    actions: {
+      retry: jest.fn(),
+      cycleSort: jest.fn(),
+      remove: jest.fn(),
+      undo: jest.fn(),
+      dismissUndo: jest.fn(),
+    },
     ...overrides,
   };
 }
@@ -84,14 +91,14 @@ describe('WatchlistScreen', () => {
   });
 
   it('shows an error with retry instead of the empty state when loading fails', async () => {
-    const retry = jest.fn();
-    mockedHook.mockReturnValue(viewModel({ isError: true, retry }));
+    const model = viewModel({ isError: true });
+    mockedHook.mockReturnValue(model);
     await render(<WatchlistScreen />);
 
     expect(screen.queryByText('Your watchlist is empty')).not.toBeOnTheScreen();
     expect(screen.getByText("Couldn't load your watchlist")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
-    expect(retry).toHaveBeenCalledTimes(1);
+    expect(model.actions.retry).toHaveBeenCalledTimes(1);
   });
 
   it('lists starred stocks with the average change', async () => {
@@ -105,11 +112,36 @@ describe('WatchlistScreen', () => {
   });
 
   it('removes a stock from its swipe action', async () => {
-    const remove = jest.fn();
-    mockedHook.mockReturnValue(viewModel({ rows: [stock('AAPL')], remove }));
+    const model = viewModel({ rows: [stock('AAPL')] });
+    mockedHook.mockReturnValue(model);
     await render(<WatchlistScreen />);
 
     await fireEvent.press(screen.getByRole('button', { name: 'Remove AAPL from watchlist' }));
-    expect(remove).toHaveBeenCalledWith('AAPL');
+    expect(model.actions.remove).toHaveBeenCalledWith('AAPL');
+  });
+
+  it('offers undo in a snackbar while the removal is pending, even on an empty list', async () => {
+    const model = viewModel({ removed: 'AAPL' });
+    mockedHook.mockReturnValue(model);
+    await render(<WatchlistScreen />);
+
+    expect(screen.getByText('AAPL removed from Watchlist')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Undo' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Dismiss' }));
+
+    expect(model.actions.undo).toHaveBeenCalledTimes(1);
+    expect(model.actions.dismissUndo).toHaveBeenCalledTimes(1);
+  });
+
+  it('cycles the sort, starting from the order stocks were added in', async () => {
+    const model = viewModel({ rows: [stock('AAPL')] });
+    mockedHook.mockReturnValue(model);
+    await render(<WatchlistScreen />);
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Sort by Order added, tap to change' }),
+    );
+
+    expect(model.actions.cycleSort).toHaveBeenCalledTimes(1);
   });
 });

@@ -2,7 +2,14 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { type Candle } from '@sarwa/contracts';
 
-import { useChartSeries, useMarketList, useStockDetail, useStocks } from '../../src/hooks';
+import {
+  useChartSeries,
+  useMarketList,
+  useRefreshStock,
+  useStock,
+  useStockDetail,
+  useStocks,
+} from '../../src/hooks';
 import { SORTS } from '../../src/markets';
 import { createTestClient, createWrapper, makeProblem, makeQuote, makeStock } from '../utils';
 
@@ -165,5 +172,45 @@ describe('useChartSeries', () => {
       expect(getCandles).toHaveBeenCalledTimes(2);
     });
     expect(result.current.showBaseline).toBe(false);
+  });
+});
+
+describe('useRefreshStock', () => {
+  it('refetches the stock but not the market list, and spins only while it runs', async () => {
+    const getStock = jest.fn(() =>
+      Promise.resolve({
+        stock: {
+          symbol: 'AAPL',
+          name: 'Apple',
+          sector: 'tech',
+          exchange: 'NASDAQ',
+          currency: 'USD',
+        },
+        quote: makeQuote(),
+        stats: { marketCap: 1, peRatio: 30, week52High: 250, week52Low: 150, avgVolume: 1 },
+      } as const),
+    );
+    const listStocks = jest.fn(() => Promise.resolve({ items: [makeStock('AAPL')] }));
+    const { Wrapper } = createWrapper(createTestClient({ getStock, listStocks }));
+    const { result } = renderHook(
+      () => ({ refresh: useRefreshStock('AAPL'), stock: useStock('AAPL'), list: useStocks() }),
+      { wrapper: Wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.stock.isSuccess && result.current.list.isSuccess).toBe(true);
+    });
+
+    let done: Promise<void> | undefined;
+    act(() => {
+      done = result.current.refresh.refresh();
+    });
+    expect(result.current.refresh.isRefreshing).toBe(true);
+    await act(async () => {
+      await done;
+    });
+
+    expect(result.current.refresh.isRefreshing).toBe(false);
+    expect(getStock).toHaveBeenCalledTimes(2);
+    expect(listStocks).toHaveBeenCalledTimes(1);
   });
 });

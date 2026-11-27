@@ -5,6 +5,7 @@ import {
   formatChange,
   formatMarketCap,
   formatPct,
+  shareStockMessage,
   formatPrice,
   formatCandleDate,
   formatListPrice,
@@ -95,5 +96,17 @@ describe('formatStockLabel', () => {
         watched: true,
       }),
     ).toBe('Apple Inc., AAPL. $231.48. Up 1.24% today. In watchlist.');
+  });
+});
+
+describe('shareStockMessage', () => {
+  it('sums up the stock and its move today', () => {
+    expect(
+      shareStockMessage({
+        symbol: 'AAPL',
+        name: 'Apple Inc.',
+        quote: { price: 192.3, prevClose: 189.94 },
+      }),
+    ).toBe('AAPL · Apple Inc. $192.30, +1.24% today');
   });
 });

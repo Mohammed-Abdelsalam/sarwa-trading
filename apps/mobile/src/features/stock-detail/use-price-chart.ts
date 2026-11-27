@@ -3,53 +3,65 @@ import { usePanGesture } from 'react-native-gesture-handler';
 import { useAnimatedProps, useSharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { type Candle, type Period } from '@sarwa/contracts';
-import { chartGeometry, nearestPointIndex, percentChange, useChartSeries } from '@sarwa/core';
+import { type Period } from '@sarwa/contracts';
+import {
+  candleGeometry,
+  candleIndexAt,
+  chartGeometry,
+  type ChartType,
+  nearestPointIndex,
+  type ScrubPoint,
+  scrubPoint,
+  useChartSeries,
+} from '@sarwa/core';
 
 const LONG_PRESS_MS = 150;
 const PADDING = 12;
 const NONE = -1;
 
-export interface ScrubPoint {
-  candle: Candle;
-  changePct: number;
-}
-
 export function usePriceChart({
   symbol,
   period,
+  type,
   width,
   height,
   onScrub,
 }: {
   symbol: string;
   period: Period;
+  type: ChartType;
   width: number;
   height: number;
   onScrub: (point: ScrubPoint | null) => void;
 }) {
   const series = useChartSeries(symbol, period);
   const activeIndex = useSharedValue(NONE);
+  const count = series.candles.length;
 
-  const { line, area, points, referenceY } = chartGeometry(
+  const area = chartGeometry(
     series.candles.map((c) => c.c),
     width,
     height,
     PADDING,
     series.showBaseline ? (series.baseline ?? undefined) : undefined,
   );
+  const candles = candleGeometry(series.candles, width, height, PADDING);
+  // The crosshair rides the line in area mode and each candle's close in candle mode.
+  const points =
+    type === 'area'
+      ? area.points
+      : candles.shapes.map((shape) => ({ x: shape.x, y: shape.closeY }));
+
   const select = (index: number) => {
     const candle = index === NONE ? undefined : series.candles[index];
-    onScrub(
-      candle ? { candle, changePct: percentChange(series.baseline ?? candle.c, candle.c) } : null,
-    );
+    onScrub(candle ? scrubPoint(candle, series.baseline) : null);
     if (candle) void Haptics.selectionAsync();
   };
 
   // Runs on the UI thread; React only hears about it when the selected candle changes.
   const track = (x: number) => {
     'worklet';
-    const index = nearestPointIndex(points, x);
+    const index = type === 'candle' ? candleIndexAt(count, width, x) : nearestPointIndex(points, x);
     if (index === NONE || index === activeIndex.get()) return;
     activeIndex.set(index);
     scheduleOnRN(select, index);
@@ -88,11 +100,13 @@ export function usePriceChart({
     state: series.state,
     retry: series.retry,
     summary: series.summary,
-    line,
-    area,
+    periodChange: series.periodChange,
+    line: area.line,
+    area: area.area,
+    candles: candles.shapes,
     rising: series.rising,
-    baselineY: referenceY,
-    lastPoint: points.at(-1) ?? null,
+    baselineY: type === 'area' ? area.referenceY : null,
+    lastPoint: type === 'area' ? (area.points.at(-1) ?? null) : null,
     axisLabels: series.axisCandles,
     scrubGesture,
     crosshairProps,

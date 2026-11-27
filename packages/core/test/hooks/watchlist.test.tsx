@@ -2,11 +2,15 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import {
   queryKeys,
+  useIsWatched,
   useToggleWatchlist,
+  useUndoableRemove,
   useWatchedSymbols,
   useWatchlist,
   useWatchlistStocks,
+  useWatchToggle,
 } from '../../src/hooks';
+import { SORTS } from '../../src/markets';
 import { createTestClient, createWrapper, makeProblem, makeStock } from '../utils';
 
 describe('useWatchlist', () => {
@@ -200,5 +204,162 @@ describe('useWatchlistStocks', () => {
       expect(result.current.rows.map((s) => s.symbol)).toEqual(['AAPL']);
     });
     expect(result.current.symbols).toEqual(['INTC', 'AAPL']);
+  });
+});
+
+describe('useWatchlistStocks with a sort', () => {
+  it('sorts the watched stocks instead of keeping the added order', async () => {
+    const { Wrapper } = createWrapper(
+      createTestClient({
+        getWatchlist: () => Promise.resolve({ symbols: ['TSLA', 'AAPL'] }),
+        listStocks: () => Promise.resolve({ items: [makeStock('AAPL'), makeStock('TSLA')] }),
+      }),
+    );
+
+    const { result } = renderHook(() => useWatchlistStocks({ sort: SORTS[0] }), {
+      wrapper: Wrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.rows.map((s) => s.symbol)).toEqual(['AAPL', 'TSLA']);
+    });
+  });
+});
+
+describe('useWatchToggle', () => {
+  it('stars one symbol optimistically', async () => {
+    const addToWatchlist = jest.fn(() => new Promise<void>(() => undefined));
+    const client = createTestClient({
+      getWatchlist: () => Promise.resolve({ symbols: [] }),
+      addToWatchlist,
+    });
+    const { Wrapper } = createWrapper(client);
+    const { result } = renderHook(() => useWatchToggle('AAPL'), { wrapper: Wrapper });
+    await waitFor(() => {
+      expect(result.current.watched).toBe(false);
+    });
+
+    act(() => {
+      result.current.toggle();
+    });
+
+    await waitFor(() => {
+      expect(result.current.watched).toBe(true);
+    });
+    expect(addToWatchlist).toHaveBeenCalledWith('AAPL');
+  });
+});
+
+describe('useUndoableRemove', () => {
+  // A tiny fake server, so the refetch after a delete reflects what was really removed.
+  function serverWith(symbols: string[], { failDelete = false } = {}) {
+    let saved = [...symbols];
+    const removeFromWatchlist = jest.fn((symbol: string) => {
+      if (failDelete) return Promise.reject(makeProblem(503));
+      saved = saved.filter((s) => s !== symbol);
+      return Promise.resolve();
+    });
+    const addToWatchlist = jest.fn(() => Promise.resolve());
+    const client = createTestClient({
+      getWatchlist: () => Promise.resolve({ symbols: saved }),
+      removeFromWatchlist,
+      addToWatchlist,
+    });
+    return { client, removeFromWatchlist, addToWatchlist };
+  }
+
+  function renderWatchlist(client: ReturnType<typeof createTestClient>) {
+    const { Wrapper } = createWrapper(client);
+    return renderHook(
+      () => ({
+        removal: useUndoableRemove(),
+        toggle: useToggleWatchlist(),
+        list: useWatchlist().data,
+        tslaWatched: useIsWatched('TSLA'),
+      }),
+      { wrapper: Wrapper },
+    );
+  }
+
+  it('hides the stock everywhere while pending and puts it back in place on undo', async () => {
+    const { client, removeFromWatchlist } = serverWith(['AAPL', 'TSLA', 'JPM']);
+    const { result } = renderWatchlist(client);
+    await waitFor(() => {
+      expect(result.current.list).toEqual(['AAPL', 'TSLA', 'JPM']);
+    });
+
+    act(() => {
+      result.current.removal.remove('TSLA');
+    });
+    expect(result.current.removal.pending).toBe('TSLA');
+    expect(result.current.list).toEqual(['AAPL', 'JPM']);
+    expect(result.current.tslaWatched).toBe(false);
+
+    act(() => {
+      result.current.removal.undo();
+    });
+
+    expect(result.current.list).toEqual(['AAPL', 'TSLA', 'JPM']);
+    expect(removeFromWatchlist).not.toHaveBeenCalled();
+  });
+
+  it('sends the delete when the window closes and keeps the row gone', async () => {
+    const { client, removeFromWatchlist } = serverWith(['AAPL', 'TSLA']);
+    const { result } = renderWatchlist(client);
+    await waitFor(() => {
+      expect(result.current.list).toHaveLength(2);
+    });
+
+    act(() => {
+      result.current.removal.remove('TSLA');
+    });
+    act(() => {
+      result.current.removal.dismiss();
+    });
+
+    expect(result.current.removal.pending).toBeNull();
+    expect(result.current.list).toEqual(['AAPL']);
+    await waitFor(() => {
+      expect(removeFromWatchlist).toHaveBeenCalledWith('TSLA');
+    });
+  });
+
+  it('brings the row back from the server when the delete fails', async () => {
+    const { client } = serverWith(['AAPL', 'TSLA'], { failDelete: true });
+    const { result } = renderWatchlist(client);
+    await waitFor(() => {
+      expect(result.current.list).toHaveLength(2);
+    });
+
+    act(() => {
+      result.current.removal.remove('TSLA');
+    });
+    act(() => {
+      result.current.removal.dismiss();
+    });
+
+    await waitFor(() => {
+      expect(result.current.list).toEqual(['AAPL', 'TSLA']);
+    });
+  });
+
+  it('cancels the pending delete without a request when the stock is starred again', async () => {
+    const { client, removeFromWatchlist, addToWatchlist } = serverWith(['AAPL', 'TSLA']);
+    const { result } = renderWatchlist(client);
+    await waitFor(() => {
+      expect(result.current.list).toHaveLength(2);
+    });
+
+    act(() => {
+      result.current.removal.remove('TSLA');
+    });
+    act(() => {
+      result.current.toggle.mutate({ symbol: 'TSLA', watched: result.current.tslaWatched });
+    });
+
+    expect(result.current.removal.pending).toBeNull();
+    expect(result.current.list).toEqual(['AAPL', 'TSLA']);
+    expect(addToWatchlist).not.toHaveBeenCalled();
+    expect(removeFromWatchlist).not.toHaveBeenCalled();
   });
 });

@@ -7,6 +7,7 @@ import {
   createDeviceIdGetter,
   createLiveStore,
   createMarketSocket,
+  createRemovalQueue,
   type SarwaClient,
 } from '@sarwa/core';
 
@@ -30,4 +31,6 @@ export const client: SarwaClient = {
     getDeviceId: createDeviceIdGetter(AsyncStorage, randomUUID),
   }),
   market: createMarketSocket({ url: API_URL, store }),
+  storage: AsyncStorage,
+  removals: createRemovalQueue(),
 };

@@ -3,9 +3,9 @@ import { useDeferredValue, useState } from 'react';
 import {
   DEFAULT_SORT,
   nextSort,
-  SECTOR_FILTERS,
+  sectorFilterLabel,
   type SectorFilter,
-  useLiveStatus,
+  useIsStale,
   useLiveSymbols,
   useMarketList,
   useToggleWatchlist,
@@ -24,7 +24,7 @@ export function useMarketsScreen() {
     sort,
   });
   const watched = useWatchedSymbols();
-  const status = useLiveStatus();
+  const stale = useIsStale();
   const { mutate: toggle } = useToggleWatchlist();
 
   // Only on-screen rows stream prices; scrolling swaps the subscription set.
@@ -33,14 +33,14 @@ export function useMarketsScreen() {
   return {
     rows,
     watched,
-    stale: status === 'offline' || status === 'paused',
+    stale,
     isLoading,
     isError,
     isRefreshing,
     filters: {
       query,
       sector,
-      sectorLabel: SECTOR_FILTERS.find((f) => f.id === sector)?.label ?? 'All',
+      sectorLabel: sectorFilterLabel(sector),
       sort,
       searchedQuery,
       searchDisabled: isLoading || isError,

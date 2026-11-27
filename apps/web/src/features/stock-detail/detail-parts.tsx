@@ -45,7 +45,10 @@ export function KeyStats({ stats, layout }: { stats: KeyStat[]; layout: 'grid' |
   if (layout === 'list') {
     return (
       <section className="border-border bg-surface overflow-hidden rounded-lg border">
-        <h2 className="type-h3 border-border border-b px-4.5 py-3.5">Key statistics</h2>
+        <div className="border-border flex items-baseline justify-between border-b px-4.5 py-3.5">
+          <h2 className="type-h3">Key statistics</h2>
+          <span className="type-caption text-fg-3">Simulated data</span>
+        </div>
         <dl>
           {stats.map(({ label, value }) => (
             <div

@@ -124,7 +124,7 @@ export const layout = {
     sparkline: { width: 52, height: 24, stroke: 1.6 },
     sparklineWide: { width: 60, height: 26 },
   },
-  detail: { chartHeight: 236, periodTabsHeight: 44 },
+  detail: { chartHeight: 236, periodTabsHeight: 44, volumeHeight: 44 },
   web: { navHeight: 64, contentMax: 1240, listPaneMin: 380, listPaneMax: 440 },
   admin: { sidebar: 244, sidebarCollapsed: 76, topbar: 64, tableRow: 52, tableHeader: 40 },
 } as const;

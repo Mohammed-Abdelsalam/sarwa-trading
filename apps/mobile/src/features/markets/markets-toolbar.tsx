@@ -1,9 +1,10 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from 'lucide-react-native';
+import { Search, X } from 'lucide-react-native';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 
 import { SECTOR_FILTERS, type SectorFilter, type SortOption } from '@sarwa/core';
 import { typography } from '@sarwa/tokens';
 
+import { SortButton } from '../../components/trading/sort-button';
 import { IconButton } from '../../components/ui/icon-button';
 import { fontFile, Text } from '../../components/ui/text';
 import { cx, useColors } from '../../lib/theme';
@@ -108,25 +109,12 @@ export function ListMeta({
   sort: SortOption;
   onCycleSort: () => void;
 }) {
-  const colors = useColors();
-  const SortIcon = sort.dir > 0 ? ArrowUp : ArrowDown;
   return (
     <View className="flex-row items-center justify-between pb-1 pl-5 pr-3 pt-2">
       <Text variant="caption" className="text-fg-3">
         {count} stocks · prices in USD
       </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Sort by ${sort.label}, tap to change`}
-        onPress={onCycleSort}
-        className="h-11 flex-row items-center gap-1.5 rounded-control-sm px-2 active:bg-surface-3"
-      >
-        <ArrowUpDown size={16} color={colors['fg-2']} />
-        <Text variant="sm" weight={600} className="text-fg-2">
-          {sort.label}
-        </Text>
-        <SortIcon size={14} color={colors['fg-2']} />
-      </Pressable>
+      <SortButton sort={sort} onPress={onCycleSort} />
     </View>
   );
 }

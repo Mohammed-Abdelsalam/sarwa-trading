@@ -4,15 +4,15 @@ import { type Period } from '@sarwa/contracts';
 import {
   axisTicks,
   candleGeometry,
+  candleIndexAt,
   chartGeometry,
+  type ChartType,
   formatCandleDate,
   formatPrice,
   nearestPointIndex,
-  percentChange,
+  scrubPoint,
   useChartSeries,
 } from '@sarwa/core';
-
-export type ChartType = 'area' | 'candle';
 
 // The SVG draws in a fixed 800-wide viewBox and stretches; positions are reported as percentages.
 const VIEW_WIDTH = 800;
@@ -46,24 +46,19 @@ export function usePriceChart({
   const pointAt = (index: number) => {
     if (type === 'area') return area.points[index];
     const shape = candles.shapes[index];
-    const candle = series.candles[index];
-    if (!shape || !candle) return undefined;
-    return {
-      x: shape.x,
-      y: candle.c >= candle.o ? shape.bodyTop : shape.bodyTop + shape.bodyHeight,
-    };
+    return shape ? { x: shape.x, y: shape.closeY } : undefined;
   };
 
   const indexAt = (event: PointerEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * VIEW_WIDTH;
-    if (type === 'area') return nearestPointIndex(area.points, x);
-    return Math.min(count - 1, Math.max(0, Math.floor(x / (VIEW_WIDTH / count))));
+    return type === 'area'
+      ? nearestPointIndex(area.points, x)
+      : candleIndexAt(count, VIEW_WIDTH, x);
   };
 
   const activeCandle = active === null ? undefined : series.candles[active];
   const activePoint = active === null ? undefined : pointAt(active);
-  const last = series.candles.at(-1);
 
   return {
     state: series.state,
@@ -76,15 +71,11 @@ export function usePriceChart({
     baselineY: area.referenceY,
     ticks: axisTicks(min, max, 3),
     axisCandles: series.axisCandles,
-    periodChange:
-      last && series.baseline !== null
-        ? { value: last.c - series.baseline, pct: percentChange(series.baseline, last.c) }
-        : null,
+    periodChange: series.periodChange,
     crosshair:
       activeCandle && activePoint
         ? {
-            candle: activeCandle,
-            changePct: percentChange(series.baseline ?? activeCandle.c, activeCandle.c),
+            ...scrubPoint(activeCandle, series.baseline),
             xPct: (activePoint.x / VIEW_WIDTH) * 100,
             yPct: (activePoint.y / height) * 100,
           }

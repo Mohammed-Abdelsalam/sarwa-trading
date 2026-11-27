@@ -1,19 +1,39 @@
-import { useLiveStatus, useToggleWatchlist, useWatchlistStocks } from '@sarwa/core';
+import * as Haptics from 'expo-haptics';
+import { useState } from 'react';
+
+import {
+  nextWatchlistSort,
+  type SortOption,
+  useIsStale,
+  useUndoableRemove,
+  useWatchlistStocks,
+} from '@sarwa/core';
 
 export function useWatchlistScreen() {
-  const { rows, average, isLoading, isError, retry } = useWatchlistStocks();
-  const status = useLiveStatus();
-  const { mutate: toggle } = useToggleWatchlist();
+  const [sort, setSort] = useState<SortOption | null>(null);
+  const { rows, average, isLoading, isError, retry } = useWatchlistStocks({ sort });
+  const stale = useIsStale();
+  const removal = useUndoableRemove();
 
   return {
     rows,
     average,
-    stale: status === 'offline' || status === 'paused',
+    stale,
     isLoading,
     isError,
-    retry,
-    remove: (symbol: string) => {
-      toggle({ symbol, watched: true });
+    sort,
+    removed: removal.pending,
+    actions: {
+      retry,
+      cycleSort: () => {
+        setSort(nextWatchlistSort);
+      },
+      remove: (symbol: string) => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        removal.remove(symbol);
+      },
+      undo: removal.undo,
+      dismissUndo: removal.dismiss,
     },
   };
 }

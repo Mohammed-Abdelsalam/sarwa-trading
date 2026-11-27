@@ -3,7 +3,7 @@
 import { LayoutGrid, List, RefreshCw, Star, TriangleAlert } from 'lucide-react';
 import { type Route } from 'next';
 
-import { formatPct, SORTS } from '@sarwa/core';
+import { formatPct, SORTS, WATCHLIST_ORDER_LABEL } from '@sarwa/core';
 import { Button, ChangePill, SegmentedControl, StateView, Toast } from '@sarwa/ui';
 
 import { StockListSkeleton, StockRow } from '../../components/trading/stock-row';
@@ -16,7 +16,7 @@ const VIEW_OPTIONS = [
 ] as const;
 
 const SORT_OPTIONS = [
-  { value: 'added', label: 'Recently added' },
+  { value: 'added', label: WATCHLIST_ORDER_LABEL },
   ...SORTS.map((sort, i) => ({
     value: String(i),
     label: `${sort.label} ${sort.dir > 0 ? '↑' : '↓'}`,
