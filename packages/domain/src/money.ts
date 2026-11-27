@@ -122,3 +122,12 @@ function parseDecimal(text: string, digits: number): number | null {
 export const parseCents = (text: string) => parseDecimal(text, 2) as Cents | null;
 export const parseTicks = (text: string) => parseDecimal(text, 4) as Ticks | null;
 export const parseMicros = (text: string) => parseDecimal(text, 6) as Micros | null;
+
+// A signed percent with up to two decimals: "-5.25" (or "−5.25") is −525 bps.
+export function parsePercentBps(text: string): Bps | null {
+  const trimmed = text.trim();
+  const signed = /^[-+−]/.test(trimmed);
+  const value = parseDecimal(signed ? trimmed.slice(1) : trimmed, 2);
+  if (value === null) return null;
+  return (signed && !trimmed.startsWith('+') ? 0 - value : value) as Bps;
+}

@@ -13,6 +13,7 @@ import {
   notionalCents,
   parseCents,
   parseMicros,
+  parsePercentBps,
   parseTicks,
   percentToBps,
   ratioBps,
@@ -169,5 +170,19 @@ describe('parsing input text', () => {
     expect(parseTicks('1.23456')).toBeNull();
     expect(parseMicros('0.000001')).toBe(1);
     expect(parseMicros('0.0000001')).toBeNull();
+  });
+
+  it.each([
+    ['5.25', 525],
+    ['+5', 500],
+    [' -5.25 ', -525],
+    ['−3', -300],
+    ['0', 0],
+  ])('parses the percent %p as %p bps', (text, expected) => {
+    expect(parsePercentBps(text)).toBe(expected);
+  });
+
+  it.each(['', '-', '5.255', '--5', '5%', 'abc'])('rejects the percent %p', (text) => {
+    expect(parsePercentBps(text)).toBeNull();
   });
 });

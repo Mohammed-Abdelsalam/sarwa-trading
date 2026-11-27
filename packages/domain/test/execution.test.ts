@@ -60,6 +60,7 @@ function order(overrides: Partial<WorkingOrder> = {}): WorkingOrder {
     heldCents: cents(0),
     heldMicros: micros(0),
     holdPriceTicks: null,
+    holdBudgetCents: null,
     ...overrides,
   };
 }
@@ -214,6 +215,37 @@ describe('applyFill', () => {
       filledNotionalCents: 40_004 + 60_000,
     });
     expect(second.position?.costBasisCents).toBe(100_004);
+  });
+
+  it('keeps the full hold for the rest after a partial buy is repriced lower', () => {
+    const placed = order({
+      type: 'limit',
+      qtyMicros: micros(100 * SHARE),
+      limitTicks: ticks(1_000_000),
+      holdPriceTicks: ticks(1_000_000),
+      heldCents: cents(1_000_000),
+      holdBudgetCents: cents(1_000_000),
+    });
+    const first = applyFill(START, null, placed, 'AAA', {
+      qtyMicros: micros(50 * SHARE),
+      priceTicks: ticks(1_000_000),
+    });
+    const newHold = notionalCents(micros(50 * SHARE), ticks(900_000), 'up');
+    const modified = {
+      ...first.order,
+      limitTicks: ticks(900_000),
+      holdPriceTicks: ticks(900_000),
+      heldCents: newHold,
+      holdBudgetCents: cents(first.order.filledNotionalCents + newHold),
+    };
+
+    const second = applyFill(first.cashCents, first.position, modified, 'AAA', {
+      qtyMicros: micros(10 * SHARE),
+      priceTicks: ticks(900_000),
+    });
+
+    // 40 × $90 still to buy.
+    expect(second.order.heldCents).toBe(360_000);
   });
 
   it('records the share count of a dollar buy at the fill', () => {

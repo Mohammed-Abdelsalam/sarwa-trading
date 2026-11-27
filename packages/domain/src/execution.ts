@@ -39,6 +39,8 @@ export interface WorkingOrder {
   // The price a share-sized buy's cash hold is computed at, so each partial fill releases exactly
   // its share of it and the rest is released on cancel.
   holdPriceTicks: Ticks | null;
+  // What fills plus the hold may ever take; reset when the order is changed. Null on older orders.
+  holdBudgetCents: Cents | null;
 }
 
 export function marketFillPrice(side: Side, quote: TradeQuote, slippageBps: Bps): Ticks {
@@ -187,7 +189,8 @@ export function applyFill(
       heldCents:
         order.side === 'buy' && order.holdPriceTicks !== null && !done
           ? remainingBuyHold(
-              micros(filledMicros + remaining),
+              order.holdBudgetCents ??
+                notionalCents(micros(filledMicros + remaining), order.holdPriceTicks, 'up'),
               order.holdPriceTicks,
               remaining,
               filledNotional,
@@ -198,13 +201,15 @@ export function applyFill(
   };
 }
 
-// What the unfilled shares still need, but never more than the original hold minus what was already
-// spent: debited + held stays within the hold taken at placement, so buying power can't dip below 0.
-function remainingBuyHold(qty: Micros, holdPrice: Ticks, remaining: Micros, debited: Cents): Cents {
-  const originalHold = notionalCents(qty, holdPrice, 'up');
-  return cents(
-    Math.max(0, Math.min(notionalCents(remaining, holdPrice, 'up'), originalHold - debited)),
-  );
+// What the unfilled shares still need, but never more than the budget minus what was already spent:
+// debited + held stays within the budget, so buying power can't dip below 0.
+function remainingBuyHold(
+  budget: Cents,
+  holdPrice: Ticks,
+  remaining: Micros,
+  debited: Cents,
+): Cents {
+  return cents(Math.max(0, Math.min(notionalCents(remaining, holdPrice, 'up'), budget - debited)));
 }
 
 // Average fill price so far, for the order detail and the filled screen.
