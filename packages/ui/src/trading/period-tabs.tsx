@@ -8,11 +8,13 @@ export function PeriodTabs({
   value,
   onChange,
   enabled = PERIODS,
+  size = 'md',
   className,
 }: {
   value: Period;
   onChange: (period: Period) => void;
   enabled?: readonly Period[];
+  size?: 'md' | 'lg';
   className?: string;
 }) {
   const choices = PERIODS.filter((period) => enabled.includes(period));
@@ -36,7 +38,11 @@ export function PeriodTabs({
       role="tablist"
       aria-label="Chart period"
       onKeyDown={onKeyDown}
-      className={cn('bg-surface-3 inline-flex gap-0.5 rounded-[11px] p-[3px]', className)}
+      className={cn(
+        'bg-surface-3 rounded-seg p-seg-pad inline-flex gap-0.5',
+        size === 'lg' && 'flex w-full',
+        className,
+      )}
     >
       {PERIODS.map((period) => {
         const selected = period === value;
@@ -54,7 +60,8 @@ export function PeriodTabs({
               onChange(period);
             }}
             className={cn(
-              'text-fg-2 h-8 min-w-11 flex-1 cursor-pointer rounded-[8px] px-2.5 text-[13px] font-semibold tabular-nums transition-colors duration-200',
+              'text-fg-2 rounded-control-sm type-sm min-w-11 flex-1 cursor-pointer px-2.5 font-semibold tabular-nums transition-colors duration-200',
+              size === 'lg' ? 'h-seg-lg' : 'h-8',
               'hover:text-fg disabled:cursor-not-allowed disabled:opacity-40',
               'focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-2',
               selected && 'bg-surface text-fg shadow-e1 dark:bg-border-strong',
