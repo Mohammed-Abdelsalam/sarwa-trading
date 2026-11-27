@@ -4,11 +4,19 @@ import { type Order, type PlaceOrderRequest } from '@sarwa/contracts';
 import { type Side } from '@sarwa/domain';
 import { createFormatter, getMessages, rejectionMessage } from '@sarwa/i18n';
 
-import { queryKeys, useOrderTicket } from '../../src/hooks';
+import { queryKeys, useOrderTicket, useTicketForm } from '../../src/hooks';
 import { type I18n } from '../../src/hooks/i18n';
+import { initialTicketForm } from '../../src/ticket';
 import { ticketEntryView, ticketResultView, ticketReviewView } from '../../src/ticket-copy';
 import { makeFilledOrder, makePortfolio, makeTradingStatus } from '../trading-fixtures';
-import { createTestClient, createWrapper, makeQuote, makeStock } from '../utils';
+import {
+  createAuthClient,
+  createTestClient,
+  createWrapper,
+  deviceKeys,
+  makeQuote,
+  makeStock,
+} from '../utils';
 
 const NOW = 1_700_000_000_000;
 
@@ -17,15 +25,17 @@ function setup({
   placeOrder = jest.fn(),
   statusLoaded = true,
   portfolioLoaded = true,
+  guest = false,
 }: {
   side?: Side;
   placeOrder?: jest.Mock;
   statusLoaded?: boolean;
   portfolioLoaded?: boolean;
+  guest?: boolean;
 } = {}) {
   jest.useFakeTimers({ now: NOW });
   const quote = makeQuote({ ts: NOW });
-  const client = createTestClient({
+  const client = (guest ? createAuthClient : createTestClient)({
     placeOrder,
     getPortfolio: () =>
       portfolioLoaded ? Promise.resolve(makePortfolio()) : new Promise<never>(() => undefined),
@@ -36,7 +46,7 @@ function setup({
   client.store.getState().setConnection({ status: 'open' });
   client.store.getState().applyQuotes([quote]);
   const { Wrapper, queryClient } = createWrapper(client);
-  if (portfolioLoaded) queryClient.setQueryData(queryKeys.portfolio, makePortfolio());
+  if (portfolioLoaded) queryClient.setQueryData(deviceKeys.portfolio, makePortfolio());
   if (statusLoaded) queryClient.setQueryData(queryKeys.tradingStatus, makeTradingStatus());
   queryClient.setQueryData(queryKeys.stocks, [makeStock('AAPL', { quote })]);
   const view = renderHook(() => useOrderTicket({ symbol: 'AAPL', initialSide: side ?? 'buy' }), {
@@ -52,6 +62,19 @@ const advance = (ms: number) =>
 
 afterEach(() => {
   jest.useRealTimers();
+});
+
+describe('useTicketForm', () => {
+  it('reopens what a guest typed before signing in, and resets to a blank ticket', () => {
+    const typed = { ...initialTicketForm('sell'), type: 'limit' as const, amountText: '250' };
+    const { result } = renderHook(() => useTicketForm('sell', typed));
+    expect(result.current.form).toEqual(typed);
+
+    act(() => {
+      result.current.reset();
+    });
+    expect(result.current.form).toEqual(initialTicketForm('sell'));
+  });
 });
 
 describe('useOrderTicket', () => {
@@ -326,6 +349,44 @@ describe('useOrderTicket', () => {
       slippageCents: 23,
     });
   });
+
+  it('gates a guest at submit and keeps what they typed for after sign-in', () => {
+    const placeOrder = jest.fn();
+    const { client, ticket } = setup({ placeOrder, guest: true });
+    act(() => {
+      ticket().setAmountText('1000');
+    });
+    act(() => {
+      ticket().review();
+    });
+    act(() => {
+      ticket().submit();
+    });
+
+    expect(placeOrder).not.toHaveBeenCalled();
+    expect(client.auth?.gate.getState().intent).toEqual({
+      kind: 'order',
+      symbol: 'AAPL',
+      side: 'buy',
+      form: { ...initialTicketForm('buy'), amountText: '1000' },
+    });
+    expect(ticket().intent).toEqual(client.auth?.gate.getState().intent);
+  });
+
+  it.each(['buy', 'sell'] as const)(
+    'skips the account checks for a guest %s, who holds no cash or shares',
+    (side) => {
+      const { ticket } = setup({ side, guest: true, portfolioLoaded: false });
+      act(() => {
+        ticket().setAmountText('1000');
+      });
+
+      expect(ticket().buyingPowerCents).toBe(0);
+      expect(ticket().issues).toEqual([]);
+      expect(ticket().fieldErrors.size).toBeUndefined();
+      expect(ticket().blockReason).toBeNull();
+    },
+  );
 
   it('goes back to entry and resets to a blank ticket', async () => {
     const { ticket } = setup({ placeOrder: jest.fn(() => Promise.resolve(makeFilledOrder())) });

@@ -15,9 +15,15 @@ jest.mock('expo-router', () => {
 jest.mock('../../src/features/order-ticket/order-ticket-screen', () => {
   const { Text: MockText } = jest.requireActual<{ Text: typeof Text }>('react-native');
   return {
-    OrderTicketScreen: ({ symbol, side }: { symbol: string; side: string }) => (
-      <MockText>{`ticket:${symbol}:${side}`}</MockText>
-    ),
+    OrderTicketScreen: ({
+      symbol,
+      side,
+      initialForm,
+    }: {
+      symbol: string;
+      side: string;
+      initialForm?: { amountText: string };
+    }) => <MockText>{`ticket:${symbol}:${side}:${initialForm?.amountText ?? '-'}`}</MockText>,
   };
 });
 
@@ -28,8 +34,37 @@ describe('NewOrderRoute', () => {
     params.mockReturnValue({ symbol: 'aapl', side: 'sell' });
     await render(<NewOrderRoute />);
 
-    expect(screen.getByText('ticket:AAPL:sell')).toBeOnTheScreen();
+    expect(screen.getByText('ticket:AAPL:sell:-')).toBeOnTheScreen();
   });
+
+  const form = {
+    side: 'buy',
+    type: 'market',
+    tif: 'day',
+    sizeMode: 'amount',
+    amountText: '500',
+    qtyText: '',
+    limitText: '',
+    stopText: '',
+    sellAll: false,
+  };
+
+  it('reopens the ticket a guest filled in before signing in', async () => {
+    params.mockReturnValue({ symbol: 'AAPL', side: 'buy', form: JSON.stringify(form) });
+    await render(<NewOrderRoute />);
+
+    expect(screen.getByText('ticket:AAPL:buy:500')).toBeOnTheScreen();
+  });
+
+  it.each(['{', JSON.stringify({ ...form, type: 'bogus' })])(
+    'drops a form it cannot read (%s)',
+    async (raw) => {
+      params.mockReturnValue({ symbol: 'AAPL', side: 'buy', form: raw });
+      await render(<NewOrderRoute />);
+
+      expect(screen.getByText('ticket:AAPL:buy:-')).toBeOnTheScreen();
+    },
+  );
 
   it.each([{}, { symbol: '' }, { symbol: ['AAPL', 'MSFT'] }])(
     'sends a link without a usable symbol back to markets (%j)',

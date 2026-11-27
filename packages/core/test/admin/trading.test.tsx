@@ -1,12 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import {
-  mergeOrder,
-  useAdminAccounts,
-  useAdminOrderStats,
-  useOrderStream,
-  useResetAccount,
-} from '../../src/admin/orders';
+import { mergeOrder, useAdminOrderStats, useOrderStream } from '../../src/admin/orders';
 import {
   useAdminLive,
   useAdminTrading,
@@ -15,7 +9,7 @@ import {
   useResumeHalt,
   useUpdateTrading,
 } from '../../src/admin/trading';
-import { createAdminWrapper, makeAccount, makeAdminOrder, makeAdminTrading } from './fixtures';
+import { createAdminWrapper, makeAdminOrder, makeAdminTrading } from './fixtures';
 
 describe('trading hooks', () => {
   it('updates the cached controls and syncs live changes', async () => {
@@ -181,43 +175,14 @@ describe('orders', () => {
     });
   });
 
-  it('loads order stats, pages accounts and resets one', async () => {
-    const accounts = jest.fn(() =>
-      Promise.resolve({ items: [makeAccount()], total: 1, page: 1, pageSize: 25 }),
-    );
-    const resetAccount = jest.fn(() =>
-      Promise.resolve({
-        id: 'acc-1',
-        handle: 'ACC-00AA11',
-        cashCents: 1,
-        startingCashCents: 1,
-        createdAt: 1,
-        resetAt: 2,
-      }),
-    );
+  it('loads order stats', async () => {
     const { Wrapper } = createAdminWrapper({
-      accounts,
-      resetAccount,
       orderStats: () => Promise.resolve({ ordersToday: 4 } as never),
     });
-    const { result } = renderHook(
-      () => ({
-        stats: useAdminOrderStats(),
-        accounts: useAdminAccounts({ sort: 'equity' }),
-        reset: useResetAccount(),
-      }),
-      { wrapper: Wrapper },
-    );
-    await waitFor(() => {
-      expect(result.current.accounts.data?.total).toBe(1);
-    });
-    expect(result.current.stats.data).toEqual({ ordersToday: 4 });
+    const { result } = renderHook(() => useAdminOrderStats(), { wrapper: Wrapper });
 
-    await act(() => result.current.reset.mutateAsync({ id: 'acc-1', confirm: 'RESET ACC-00AA11' }));
-
-    expect(resetAccount).toHaveBeenCalledWith('acc-1', 'RESET ACC-00AA11');
     await waitFor(() => {
-      expect(accounts).toHaveBeenCalledTimes(2);
+      expect(result.current.data).toEqual({ ordersToday: 4 });
     });
   });
 });

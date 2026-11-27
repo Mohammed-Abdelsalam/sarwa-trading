@@ -305,6 +305,8 @@ export const NotificationPayloadSchema = z.discriminatedUnion('kind', [
     resumesAt: Timestamp.nullable(),
   }),
   z.object({ kind: z.literal('market_notice'), message: z.string() }),
+  // Sent once, when the account is created.
+  z.object({ kind: z.literal('welcome') }),
 ]);
 
 export const NotificationSchema = z.object({

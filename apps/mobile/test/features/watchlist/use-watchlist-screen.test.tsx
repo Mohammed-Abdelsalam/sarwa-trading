@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { type ReactNode } from 'react';
 
 import { type StockWithQuote } from '@sarwa/contracts';
 import {
   type ApiClient,
+  type ClientAuth,
   createLiveStore,
   createRemovalQueue,
   SarwaProvider,
@@ -13,6 +15,9 @@ import {
 } from '@sarwa/core';
 
 import { useWatchlistScreen } from '../../../src/features/watchlist/use-watchlist-screen';
+import { mockApi, Providers, testAuth } from '../../render';
+
+jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
 function stock(symbol: string): StockWithQuote {
   return {
@@ -42,7 +47,7 @@ function stock(symbol: string): StockWithQuote {
 }
 
 // The real core hooks over a fake API, so undo is checked end to end, request by request.
-async function renderScreenHook() {
+async function renderScreenHook(auth?: ClientAuth) {
   const removeFromWatchlist = jest.fn(() => Promise.resolve());
   const addToWatchlist = jest.fn(() => Promise.resolve());
   const api = {
@@ -53,6 +58,7 @@ async function renderScreenHook() {
   } as Partial<ApiClient> as ApiClient;
   const client = {
     api,
+    auth,
     store: createLiveStore(),
     market: {
       connect: jest.fn(),
@@ -115,5 +121,40 @@ describe('useWatchlistScreen', () => {
 
     expect(result.current.sort).toBe(SORTS[0]);
     expect(symbols(result.current.rows)).toEqual(['AAPL', 'NVDA', 'TSLA']);
+  });
+
+  it('loads a guest’s stars, removes them with undo, and leads to sign-up', async () => {
+    const { result, removeFromWatchlist } = await renderScreenHook(testAuth());
+
+    expect(result.current.isGuest).toBe(true);
+    await act(() => {
+      result.current.actions.remove('AAPL');
+    });
+    expect(symbols(result.current.rows)).toEqual(['TSLA', 'NVDA']);
+    expect(removeFromWatchlist).not.toHaveBeenCalled();
+
+    result.current.actions.signUp();
+    expect(router.push).toHaveBeenCalledWith('/sign-up');
+  });
+
+  it('stays loading while the session restores, so no empty state or note flashes', async () => {
+    const getWatchlist = jest.fn();
+    const api = mockApi({
+      getWatchlist,
+      listStocks: () => Promise.resolve({ items: [stock('AAPL')] }),
+    });
+    const view = await renderHook(() => useWatchlistScreen(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <Providers api={api} auth={testAuth('loading')}>
+          {children}
+        </Providers>
+      ),
+    });
+
+    // Let the stock list settle: only the session should be holding the tab.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(view.result.current.isLoading).toBe(true);
+    expect(view.result.current.isGuest).toBe(false);
+    expect(getWatchlist).not.toHaveBeenCalled();
   });
 });

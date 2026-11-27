@@ -70,6 +70,22 @@ describe('validateStockDraft', () => {
     expect(update).not.toHaveProperty('symbol');
   });
 
+  it('reads Arabic digits and comma decimals in the numeric fields', () => {
+    const draft = {
+      ...stockToDraft(makeAdminStock()),
+      basePrice: '٢٣٠٫٥',
+      volatility: '1,2',
+      peRatio: '۲۵',
+    };
+
+    expect(validateStockDraft(draft, { editing: true }).update).toMatchObject({
+      basePrice: 230.5,
+      volatility: 1.2,
+      peRatio: 25,
+    });
+    expect(validateStockDraft({ ...draft, basePrice: '1,234.5' }).errors.basePrice).toBe('invalid');
+  });
+
   it('ignores the symbol while editing', () => {
     const draft = stockToDraft(makeAdminStock());
     expect(validateStockDraft(draft, { existing: ['AAPL'], editing: true }).errors).toEqual({});

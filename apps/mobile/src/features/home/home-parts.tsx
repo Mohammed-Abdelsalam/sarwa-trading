@@ -1,10 +1,11 @@
 import { Bell, ChevronRight, type LucideIcon } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
-import { type Direction } from '@sarwa/core';
+import { type Direction, type MoversTab } from '@sarwa/core';
 
 import { EquityChart } from '../../components/trading/equity-chart';
 import { SignedText } from '../../components/trading/signed-text';
+import { Segmented } from '../../components/ui/segmented';
 import { Text } from '../../components/ui/text';
 import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
@@ -127,5 +128,34 @@ export function ShortcutCard({
         style={dir === 'rtl' ? { transform: [{ scaleX: -1 }] } : undefined}
       />
     </Pressable>
+  );
+}
+
+export function MoversHeader({
+  value,
+  onChange,
+}: {
+  value: MoversTab;
+  onChange: (tab: MoversTab) => void;
+}) {
+  const { t } = useCopy();
+  const tabs: { value: MoversTab; label: string }[] = [
+    { value: 'gainers', label: t.portfolio.gainers },
+    { value: 'losers', label: t.portfolio.losers },
+    { value: 'active', label: t.portfolio.active },
+  ];
+  return (
+    <View className="flex-row flex-wrap items-center justify-between gap-2 px-5 pb-1 pt-4">
+      <Text variant="h3" accessibilityRole="header">
+        {t.portfolio.topMovers}
+      </Text>
+      <Segmented
+        size="sm"
+        label={t.portfolio.topMovers}
+        options={tabs}
+        value={value}
+        onChange={onChange}
+      />
+    </View>
   );
 }

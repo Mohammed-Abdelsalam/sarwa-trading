@@ -199,9 +199,9 @@ export function MarketPage() {
 
   return (
     <>
-      {page.canEdit ? null : <ViewerNotice />}
+      {page.isViewer ? <ViewerNotice /> : null}
       <PageHeader title={copy.title} subtitle={page.canEdit ? copy.subtitle : undefined}>
-        {page.canEdit ? null : <ReadOnlyBadge />}
+        {page.isViewer ? <ReadOnlyBadge /> : null}
         {page.canEdit && page.lastChange ? (
           <span className="type-caption text-fg-3">
             {copy.lastChange({

@@ -1,54 +1,42 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ApiError } from '@sarwa/core';
-import {
-  useAdminSession,
-  useAdminStocks,
-  useCreateStock,
-  useDeleteStock,
-  useUpdateStock,
-} from '@sarwa/core/admin';
+import { type AdminStock, type AdminUser } from '@sarwa/contracts';
 
 import { StocksPage } from '../../src/features/stocks/stocks-page';
-import { makeStock, mutation, query, renderWithProviders, session } from '../utils';
+import { type ApiCall, HttpError, makeStock, me, renderWithApi } from '../utils';
 
-jest.mock('@sarwa/core/admin', () => ({
-  ...jest.requireActual<object>('@sarwa/core/admin'),
-  useAdminSession: jest.fn(),
-  useAdminStocks: jest.fn(),
-  useCreateStock: jest.fn(),
-  useUpdateStock: jest.fn(),
-  useDeleteStock: jest.fn(),
-}));
+const writes = (calls: ApiCall[]) => calls.filter((call) => call.method !== 'GET');
 
-const conflict = new ApiError({ type: 'x', title: 'Conflict', status: 409, code: 'CONFLICT' });
-
-function setup({
+function renderStocks({
   role = 'ADMIN',
   stocks = [makeStock()],
-}: { role?: 'ADMIN' | 'VIEWER'; stocks?: ReturnType<typeof makeStock>[] } = {}) {
-  const create = mutation();
-  const update = mutation();
-  const remove = mutation({
-    mutate: jest.fn((_symbol: string, options: { onError: (error: unknown) => void }) => {
-      options.onError(conflict);
-    }),
+}: { role?: AdminUser['role']; stocks?: AdminStock[] } = {}) {
+  return renderWithApi(<StocksPage />, {
+    'GET admin/auth/me': me(role),
+    'GET admin/stocks': { items: stocks },
+    'POST admin/stocks': (call: ApiCall) => makeStock(call.body as Partial<AdminStock>),
+    'PATCH admin/stocks/AAPL': (call: ApiCall) => makeStock(call.body as Partial<AdminStock>),
+    'DELETE admin/stocks/AAPL': new HttpError(409),
   });
-  jest.mocked(useAdminSession).mockReturnValue(session(role));
-  jest.mocked(useAdminStocks).mockReturnValue(query(stocks));
-  jest.mocked(useCreateStock).mockReturnValue(create as never);
-  jest.mocked(useUpdateStock).mockReturnValue(update as never);
-  jest.mocked(useDeleteStock).mockReturnValue(remove as never);
-  renderWithProviders(<StocksPage />);
-  return { create, update, remove };
 }
 
 describe('StocksPage', () => {
+  it('shows the view-only notice only once the session says VIEWER', async () => {
+    renderWithApi(<StocksPage />, {
+      'GET admin/auth/me': () => new Promise(() => undefined),
+      'GET admin/stocks': { items: [makeStock()] },
+    });
+
+    expect(await screen.findByText('Apple Inc.')).toBeInTheDocument();
+    expect(screen.queryByText('View-only access.')).not.toBeInTheDocument();
+  });
+
   it('validates the add-stock form inline and summarises the errors', async () => {
     const user = userEvent.setup({ delay: null });
-    const { create } = setup();
+    const { calls } = renderStocks();
 
+    await screen.findByText('Apple Inc.');
     await user.click(screen.getByRole('button', { name: 'Add stock' }));
     const dialog = screen.getByRole('dialog', { name: 'Add stock' });
     await user.type(within(dialog).getByLabelText('Symbol'), 'aapl');
@@ -58,7 +46,7 @@ describe('StocksPage', () => {
     expect(within(dialog).getByText('Fix 5 fields to continue.')).toBeInTheDocument();
     expect(within(dialog).getByText('This symbol already exists')).toBeInTheDocument();
     expect(within(dialog).getByText('Must be > 0')).toBeInTheDocument();
-    expect(create.mutate).not.toHaveBeenCalled();
+    expect(writes(calls)).toEqual([]);
 
     await user.clear(within(dialog).getByLabelText('Symbol'));
     await user.type(within(dialog).getByLabelText('Symbol'), 'nvda');
@@ -69,53 +57,83 @@ describe('StocksPage', () => {
     await user.type(within(dialog).getByLabelText('Base price'), '142.5');
     await user.click(within(dialog).getByRole('button', { name: 'Add stock' }));
 
-    expect(create.mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ symbol: 'NVDA', basePrice: 142.5, volatility: 1, isEnabled: true }),
-      expect.anything(),
-    );
+    await waitFor(() => {
+      expect(writes(calls)).toEqual([
+        expect.objectContaining({
+          method: 'POST',
+          path: 'admin/stocks',
+          body: expect.objectContaining({
+            symbol: 'NVDA',
+            basePrice: 142.5,
+            volatility: 1,
+            isEnabled: true,
+          }) as unknown,
+        }),
+      ]);
+    });
   });
 
   it('offers to disable a stock the server refuses to delete', async () => {
-    const { remove, update } = setup();
+    const { calls } = renderStocks();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Actions for AAPL' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Actions for AAPL' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete stock' }));
     await userEvent.click(screen.getByRole('button', { name: 'Delete stock' }));
 
-    expect(remove.mutate).toHaveBeenCalledWith('AAPL', expect.anything());
-    expect(screen.getByRole('dialog', { name: "AAPL can't be deleted" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('dialog', { name: "AAPL can't be deleted" }),
+    ).toBeInTheDocument();
+    expect(writes(calls)).toEqual([
+      expect.objectContaining({ method: 'DELETE', path: 'admin/stocks/AAPL' }),
+    ]);
     await userEvent.click(screen.getByRole('button', { name: 'Disable instead' }));
-    expect(update.mutate).toHaveBeenCalledWith({ symbol: 'AAPL', patch: { isEnabled: false } });
+    await waitFor(() => {
+      expect(writes(calls).at(-1)).toEqual(
+        expect.objectContaining({
+          method: 'PATCH',
+          path: 'admin/stocks/AAPL',
+          body: { isEnabled: false },
+        }),
+      );
+    });
   });
 
-  it('toggles a stock and shows the empty state', async () => {
-    const { update } = setup();
+  it('disables a stock from its switch', async () => {
+    const { calls } = renderStocks();
 
-    await userEvent.click(screen.getByRole('switch', { name: 'Disable AAPL' }));
-    expect(update.mutate).toHaveBeenCalledWith({ symbol: 'AAPL', patch: { isEnabled: false } });
+    await userEvent.click(await screen.findByRole('switch', { name: 'Disable AAPL' }));
+    await waitFor(() => {
+      expect(writes(calls)).toEqual([
+        expect.objectContaining({ path: 'admin/stocks/AAPL', body: { isEnabled: false } }),
+      ]);
+    });
   });
 
-  it('shows an empty catalogue with a first-stock action', () => {
-    setup({ stocks: [] });
+  it('shows an empty catalogue with a first-stock action', async () => {
+    renderStocks({ stocks: [] });
 
-    expect(screen.getByRole('heading', { name: 'No stocks listed yet' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'No stocks listed yet' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add your first stock' })).toBeEnabled();
   });
 
   it('locks every change for viewers without hiding it', async () => {
-    setup({ role: 'VIEWER' });
+    const { calls } = renderStocks({ role: 'VIEWER' });
 
+    const actions = await screen.findByRole('button', { name: 'Actions for AAPL' });
+    await waitFor(() => {
+      expect(actions).toHaveAccessibleDescription("Viewers can't make changes");
+    });
     expect(screen.getByRole('button', { name: 'Add stock' })).toHaveAttribute(
       'aria-disabled',
       'true',
     );
-    expect(screen.getByRole('switch', { name: 'Disable AAPL' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-    const actions = screen.getByRole('button', { name: 'Actions for AAPL' });
-    expect(actions).toHaveAccessibleDescription("Viewers can't make changes");
+    const toggle = screen.getByRole('switch', { name: 'Disable AAPL' });
+    expect(toggle).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(toggle);
     await userEvent.click(actions);
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+    expect(writes(calls)).toEqual([]);
   });
 });

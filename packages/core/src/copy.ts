@@ -1,5 +1,5 @@
 import { type Alert, type NotificationPayload, type TradingStatus } from '@sarwa/contracts';
-import { bps, cents, micros, ticks } from '@sarwa/domain';
+import { bps, cents, micros, POLICY, ticks } from '@sarwa/domain';
 import { createFormatter, type Digits, DIGITS, LOCALES } from '@sarwa/i18n';
 
 import { type I18n } from './hooks/i18n';
@@ -18,6 +18,14 @@ export interface MarketPill {
 export interface NotificationText {
   title: string;
   body: string;
+}
+
+// The sign-up welcome joins NotificationPayload in the contract with the auth server work.
+export type InboxPayload = NotificationPayload | { kind: 'welcome' };
+
+// Who reads the inbox: the welcome greets them by name.
+export interface Reader {
+  name: string;
 }
 
 const DIGIT_SAMPLE = 123;
@@ -39,8 +47,9 @@ export function alertRuleText(
 
 // Notifications carry data, not sentences: every surface renders them here in the reader's language.
 export function notificationText(
-  payload: NotificationPayload,
+  payload: InboxPayload,
   copy: Pick<I18n, 't' | 'f' | 'rejection'>,
+  reader?: Reader,
 ): NotificationText {
   const { t, f } = copy;
   switch (payload.kind) {
@@ -106,6 +115,11 @@ export function notificationText(
       };
     case 'market_notice':
       return { title: t.notifications.marketNotice, body: payload.message };
+    case 'welcome':
+      return {
+        title: reader ? t.welcomeNotification.title(reader) : t.account.guest.title,
+        body: t.welcomeNotification.body({ amount: f.money(POLICY.startingCashCents) }),
+      };
   }
 }
 

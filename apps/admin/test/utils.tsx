@@ -1,17 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import { type ReactElement, type ReactNode } from 'react';
 
 import {
-  type AdminAccount,
+  type AdminOrder,
   type AdminStats,
   type AdminStock,
   type AdminTrading,
   type AdminUser,
+  type CustomerRow,
 } from '@sarwa/contracts';
 import {
   type ApiClient,
   createApiClient,
+  type KeyValueStorage,
   createLiveStore,
   createRemovalQueue,
   SarwaProvider,
@@ -43,6 +45,21 @@ function testClient(): SarwaClient {
   };
 }
 
+const idleSocket = (): AdminClient['socket'] => ({
+  connect: jest.fn(),
+  disconnect: jest.fn(),
+  onOrder: () => () => undefined,
+  onTrading: () => () => undefined,
+  onConnect: () => () => undefined,
+});
+
+export function testClients(): { sarwa: SarwaClient; admin: AdminClient } {
+  return {
+    sarwa: testClient(),
+    admin: { api: createAdminApi(), socket: idleSocket(), toLogin: jest.fn() },
+  };
+}
+
 // Pages read copy through useI18n, which needs the Sarwa and Query providers.
 export function renderWithProviders(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -65,10 +82,14 @@ export interface ApiCall {
 export type Routes = Record<string, unknown>;
 
 export class HttpError {
-  constructor(readonly status: number) {}
+  constructor(
+    readonly status: number,
+    readonly requestId?: string,
+  ) {}
 }
 
-// A fake server at the fetch boundary: keys look like "GET admin/accounts", and an unrouted call is a 404.
+// A fake server at the fetch boundary: keys look like "GET admin/stocks", and an unrouted call is a 404.
+// A string reply is sent as text (a CSV export); an HttpError may carry the server's request id.
 export function fakeFetch(routes: Routes) {
   const calls: ApiCall[] = [];
   globalThis.fetch = jest.fn((input: string, init: RequestInit = {}) => {
@@ -88,33 +109,44 @@ export function fakeFetch(routes: Routes) {
         : typeof route === 'function'
           ? (route as (call: ApiCall) => unknown)(call)
           : route;
-    const status = reply instanceof HttpError ? reply.status : 200;
+    const failure = reply instanceof HttpError ? reply : null;
+    const status = failure?.status ?? 200;
     return Promise.resolve({
       ok: status < 400,
       status,
       statusText: key,
-      json: () => Promise.resolve(reply instanceof HttpError ? null : reply),
-    } as Response);
+      headers: { get: (name: string) => (name === 'x-request-id' ? failure?.requestId : null) },
+      json: () => Promise.resolve(failure ? null : reply),
+      text: () => Promise.resolve(String(reply)),
+    } as unknown as Response);
   }) as unknown as typeof fetch;
   return calls;
 }
 
 // Real core hooks and API clients over the fake server; only the sockets are stubbed.
-export function renderWithApi(ui: ReactElement, routes: Routes) {
+export function renderWithApi(
+  ui: ReactElement,
+  routes: Routes,
+  { storage }: { storage?: KeyValueStorage } = {},
+) {
   const calls = fakeFetch(routes);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const orderListeners = new Set<(order: AdminOrder) => void>();
   const sarwa: SarwaClient = {
     ...testClient(),
     api: createApiClient({ baseUrl: '', getDeviceId: () => Promise.resolve('device-1') }),
+    ...(storage ? { storage } : {}),
   };
   const admin: AdminClient = {
     api: createAdminApi(),
     socket: {
-      connect: jest.fn(),
-      disconnect: jest.fn(),
-      onOrder: () => () => undefined,
-      onTrading: () => () => undefined,
-      onConnect: () => () => undefined,
+      ...idleSocket(),
+      onOrder: (listener) => {
+        orderListeners.add(listener);
+        return () => {
+          orderListeners.delete(listener);
+        };
+      },
     },
     toLogin: jest.fn(),
   };
@@ -125,7 +157,14 @@ export function renderWithApi(ui: ReactElement, routes: Routes) {
       </SarwaProvider>
     </QueryClientProvider>
   );
-  return { calls, admin, ...render(ui, { wrapper: Wrapper }) };
+  const pushOrder = (order: AdminOrder) => {
+    act(() => {
+      orderListeners.forEach((listener) => {
+        listener(order);
+      });
+    });
+  };
+  return { calls, admin, queryClient, pushOrder, ...render(ui, { wrapper: Wrapper }) };
 }
 
 export const me = (role: AdminUser['role'] = 'ADMIN') => ({ user: makeUser({ role }) });
@@ -147,50 +186,6 @@ export function makeStats(overrides: Partial<AdminStats> = {}): AdminStats {
     },
     recentActivity: [],
     ...overrides,
-  };
-}
-
-export function query(data: unknown, overrides: object = {}) {
-  return {
-    data,
-    isPending: false,
-    isError: false,
-    isFetching: false,
-    dataUpdatedAt: 1_000,
-    refetch: jest.fn(),
-    ...overrides,
-  } as never;
-}
-
-// Settles every call successfully, so confirm dialogs close like they do after a real save.
-export function succeedingMutation() {
-  return mutation({
-    mutate: jest.fn((_variables: unknown, options?: { onSuccess?: () => void }) => {
-      options?.onSuccess?.();
-    }),
-  });
-}
-
-export function mutation(overrides: object = {}) {
-  return {
-    mutate: jest.fn(),
-    reset: jest.fn(),
-    isPending: false,
-    isError: false,
-    error: null,
-    variables: undefined,
-    ...overrides,
-  } as { mutate: jest.Mock; reset: jest.Mock };
-}
-
-export function session(role: AdminUser['role'] = 'ADMIN') {
-  const user = makeUser({ role });
-  return {
-    user,
-    isLoading: false,
-    isError: false,
-    canEdit: role === 'ADMIN',
-    isViewer: role === 'VIEWER',
   };
 }
 
@@ -242,19 +237,24 @@ export function makeTrading(overrides: Partial<AdminTrading> = {}): AdminTrading
   };
 }
 
-export function makeAccount(overrides: Partial<AdminAccount> = {}): AdminAccount {
+export const NOW = Date.UTC(2026, 10, 27, 15);
+
+export function makeCustomer(overrides: Partial<CustomerRow> = {}): CustomerRow {
   return {
-    id: 'acc-1',
-    handle: 'ACC-00AA11',
-    createdAt: 1_000,
+    id: 'c1',
+    handle: 'ACC-7F2E9C',
+    name: 'Sara Hassan',
+    email: 'sara.h@example.com',
+    status: 'active',
+    emailVerified: true,
+    signupPlatform: 'web',
     equityCents: 11_019_429,
-    cashCents: 5_142_340,
-    todayCents: 64_732,
     allTimeCents: 1_019_429,
     allTimeBps: 1_019,
-    positions: 8,
     openOrders: 3,
-    lastTradeAt: null,
+    lastActiveAt: NOW - 120_000,
+    createdAt: Date.UTC(2026, 9, 2),
+    deletionRequestedAt: null,
     ...overrides,
   };
 }

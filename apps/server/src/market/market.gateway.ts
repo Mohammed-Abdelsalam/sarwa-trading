@@ -12,6 +12,7 @@ import { type Subscription } from 'rxjs';
 import { type Namespace, type Socket } from 'socket.io';
 
 import {
+  ErrorCode,
   type ClientToServerEvents,
   MARKET_NAMESPACE,
   MAX_SUBSCRIBE_SYMBOLS,
@@ -82,7 +83,7 @@ export class MarketGateway implements OnGatewayInit, OnGatewayConnection, OnModu
       return {
         ok: false,
         error: {
-          code: 'INVALID_PAYLOAD',
+          code: ErrorCode.InvalidPayload,
           message: parsed.error.issues[0]?.message ?? 'Invalid payload',
         },
       };
@@ -95,7 +96,7 @@ export class MarketGateway implements OnGatewayInit, OnGatewayConnection, OnModu
       return {
         ok: false,
         error: {
-          code: 'TOO_MANY_SYMBOLS',
+          code: ErrorCode.TooManySymbols,
           message: `At most ${MAX_SUBSCRIBE_SYMBOLS} symbols per connection`,
         },
       };

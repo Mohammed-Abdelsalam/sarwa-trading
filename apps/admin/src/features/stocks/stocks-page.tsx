@@ -246,7 +246,7 @@ export function StocksPage() {
 
   return (
     <>
-      {page.canEdit ? null : <ViewerNotice />}
+      {page.isViewer ? <ViewerNotice /> : null}
       <PageHeader
         title={copy.title}
         subtitle={
@@ -255,7 +255,7 @@ export function StocksPage() {
             : copy.subtitle({ listed: f.number(page.total), enabled: f.number(page.enabledCount) })
         }
       >
-        {page.canEdit ? null : <ReadOnlyBadge />}
+        {page.isViewer ? <ReadOnlyBadge /> : null}
         {addButton(copy.add)}
       </PageHeader>
       <div className="flex flex-wrap items-center gap-3">

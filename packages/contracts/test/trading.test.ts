@@ -9,6 +9,7 @@ import {
   OrderUpdatedEventSchema,
   PlaceOrderRequestSchema,
   RejectionCodeSchema,
+  RejectionSchema,
   type RejectionWire,
   resetConfirmation,
   toDomain,
@@ -92,6 +93,19 @@ describe('rejections', () => {
     };
 
     expect(toDomain<Rejection>(toWire(collar))).toEqual(collar);
+  });
+
+  it('carries the figures each rejection code needs to explain itself', () => {
+    expect(RejectionSchema.safeParse({ code: 'MARKET_CLOSED' }).success).toBe(true);
+    expect(
+      RejectionSchema.safeParse({ code: 'STALE_QUOTE', ageMs: 3_000, maxAgeMs: 2_000 }).success,
+    ).toBe(true);
+    expect(RejectionSchema.safeParse({ code: 'INSUFFICIENT_SHARES', field: 'size' }).success).toBe(
+      false,
+    );
+    expect(
+      RejectionSchema.safeParse({ code: 'MIN_NOTIONAL', field: 'limit', minCents: 100 }).success,
+    ).toBe(false);
   });
 });
 

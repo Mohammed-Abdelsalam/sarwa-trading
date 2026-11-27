@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { cn, IconButton, Kbd, Logo, MarketStatusPill } from '@sarwa/ui';
 
+import { GuestBell, GuestTopBarActions } from '../../features/gating/guest-views';
 import { AccountMenu } from './account-menu';
 import { CommandMenu } from './command-menu';
 import { NotificationCenter } from './notification-center';
@@ -71,8 +72,18 @@ export function TopNav() {
         <span data-live={nav.live}>
           <MarketStatusPill state={nav.pill.state} label={nav.pill.label} compact />
         </span>
-        <NotificationCenter />
-        <AccountMenu />
+        {nav.account === 'member' ? (
+          <>
+            <NotificationCenter />
+            <AccountMenu />
+          </>
+        ) : null}
+        {nav.account === 'guest' ? (
+          <>
+            <GuestBell {...nav.guest} />
+            <GuestTopBarActions />
+          </>
+        ) : null}
       </nav>
       {/* The fade at the inline end hints that more sections scroll into view. */}
       <div

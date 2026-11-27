@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, Moon, Settings, Sun, User } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Moon, Settings, Sun, User } from 'lucide-react';
 
 import {
   Badge,
@@ -14,6 +14,7 @@ import {
   MenuTrigger,
 } from '@sarwa/ui';
 
+import { settingsHref } from '../../features/account/settings-layout';
 import { useAccountMenu } from './use-account-menu';
 
 export function AccountMenu() {
@@ -39,6 +40,12 @@ export function AccountMenu() {
       <MenuContent className="w-72">
         <MenuLabel>{labels.account}</MenuLabel>
         <div className="flex flex-col gap-1.5 px-2.5 pb-2">
+          {menu.user ? (
+            <span className="flex min-w-0 flex-col">
+              <b className="type-sm truncate">{menu.user.name}</b>
+              <span className="type-caption text-fg-3 truncate">{menu.user.email}</span>
+            </span>
+          ) : null}
           {menu.handle ? <span className="type-mono text-fg-3 text-xs">{menu.handle}</span> : null}
           <div className="type-sm flex justify-between">
             <span className="text-fg-2">{labels.equity}</span>
@@ -54,7 +61,7 @@ export function AccountMenu() {
         <MenuItem
           icon={<Settings />}
           onSelect={() => {
-            actions.go('/settings');
+            actions.go(settingsHref('security'));
           }}
         >
           {labels.settings}
@@ -100,6 +107,10 @@ export function AccountMenu() {
             </MenuRadioItem>
           ))}
         </MenuRadioGroup>
+        <MenuSeparator />
+        <MenuItem icon={<LogOut />} onSelect={actions.signOut}>
+          {labels.signOut}
+        </MenuItem>
       </MenuContent>
     </Menu>
   );

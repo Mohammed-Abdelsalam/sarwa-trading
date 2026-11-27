@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { contentSecurityPolicy } from './lib/csp';
+import { contentSecurityPolicy } from '@sarwa/ui/next-config';
+
+import { API_URL } from './lib/api-url';
 
 // A fresh nonce per request: Next stamps it on its own scripts, the root layout on the theme script.
 export function proxy(request: NextRequest) {
@@ -9,6 +11,7 @@ export function proxy(request: NextRequest) {
     nonce,
     dev: process.env.NODE_ENV === 'development',
     https: request.nextUrl.protocol === 'https:',
+    apiUrl: API_URL,
   });
   const headers = new Headers(request.headers);
   headers.set('x-nonce', nonce);

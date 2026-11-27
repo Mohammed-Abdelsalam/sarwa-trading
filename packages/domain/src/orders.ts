@@ -42,7 +42,12 @@ export const TERMINAL_STATUSES: readonly OrderStatus[] = [
   'expired',
 ];
 
-export const CANCEL_REASONS = ['user', 'admin_reset', 'symbol_disabled'] as const;
+export const CANCEL_REASONS = [
+  'user',
+  'admin_reset',
+  'symbol_disabled',
+  'account_suspended',
+] as const;
 export type CancelReason = (typeof CANCEL_REASONS)[number];
 
 export function isTerminal(status: OrderStatus): boolean {

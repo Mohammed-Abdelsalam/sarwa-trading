@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useEffectEvent, useState } from 'react';
 
 import { type Notification as TradingNotification } from '@sarwa/contracts';
 import {
+  type SarwaClientOptions,
   notificationText,
   queryKeys,
   SarwaProvider,
@@ -12,13 +13,19 @@ import {
   useMarketConnection,
   useSarwa,
   useSyncStocksOnChange,
+  useAuthSync,
   useTradingEvents,
 } from '@sarwa/core';
 import { usePageLifecycle } from '@sarwa/ui';
+import { type LocalePreferences, PREFERENCE_COOKIES } from '@sarwa/ui/locale-cookie';
 
+import { ToastHost } from '../components/layout/toast-host';
+import { SignedOutHost } from '../features/account/signed-out-dialog';
+import { useSuspendedRedirect } from '../features/account/use-suspended-page';
+import { AuthGateHost } from '../features/gating/auth-gate-dialog';
+import { AuthUiProvider } from '../features/gating/auth-ui';
 import { createBrowserClient } from '../lib/client';
 import { useCopy } from '../lib/i18n';
-import { type LocalePreferences, PREFERENCE_COOKIES } from '../lib/locale-cookie';
 
 function LiveSync() {
   useMarketConnection(usePageLifecycle());
@@ -63,11 +70,35 @@ function BrowserNotifications() {
   return null;
 }
 
+function SessionSync() {
+  useAuthSync();
+  useSuspendedRedirect();
+  return null;
+}
+
+// Customer accounts: session restore, the sign-in gate, resumed intents and the signed-out notice.
+function Accounts({ children }: { children: ReactNode }) {
+  const { auth } = useSarwa();
+  if (!auth) return children;
+  return (
+    <AuthUiProvider>
+      <SessionSync />
+      {/* First, so the layout's HydrationBoundary fills the stock list before the gate reads it. */}
+      {children}
+      <AuthGateHost />
+      <SignedOutHost />
+    </AuthUiProvider>
+  );
+}
+
 export function AppProviders({
   preferences,
+  initialStatus,
   children,
 }: {
   preferences: LocalePreferences;
+  // From the server's cookie read: a guest paints the guest view at once, in the HTML.
+  initialStatus?: SarwaClientOptions['initialStatus'];
   children: ReactNode;
 }) {
   const [queryClient] = useState(() => {
@@ -79,7 +110,7 @@ export function AppProviders({
     client.setQueryData(queryKeys.preference(PREFERENCE_COOKIES.digits), preferences.digits);
     return client;
   });
-  const [client] = useState(createBrowserClient);
+  const [client] = useState(() => createBrowserClient(initialStatus));
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -87,7 +118,9 @@ export function AppProviders({
         <LiveSync />
         <DocumentLocale />
         <BrowserNotifications />
-        {children}
+        <ToastHost>
+          <Accounts>{children}</Accounts>
+        </ToastHost>
       </SarwaProvider>
     </QueryClientProvider>
   );

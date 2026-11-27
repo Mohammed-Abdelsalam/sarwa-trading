@@ -96,68 +96,66 @@ export function AlertsPage() {
         ) : page.rows.length === 0 ? (
           <StateView icon={<Bell />} title={labels.empty} />
         ) : (
-          <div className="relative overflow-x-auto">
-            <Table>
-              <THead>
-                <tr>
-                  <TH className="ps-4">{labels.columns.symbol}</TH>
-                  <TH>{labels.columns.condition}</TH>
-                  <TH className="max-md:hidden">{labels.columns.distance}</TH>
-                  <TH className="max-md:hidden">{labels.columns.repeat}</TH>
-                  <TH>{labels.columns.status}</TH>
-                  <TH align="end">
-                    <span className="sr-only">{labels.actions}</span>
-                  </TH>
-                </tr>
-              </THead>
-              <TBody>
-                {page.rows.map((row) => (
-                  <TRow key={row.id}>
-                    <TCell className="ps-4">
-                      <span className="flex items-center gap-2.5">
-                        <StockAvatar symbol={row.symbol} sector={row.sector} size={32} />
-                        <b>{row.symbol}</b>
-                      </span>
-                    </TCell>
-                    <TCell>{row.condition}</TCell>
-                    <TCell className="text-fg-3 max-md:hidden">{row.distance}</TCell>
-                    <TCell className="text-fg-2 max-md:hidden">{row.repeat}</TCell>
-                    <TCell>
-                      <StatusBadge status={row.state} label={row.stateLabel} />
-                    </TCell>
-                    <TCell align="end">
-                      <Menu>
-                        <MenuTrigger asChild>
-                          <IconButton label={`${labels.actions} · ${row.symbol}`} size={32}>
-                            <MoreHorizontal aria-hidden className="size-4" />
-                          </IconButton>
-                        </MenuTrigger>
-                        <MenuContent>
-                          <MenuItem
-                            icon={row.enabled ? <Pause /> : <Play />}
-                            onSelect={() => {
-                              actions.setEnabled(row.id, !row.enabled);
-                            }}
-                          >
-                            {row.enabled ? labels.pause : labels.resume}
-                          </MenuItem>
-                          <MenuItem
-                            danger
-                            icon={<Trash2 />}
-                            onSelect={() => {
-                              actions.remove(row.id);
-                            }}
-                          >
-                            {labels.delete}
-                          </MenuItem>
-                        </MenuContent>
-                      </Menu>
-                    </TCell>
-                  </TRow>
-                ))}
-              </TBody>
-            </Table>
-          </div>
+          <Table label={labels.title}>
+            <THead>
+              <tr>
+                <TH className="ps-4">{labels.columns.symbol}</TH>
+                <TH>{labels.columns.condition}</TH>
+                <TH className="max-md:hidden">{labels.columns.distance}</TH>
+                <TH className="max-md:hidden">{labels.columns.repeat}</TH>
+                <TH>{labels.columns.status}</TH>
+                <TH align="end">
+                  <span className="sr-only">{labels.actions}</span>
+                </TH>
+              </tr>
+            </THead>
+            <TBody>
+              {page.rows.map((row) => (
+                <TRow key={row.id}>
+                  <TCell className="ps-4">
+                    <span className="flex items-center gap-2.5">
+                      <StockAvatar symbol={row.symbol} sector={row.sector} size={32} />
+                      <b>{row.symbol}</b>
+                    </span>
+                  </TCell>
+                  <TCell>{row.condition}</TCell>
+                  <TCell className="text-fg-3 max-md:hidden">{row.distance}</TCell>
+                  <TCell className="text-fg-2 max-md:hidden">{row.repeat}</TCell>
+                  <TCell>
+                    <StatusBadge status={row.state} label={row.stateLabel} />
+                  </TCell>
+                  <TCell align="end">
+                    <Menu>
+                      <MenuTrigger asChild>
+                        <IconButton label={`${labels.actions} · ${row.symbol}`} size={32}>
+                          <MoreHorizontal aria-hidden className="size-4" />
+                        </IconButton>
+                      </MenuTrigger>
+                      <MenuContent>
+                        <MenuItem
+                          icon={row.enabled ? <Pause /> : <Play />}
+                          onSelect={() => {
+                            actions.setEnabled(row.id, !row.enabled);
+                          }}
+                        >
+                          {row.enabled ? labels.pause : labels.resume}
+                        </MenuItem>
+                        <MenuItem
+                          danger
+                          icon={<Trash2 />}
+                          onSelect={() => {
+                            actions.remove(row.id);
+                          }}
+                        >
+                          {labels.delete}
+                        </MenuItem>
+                      </MenuContent>
+                    </Menu>
+                  </TCell>
+                </TRow>
+              ))}
+            </TBody>
+          </Table>
         )}
       </Card>
 

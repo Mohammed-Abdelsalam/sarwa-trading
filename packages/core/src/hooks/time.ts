@@ -22,12 +22,16 @@ export function useCountdown(until: number | null, onDone: () => void): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (until === null) return;
-    const timer = setInterval(() => {
+    const tick = () => {
       const current = Date.now();
       setNow(current);
       if (current >= until) onDone();
-    }, 1_000);
+    };
+    // The clock last moved when the screen mounted; catch it up before the first second passes.
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 1_000);
     return () => {
+      clearTimeout(first);
       clearInterval(timer);
     };
   }, [until, onDone]);

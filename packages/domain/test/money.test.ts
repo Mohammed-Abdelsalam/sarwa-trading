@@ -11,6 +11,7 @@ import {
   microsToShares,
   negate,
   notionalCents,
+  normalizeDecimal,
   parseCents,
   parseMicros,
   parsePercentBps,
@@ -164,6 +165,48 @@ describe('parsing input text', () => {
       expect(parseCents(text)).toBeNull();
     },
   );
+
+  it.each([
+    ['٣٫٥', 350],
+    ['3,5', 350],
+    ['3,', 300],
+    ['١٢٣', 12_300],
+    ['۱۲۳', 12_300],
+    ['1٢3.4٥', 12_345],
+    [' ٣,٥٠ ', 350],
+    ['٣٫', 300],
+  ])('parses the localised %p as %p cents', (text, expected) => {
+    expect(parseCents(text)).toBe(expected);
+  });
+
+  it.each([
+    '1,234.56',
+    '1,234,567',
+    '3,5,0',
+    '3,,5',
+    ',5',
+    '٫5',
+    '1٬234',
+    '٣٬٥',
+    '3,5.',
+    '3٫5,0',
+    '3٫٫5',
+  ])('rejects the grouped or malformed %p', (text) => {
+    expect(parseCents(text)).toBeNull();
+  });
+
+  it('normalises digits and the decimal separator without validating', () => {
+    expect(normalizeDecimal(' ٣٫٥ ')).toBe('3.5');
+    expect(normalizeDecimal('۱,۲')).toBe('1.2');
+    expect(normalizeDecimal('1,234.5')).toBe('1,234.5');
+    expect(normalizeDecimal('1٬234')).toBe('1٬234');
+  });
+
+  it('parses localised ticks, micros and percents', () => {
+    expect(parseTicks('١٫٢٣٤٥')).toBe(12_345);
+    expect(parseMicros('0,000001')).toBe(1);
+    expect(parsePercentBps('-٥٫٢٥')).toBe(-525);
+  });
 
   it('parses ticks and micros at their own precision', () => {
     expect(parseTicks('1.2345')).toBe(12_345);

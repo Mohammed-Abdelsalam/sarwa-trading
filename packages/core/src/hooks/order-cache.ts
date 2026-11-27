@@ -5,7 +5,7 @@ import { isTerminal } from '@sarwa/domain';
 
 import { type AnalyticsProvider } from '../analytics';
 import { orderFill } from '../trading';
-import { type OrderListQuery, queryKeys } from './keys';
+import { type MeKeys, type OrderListQuery } from './keys';
 
 function belongsTo(order: Order, query: OrderListQuery): boolean {
   if (query.symbol && query.symbol !== order.symbol) return false;
@@ -52,15 +52,15 @@ export function upsertOrderInPages(
   };
 }
 
-function cachedOrder(queryClient: QueryClient, id: string): Order | undefined {
-  const detail = queryClient.getQueryData<Order>(queryKeys.order(id));
+function cachedOrder(queryClient: QueryClient, keys: MeKeys, id: string): Order | undefined {
+  const detail = queryClient.getQueryData<Order>(keys.order(id));
   if (detail) return detail;
   const lists = [
     ...queryClient
-      .getQueriesData<OrdersResponse>({ queryKey: queryKeys.orderLists })
+      .getQueriesData<OrdersResponse>({ queryKey: keys.orderLists })
       .map(([, list]) => list),
     ...queryClient
-      .getQueriesData<OrderPages>({ queryKey: queryKeys.orderPageLists })
+      .getQueriesData<OrderPages>({ queryKey: keys.orderPageLists })
       .flatMap(([, data]) => data?.pages ?? []),
   ];
   for (const list of lists) {
@@ -74,21 +74,22 @@ function cachedOrder(queryClient: QueryClient, id: string): Order | undefined {
 // the order_filled event agree whichever arrives first.
 export function applyOrderUpdate(
   queryClient: QueryClient,
+  keys: MeKeys,
   order: Order,
   track: AnalyticsProvider['track'],
 ): void {
-  const previous = cachedOrder(queryClient, order.id);
+  const previous = cachedOrder(queryClient, keys, order.id);
   if (previous && previous.updatedAt > order.updatedAt) return;
 
-  queryClient.setQueryData(queryKeys.order(order.id), order);
-  for (const query of queryClient.getQueryCache().findAll({ queryKey: queryKeys.orderLists })) {
-    const filter = (query.queryKey[2] ?? {}) as OrderListQuery;
+  queryClient.setQueryData(keys.order(order.id), order);
+  for (const query of queryClient.getQueryCache().findAll({ queryKey: keys.orderLists })) {
+    const filter = (query.queryKey[keys.orderLists.length] ?? {}) as OrderListQuery;
     queryClient.setQueryData<OrdersResponse>(query.queryKey, (list) =>
       list ? upsertOrderInList(list, order, filter) : list,
     );
   }
-  for (const query of queryClient.getQueryCache().findAll({ queryKey: queryKeys.orderPageLists })) {
-    const filter = (query.queryKey[2] ?? {}) as OrderListQuery;
+  for (const query of queryClient.getQueryCache().findAll({ queryKey: keys.orderPageLists })) {
+    const filter = (query.queryKey[keys.orderPageLists.length] ?? {}) as OrderListQuery;
     queryClient.setQueryData<OrderPages>(query.queryKey, (data) =>
       data ? upsertOrderInPages(data, order, filter) : data,
     );
@@ -101,6 +102,6 @@ export function applyOrderUpdate(
       slippageBps: orderFill(order).slippageBps ?? 0,
     });
   }
-  void queryClient.invalidateQueries({ queryKey: queryKeys.portfolio });
-  void queryClient.invalidateQueries({ queryKey: queryKeys.account });
+  void queryClient.invalidateQueries({ queryKey: keys.portfolio });
+  void queryClient.invalidateQueries({ queryKey: keys.account });
 }

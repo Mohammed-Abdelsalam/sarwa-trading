@@ -1,12 +1,7 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import {
-  type AdminAccountsQuery,
-  type AdminOrder,
-  type AdminOrdersQuery,
-  type AdminOrderStats,
-} from '@sarwa/contracts';
+import { type AdminOrder, type AdminOrdersQuery, type AdminOrderStats } from '@sarwa/contracts';
 import {
   cents,
   type Cents,
@@ -39,7 +34,12 @@ export function mergeOrder(
 }
 
 // Amount orders know their dollars up front; share orders use what filled, else the quoted price.
-export function orderNotionalCents(order: AdminOrder): Cents {
+export function orderNotionalCents(
+  order: Pick<
+    AdminOrder,
+    'amountCents' | 'filledNotionalCents' | 'qtyMicros' | 'limitTicks' | 'quotedTicks'
+  >,
+): Cents {
   if (order.amountCents !== null) return cents(order.amountCents);
   if (order.filledNotionalCents > 0) return cents(order.filledNotionalCents);
   return notionalCents(
@@ -122,23 +122,5 @@ export function useAdminOrderStats() {
     queryFn: ({ signal }) => api.orderStats({ signal }),
     refetchInterval: STATS_REFRESH_MS,
     refetchIntervalInBackground: false,
-  });
-}
-
-export function useAdminAccounts(query: AdminAccountsQuery) {
-  const { api } = useAdmin();
-  return useQuery({
-    queryKey: adminKeys.accounts(query),
-    queryFn: ({ signal }) => api.accounts(query, { signal }),
-    placeholderData: keepPreviousData,
-  });
-}
-
-export function useResetAccount() {
-  const { api } = useAdmin();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, confirm }: { id: string; confirm: string }) => api.resetAccount(id, confirm),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminKeys.accountPages }),
   });
 }

@@ -2,10 +2,12 @@ import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 
 import {
+  type AuthIntent,
   type Ticket,
   ticketResultView,
   useOrderTicket,
   usePortfolio,
+  useRequireAuth,
   useTradingStatus,
 } from '@sarwa/core';
 import { breakpoints } from '@sarwa/tokens';
@@ -19,6 +21,7 @@ import {
   useWindowKeyDown,
 } from '../../lib/browser';
 import { type Copy, useCopy } from '../../lib/i18n';
+import { useOpenGate, useResumedIntent } from '../gating/auth-ui';
 import { entryView, reviewView } from './ticket-copy';
 
 type Side = 'buy' | 'sell';
@@ -58,8 +61,18 @@ export function resultView(
   };
 }
 
+export type ResumedOrder = Extract<AuthIntent, { kind: 'order' }>;
+
+// The order a guest filled in before signing in, when it is for this stock.
+export function useResumedOrder(symbol: string): ResumedOrder | null {
+  return useResumedIntent(
+    (intent): intent is ResumedOrder => intent.kind === 'order' && intent.symbol === symbol,
+  );
+}
+
 // The ticket follows ?trade=buy|sell: the deep link opens it, B / S set it, closing clears it.
-export function useOrderPanel(symbol: string) {
+// A resumed order comes back prefilled and still needs its review; it is never sent for them.
+export function useOrderPanel(symbol: string, resumed: ResumedOrder | null = null) {
   const copy = useCopy();
   const { t, m } = copy;
   const router = useRouter();
@@ -67,7 +80,16 @@ export function useOrderPanel(symbol: string) {
   // CSS lays out the side panel and the trade bar; these only decide how the ticket behaves.
   const wide = useMediaQuery(`(min-width: ${String(breakpoints.xl)}px)`);
   const tablet = useMediaQuery(`(min-width: ${String(breakpoints.md)}px)`);
-  const ticket = useOrderTicket({ symbol, initialSide: trade ?? 'buy' });
+  const ticket = useOrderTicket({
+    symbol,
+    initialSide: resumed?.side ?? trade ?? 'buy',
+    initialForm: resumed?.form,
+  });
+  const { allowed } = useRequireAuth();
+  const openGate = useOpenGate();
+  const gateOrder = (tab: 'signUp' | 'signIn') => {
+    openGate(ticket.intent, tab);
+  };
   const status = useTradingStatus().data;
   const { summary } = usePortfolio();
   const mod = useModKey();
@@ -97,7 +119,13 @@ export function useOrderPanel(symbol: string) {
     if (key === 'b' || key === 's') {
       event.preventDefault();
       openTicket(key === 'b' ? 'buy' : 'sell');
-    } else if (event.key === 'Enter' && open && ticket.step === 'entry' && ticket.canReview) {
+    } else if (
+      event.key === 'Enter' &&
+      allowed &&
+      open &&
+      ticket.step === 'entry' &&
+      ticket.canReview
+    ) {
       const target = event.target;
       if (target instanceof HTMLElement && target.closest('button, a, [role="option"]')) return;
       event.preventDefault();
@@ -105,12 +133,32 @@ export function useOrderPanel(symbol: string) {
     }
   });
 
+  const entry = entryView(ticket, symbol, status, copy);
   return {
+    // A guest explores the ticket freely; its submit becomes sign-up, with no buying power shown.
+    guest: allowed
+      ? null
+      : {
+          onSignUp: () => {
+            gateOrder('signUp');
+          },
+          onSignIn: () => {
+            gateOrder('signIn');
+          },
+        },
+    symbol,
     overlay: tablet ? ('drawer' as const) : ('sheet' as const),
     overlayOpen,
     open,
     step: ticket.step,
-    entry: entryView(ticket, symbol, status, copy),
+    entry: allowed
+      ? entry
+      : {
+          ...entry,
+          estimate: { rows: entry.estimate.rows.slice(0, 2), total: undefined },
+          gate: null,
+          canReview: false,
+        },
     review: ticket.step === 'review' ? reviewView(ticket, { symbol, mod }, copy) : null,
     result: resultView(ticket, symbol, status, summary, copy),
     labels: {

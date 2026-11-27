@@ -78,37 +78,8 @@ export const AdminOrderStatsSchema = z.object({
   amountOrders: Count,
 });
 
-export const AdminAccountSchema = z.object({
-  id: z.string().min(1),
-  handle: z.string(),
-  createdAt: Timestamp,
-  equityCents: Cents,
-  cashCents: Cents,
-  todayCents: Cents,
-  allTimeCents: Cents,
-  allTimeBps: z.number().int(),
-  positions: Count,
-  openOrders: Count,
-  lastTradeAt: Timestamp.nullable(),
-});
-
-export const AdminAccountsQuerySchema = z.object({
-  q: z.string().trim().max(32).optional(),
-  sort: z.enum(['allTime', 'equity', 'lastTrade']).default('allTime'),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
-});
-
-export const AdminAccountsResponseSchema = z.object({
-  items: z.array(AdminAccountSchema),
-  total: Count,
-  page: z.number().int().min(1),
-  pageSize: z.number().int().min(1),
-});
-
 // Reset is irreversible, so it's confirmed by typing the account's handle (accounts have no email).
 export const resetConfirmation = (handle: string) => `RESET ${handle}`;
-export const ResetAccountSchema = z.object({ confirm: z.string().trim().min(1) });
 
 export type AdminTrading = z.infer<typeof AdminTradingSchema>;
 export type UpdateTrading = z.infer<typeof UpdateTradingSchema>;
@@ -119,10 +90,6 @@ export type AdminOrder = z.infer<typeof AdminOrderSchema>;
 export type AdminOrdersQuery = z.input<typeof AdminOrdersQuerySchema>;
 export type AdminOrdersResponse = z.infer<typeof AdminOrdersResponseSchema>;
 export type AdminOrderStats = z.infer<typeof AdminOrderStatsSchema>;
-export type AdminAccount = z.infer<typeof AdminAccountSchema>;
-export type AdminAccountsQuery = z.input<typeof AdminAccountsQuerySchema>;
-export type AdminAccountsResponse = z.infer<typeof AdminAccountsResponseSchema>;
-export type ResetAccount = z.infer<typeof ResetAccountSchema>;
 
 // The admin socket namespace is authenticated with the admin session cookie.
 export const ADMIN_NAMESPACE = '/admin';

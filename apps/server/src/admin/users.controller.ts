@@ -1,11 +1,9 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { type AdminUser as AdminUserRow } from '@prisma/client';
 
 import {
   ADMIN_ROUTES,
   type AdminUser,
-  type CreateUser,
-  CreateUserSchema,
   type UpdateUser,
   UpdateUserSchema,
   type UsersResponse,
@@ -27,15 +25,6 @@ export class UsersController {
   @Roles(['ADMIN'])
   list(): Promise<UsersResponse> {
     return this.users.list();
-  }
-
-  @Post(ADMIN_ROUTES.users)
-  @Roles(['ADMIN'])
-  create(
-    @Body(new ZodValidationPipe(CreateUserSchema)) input: CreateUser,
-    @CurrentActor() actor: Actor,
-  ): Promise<AdminUser> {
-    return this.users.create(input, actor);
   }
 
   @Patch(ADMIN_ROUTES.user)

@@ -44,7 +44,7 @@ export default [
   {
     name: 'sarwa/ui/next-config',
     files: ['next-config.cjs'],
-    languageOptions: { sourceType: 'commonjs' },
+    languageOptions: { sourceType: 'commonjs', globals: { process: 'readonly', URL: 'readonly' } },
   },
   { languageOptions: { parserOptions: { tsconfigRootDir: import.meta.dirname } } },
 ];

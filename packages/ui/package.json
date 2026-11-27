@@ -6,6 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./locale-cookie": "./src/lib/locale-cookie.ts",
     "./next-config": {
       "types": "./next-config.d.cts",
       "default": "./next-config.cjs"
@@ -39,6 +40,7 @@
     "@testing-library/jest-dom": "^8.0.0",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.13",
+    "@types/node": "22.20.7",
     "@types/react": "^19.3.3",
     "@types/react-dom": "^19.3.0",
     "react": "^19",

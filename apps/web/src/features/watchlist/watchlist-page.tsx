@@ -2,11 +2,14 @@
 
 import { LayoutGrid, List, RefreshCw, Star, TriangleAlert } from 'lucide-react';
 import { type Route } from 'next';
+import Link from 'next/link';
 
 import { formatPct, sortLabel, SORTS, useI18n } from '@sarwa/core';
 import { Button, ChangePill, SegmentedControl, Select, StateView, Toast } from '@sarwa/ui';
 
 import { StockListSkeleton, StockRow } from '../../components/trading/stock-row';
+import { linkClass } from '../auth/auth-parts';
+import { AUTH_ROUTES } from '../auth/auth-view';
 import { useWatchlistPage } from './use-watchlist-page';
 import { EmptyWatchlist, WatchlistGrid, WatchlistTable } from './watchlist-views';
 
@@ -128,6 +131,15 @@ export function WatchlistPage() {
           </div>
         </>
       )}
+
+      {page.guest && !page.isLoading && !page.isError ? (
+        <p className="type-sm text-fg-3 px-4 text-center md:px-0">
+          {t.watchlist.guestNote}{' '}
+          <Link href={AUTH_ROUTES.signUp} className={linkClass}>
+            {t.gate.tabs.signUp}
+          </Link>
+        </p>
+      ) : null}
 
       {page.removed ? (
         <Toast

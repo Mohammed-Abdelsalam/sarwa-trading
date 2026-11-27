@@ -1,8 +1,5 @@
-import { SettingsPage } from '../../features/settings/settings-page';
-import { personalMetadata } from '../../lib/seo';
-
-export const generateMetadata = () => personalMetadata('settings');
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <SettingsPage />;
+  redirect('/settings/security');
 }

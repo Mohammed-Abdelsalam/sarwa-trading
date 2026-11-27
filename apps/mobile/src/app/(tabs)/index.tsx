@@ -1,3 +1,3 @@
-import { HomeScreen } from '../../features/home/home-screen';
+import { HomeTab } from '../../features/home/home-tab';
 
-export default HomeScreen;
+export default HomeTab;

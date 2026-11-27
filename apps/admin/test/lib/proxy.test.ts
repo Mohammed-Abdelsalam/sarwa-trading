@@ -36,9 +36,28 @@ describe('proxy', () => {
     expect(getRedirectUrl(proxy(request('/login')))).toBeNull();
   });
 
+  it('lets anyone open an invite link, signed in or not', () => {
+    expect(getRedirectUrl(proxy(request('/invite/tok_123')))).toBeNull();
+    expect(getRedirectUrl(proxy(request('/invite/tok_123', true)))).toBeNull();
+  });
+
   it('sends a signed-in admin away from the login page', () => {
     expect(getRedirectUrl(proxy(request('/login', true)))).toBe('https://admin.test/overview');
     expect(getRedirectUrl(proxy(request('/trading', true)))).toBeNull();
     expect(getRedirectUrl(proxy(request('/login?next=%2Forders', true)))).toBeNull();
+  });
+
+  it('sends a fresh nonce CSP on every page and hands the nonce to the render', () => {
+    const first = proxy(request('/overview', true));
+    const second = proxy(request('/login'));
+    const policy = first.headers.get('content-security-policy') ?? '';
+    const nonce = first.headers.get('x-middleware-request-x-nonce');
+
+    expect(nonce).toBeTruthy();
+    expect(policy).toContain(`'nonce-${nonce ?? ''}'`);
+    expect(policy).toContain("connect-src 'self';");
+    expect(first.headers.get('x-middleware-request-content-security-policy')).toBe(policy);
+    expect(second.headers.get('content-security-policy')).not.toBe(policy);
+    expect(proxy(request('/orders')).headers.get('content-security-policy')).toMatch(/nonce-/);
   });
 });

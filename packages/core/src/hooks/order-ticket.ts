@@ -15,12 +15,14 @@ import {
   type OrderType,
   POLICY,
   ratioBps,
+  type RejectionCode,
   type Side,
   type TimeInForce,
   type TradeQuote,
   validateOrder,
 } from '@sarwa/domain';
 
+import { type AuthIntent } from '../auth/session';
 import { useSarwa } from '../provider';
 import {
   buildDraft,
@@ -38,10 +40,12 @@ import { orderFill, spreadBps, toTradeQuote } from '../trading';
 import { useLiveStatus, useLiveSymbols, useMarketStatus, useQuote } from './live';
 import { usePlaceOrder } from './orders';
 import { usePortfolio } from './portfolio';
+import { useSessionState } from './session';
 import { useNow } from './time';
 import { useIsHalted, useTradingStatus } from './trading-status';
 
 const CLOCK_MS = 250;
+const ACCOUNT_CHECKS = new Set<RejectionCode>(['INSUFFICIENT_FUNDS', 'INSUFFICIENT_SHARES']);
 
 interface Frozen {
   quote: Quote;
@@ -49,8 +53,9 @@ interface Frozen {
 }
 
 // What the trader typed, edited field by field; a size edit always undoes "sell all".
-export function useTicketForm(initialSide: Side) {
-  const [form, setForm] = useState<TicketForm>(() => initialTicketForm(initialSide));
+// `initialForm` reopens a ticket a guest filled in before signing in.
+export function useTicketForm(initialSide: Side, initialForm?: TicketForm) {
+  const [form, setForm] = useState<TicketForm>(() => initialForm ?? initialTicketForm(initialSide));
   const edit = (patch: Partial<TicketForm>) => {
     setForm((current) => ({ ...current, ...patch }));
   };
@@ -139,6 +144,7 @@ export function useTicketValidation(
   const live = useLiveStatus();
   const halted = useIsHalted(symbol);
   const portfolio = usePortfolio();
+  const member = useSessionState((s) => s.status === 'authenticated');
   const now = useNow(CLOCK_MS);
 
   const liveQuote = quote ? toTradeQuote(quote) : null;
@@ -159,7 +165,10 @@ export function useTicketValidation(
           now,
         }
       : null;
-  const issues = draft && ctx ? validateOrder(draft, ctx) : [];
+  // A guest has no cash or shares yet; the ticket gates them at submit instead.
+  const issues = (draft && ctx ? validateOrder(draft, ctx) : []).filter(
+    (issue) => member || !ACCOUNT_CHECKS.has(issue.code),
+  );
   const priced = shownQuote ?? liveQuote;
   const estimate = draft && ctx && priced ? estimateOrder(draft, { ...ctx, quote: priced }) : null;
   const connectionLive = live === 'live' || live === 'paused';
@@ -185,9 +194,17 @@ export function useTicketValidation(
 }
 
 // The order ticket as a view model: both apps render it, neither re-implements a rule.
-export function useOrderTicket({ symbol, initialSide }: { symbol: string; initialSide: Side }) {
+export function useOrderTicket({
+  symbol,
+  initialSide,
+  initialForm,
+}: {
+  symbol: string;
+  initialSide: Side;
+  initialForm?: TicketForm;
+}) {
   const place = usePlaceOrder();
-  const ticketForm = useTicketForm(initialSide);
+  const ticketForm = useTicketForm(initialSide, initialForm);
   const { form } = ticketForm;
   const [rawStep, setStep] = useState<'entry' | 'review'>('entry');
   const step: TicketStep = rawStep === 'review' && place.status === 'done' ? 'result' : rawStep;
@@ -216,6 +233,8 @@ export function useOrderTicket({ symbol, initialSide }: { symbol: string; initia
 
   return {
     form,
+    // What a guest's gate keeps, so the ticket reopens as typed after sign-in.
+    intent: { kind: 'order', symbol, side: form.side, form } satisfies AuthIntent,
     step,
     quote,
     draft,
@@ -265,11 +284,14 @@ export function useOrderTicket({ symbol, initialSide }: { symbol: string; initia
     submit: () => {
       if (step !== 'review' || !draft || !frozen || blockReason) return;
       const quoted = toTradeQuote(frozen.quote);
-      place.submit({
-        symbol,
-        ...draft,
-        quotedTicks: draft.side === 'buy' ? quoted.askTicks : quoted.bidTicks,
-      });
+      place.submit(
+        {
+          symbol,
+          ...draft,
+          quotedTicks: draft.side === 'buy' ? quoted.askTicks : quoted.bidTicks,
+        },
+        form,
+      );
     },
     retry: place.retry,
     backToEntry: () => {

@@ -71,7 +71,7 @@ export function createFormatter({ locale, digits = DEFAULT_DIGITS }: FormatterOp
 }
 
 function buildFormatter(locale: Locale, digits: Digits): Formatter {
-  const messages = getMessages(locale).common;
+  const { common: messages, counts: units } = getMessages(locale);
   const numbers = (options: Intl.NumberFormatOptions, tag = INTL_LOCALE[locale]) =>
     new Intl.NumberFormat(tag, { numberingSystem: digits, ...options });
   const dates = (options: Intl.DateTimeFormatOptions) =>
@@ -124,6 +124,12 @@ function buildFormatter(locale: Locale, digits: Digits): Formatter {
   };
   const number = (value: number) => unsigned(plain, value);
   const count = (value: number): Count => ({ count: value, n: number(value) });
+  // Intl.RelativeTimeFormat is missing on Hermes, so the catalog's plural units are used instead.
+  const countdown = (ms: number) => {
+    if (ms < HOUR_MS) return units.minutes(count(Math.floor(ms / MINUTE_MS)));
+    if (ms < DAY_MS) return units.hours(count(Math.floor(ms / HOUR_MS)));
+    return units.days(count(Math.round(ms / DAY_MS)));
+  };
 
   return {
     locale,
@@ -151,7 +157,9 @@ function buildFormatter(locale: Locale, digits: Digits): Formatter {
         ? text.replace(/[0-9]/g, (d) => String.fromCharCode(ARABIC_INDIC_ZERO + Number(d)))
         : text,
     relative: (ms, now) => {
-      const elapsed = Math.max(0, now - ms);
+      const ahead = ms - now;
+      if (ahead >= MINUTE_MS) return messages.inTime({ time: countdown(ahead) });
+      const elapsed = Math.max(0, -ahead);
       if (elapsed < MINUTE_MS) return messages.justNow;
       if (elapsed < HOUR_MS) return messages.minutesAgo(count(Math.floor(elapsed / MINUTE_MS)));
       if (elapsed < DAY_MS) return messages.hoursAgo(count(Math.floor(elapsed / HOUR_MS)));

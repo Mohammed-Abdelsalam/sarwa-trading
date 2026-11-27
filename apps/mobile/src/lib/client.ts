@@ -2,9 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { randomUUID } from 'expo-crypto';
 
-import { createSarwaClient, type SarwaClient } from '@sarwa/core';
+import { bearerAuth, createSarwaClient, type SarwaClient } from '@sarwa/core';
 
 import { resolveApiUrl } from './api-url';
+import { devicePlatform } from './device';
 import { createSecureStorage } from './secure-storage';
 
 export const API_URL = resolveApiUrl({
@@ -16,7 +17,8 @@ export const API_URL = resolveApiUrl({
 export const client: SarwaClient = createSarwaClient({
   apiUrl: API_URL,
   storage: AsyncStorage,
-  // The device id is the account's only credential until sign-in exists, so it lives in the keychain.
+  // The device id still names a guest's paper account, so it lives in the keychain too.
   identityStorage: createSecureStorage(AsyncStorage),
+  authTransport: bearerAuth({ storage: createSecureStorage(), platform: devicePlatform() }),
   randomUUID,
 });

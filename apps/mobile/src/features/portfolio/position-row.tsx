@@ -1,6 +1,5 @@
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
-import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { type Sector } from '@sarwa/contracts';
 import { type Direction } from '@sarwa/core';
@@ -9,6 +8,7 @@ import { SignedText } from '../../components/trading/signed-text';
 import { StockAvatar } from '../../components/trading/stock-avatar';
 import { openTicket } from '../../components/trading/trade-bar';
 import { Text } from '../../components/ui/text';
+import { TrailingSwipeable } from '../../components/ui/trailing-swipeable';
 import { useCopy } from '../../lib/i18n';
 
 export interface PositionModel {
@@ -24,11 +24,8 @@ export function PositionRow({ position }: { position: PositionModel }) {
   const { t } = useCopy();
   const { symbol } = position;
   return (
-    <ReanimatedSwipeable
-      friction={2}
-      rightThreshold={48}
-      overshootRight={false}
-      renderRightActions={() => (
+    <TrailingSwipeable
+      actions={() => (
         <View className="flex-row">
           <Pressable
             accessibilityRole="button"
@@ -93,6 +90,6 @@ export function PositionRow({ position }: { position: PositionModel }) {
           <SignedText value={position.total} variant="caption" />
         </View>
       </Pressable>
-    </ReanimatedSwipeable>
+    </TrailingSwipeable>
   );
 }

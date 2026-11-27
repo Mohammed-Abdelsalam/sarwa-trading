@@ -11,20 +11,28 @@ import {
   CandlesResponseSchema,
   DEVICE_ID_HEADER,
   HealthResponseSchema,
+  InviteResponseSchema,
   ProblemSchema,
   StockDetailResponseSchema,
   StocksResponseSchema,
 } from '@sarwa/contracts';
+import { POLICY } from '@sarwa/domain';
 
+import { PasswordHasher } from '../src/common/password-hasher';
 import { PrismaService } from '../src/prisma.service';
+import { AccountsService } from '../src/trading/accounts.service';
 import { TradingEngine } from '../src/trading/engine.service';
-import { startApp } from './app';
+import { GUEST_WATCHLIST_LIMIT } from '../src/watchlist/watchlist.service';
+import { inviteAdmin } from './admins';
+import { CapturingMailer, startApp } from './app';
+import { bearer, type Customer, signUp } from './customers';
 
 let app: INestApplication;
 let http: ReturnType<typeof request>;
+const mailer = new CapturingMailer();
 
 beforeAll(async () => {
-  ({ app } = await startApp());
+  ({ app } = await startApp({ mailer }));
   http = request(app.getHttpServer());
 });
 
@@ -94,30 +102,147 @@ describe('public market API', () => {
   });
 });
 
-describe('watchlist', () => {
-  const deviceId = randomUUID();
+describe("a device's guest account", () => {
+  it('is opened only when asked for, once, with no user', async () => {
+    const accounts = app.get(AccountsService);
+    const deviceId = randomUUID();
 
-  it('rejects requests without a valid device id', async () => {
-    const res = await http.get(api('/watchlist')).expect(400);
-    expect(res.body).toMatchObject({ code: 'VALIDATION_FAILED' });
+    const before = await accounts.forDevice(deviceId, { create: false });
+    const [opened, again] = await Promise.all([
+      accounts.forDevice(deviceId, { create: true }),
+      accounts.forDevice(deviceId, { create: true }),
+    ]);
+
+    expect(before).toBeNull();
+    expect(
+      await app.get(PrismaService).device.findUnique({ where: { id: deviceId } }),
+    ).not.toBeNull();
+    expect(opened).toMatchObject({
+      deviceId,
+      userId: null,
+      cashCents: BigInt(POLICY.startingCashCents),
+    });
+    expect(again?.id).toBe(opened?.id);
+  });
+});
+
+describe('watchlist', () => {
+  let customer: Customer;
+  const as = (req: request.Test) => req.set('Authorization', bearer(customer));
+
+  beforeAll(async () => {
+    customer = await signUp(http, { ip: '198.51.100.40' });
+  });
+
+  it('needs a signed-in customer or a device id', async () => {
+    for (const req of [
+      http.get(api('/watchlist')),
+      http.put(api('/watchlist/AAPL')),
+      http.delete(api('/watchlist/AAPL')),
+      http.get(api('/watchlist')).set(DEVICE_ID_HEADER, 'not-a-uuid'),
+    ]) {
+      const res = await req.expect(401);
+      expect(res.body).toMatchObject({ code: 'UNAUTHORIZED' });
+    }
+  });
+
+  it("answers a stale token with 401, not the device's list", async () => {
+    await http
+      .get(api('/watchlist'))
+      .set('Authorization', 'Bearer not-a-token')
+      .set(DEVICE_ID_HEADER, randomUUID())
+      .expect(401);
+  });
+
+  it("keeps a guest's stars on their device", async () => {
+    const [device, other] = [randomUUID(), randomUUID()];
+    const guest = (req: request.Test, id = device) => req.set(DEVICE_ID_HEADER, id);
+
+    await guest(http.put(api('/watchlist/AAPL'))).expect(204);
+    await guest(http.put(api('/watchlist/AAPL'))).expect(204);
+    await guest(http.put(api('/watchlist/NVDA'))).expect(204);
+    await guest(http.put(api('/watchlist/MSFT')), other).expect(204);
+    await guest(http.delete(api('/watchlist/AAPL'))).expect(204);
+
+    expect((await guest(http.get(api('/watchlist'))).expect(200)).body).toEqual({
+      symbols: ['NVDA'],
+    });
+    expect((await guest(http.get(api('/watchlist')), other).expect(200)).body).toEqual({
+      symbols: ['MSFT'],
+    });
+    expect(
+      await app.get(PrismaService).account.findUnique({ where: { deviceId: device } }),
+    ).toMatchObject({ userId: null });
+  });
+
+  it(`caps a guest at ${String(GUEST_WATCHLIST_LIMIT)} stars, but not a customer`, async () => {
+    const prisma = app.get(PrismaService);
+    const device = randomUUID();
+    await http.put(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, device).expect(204);
+    const { id } = await prisma.account.findUniqueOrThrow({ where: { deviceId: device } });
+    const symbols = Array.from({ length: GUEST_WATCHLIST_LIMIT - 1 }, (_, i) => `ZZ${String(i)}`);
+    await prisma.stock.createMany({
+      data: symbols.map((symbol) => ({
+        symbol,
+        name: symbol,
+        exchange: 'NASDAQ',
+        sector: 'Test',
+        basePrice: 1,
+      })),
+    });
+    await prisma.watchlistItem.createMany({
+      data: symbols.map((symbol) => ({ accountId: id, symbol })),
+    });
+
+    const full = await http.put(api('/watchlist/NVDA')).set(DEVICE_ID_HEADER, device).expect(409);
+    await http.put(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, device).expect(204);
+    await http.delete(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, device).expect(204);
+    await http.put(api('/watchlist/NVDA')).set(DEVICE_ID_HEADER, device).expect(204);
+
+    expect(ProblemSchema.parse(full.body).code).toBe('TOO_MANY_SYMBOLS');
+    await prisma.stock.deleteMany({ where: { symbol: { in: symbols } } });
+  });
+
+  it('opens no account for a guest who only reads or unstars', async () => {
+    const device = randomUUID();
+
+    const list = await http.get(api('/watchlist')).set(DEVICE_ID_HEADER, device).expect(200);
+    await http.delete(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, device).expect(204);
+
+    expect(list.body).toEqual({ symbols: [] });
+    expect(
+      await app.get(PrismaService).account.findUnique({ where: { deviceId: device } }),
+    ).toBeNull();
+  });
+
+  it("uses a signed-in customer's own account, whatever device they are on", async () => {
+    const device = randomUUID();
+    await as(http.put(api('/watchlist/AMZN')).set(DEVICE_ID_HEADER, device)).expect(204);
+
+    const own = await as(http.get(api('/watchlist'))).expect(200);
+    const res = await http.get(api('/watchlist')).set(DEVICE_ID_HEADER, device).expect(200);
+    await as(http.delete(api('/watchlist/AMZN'))).expect(204);
+
+    expect(own.body).toEqual({ symbols: ['AMZN'] });
+    expect(res.body).toEqual({ symbols: [] });
   });
 
   it('adds, lists and removes symbols idempotently', async () => {
-    await http.put(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, deviceId).expect(204);
-    await http.put(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, deviceId).expect(204);
-    await http.put(api('/watchlist/NVDA')).set(DEVICE_ID_HEADER, deviceId).expect(204);
+    await as(http.put(api('/watchlist/AAPL'))).expect(204);
+    await as(http.put(api('/watchlist/AAPL'))).expect(204);
+    await as(http.put(api('/watchlist/NVDA'))).expect(204);
 
-    const list = await http.get(api('/watchlist')).set(DEVICE_ID_HEADER, deviceId).expect(200);
+    const list = await as(http.get(api('/watchlist'))).expect(200);
     expect(list.body).toEqual({ symbols: ['AAPL', 'NVDA'] });
 
-    await http.delete(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, deviceId).expect(204);
-    await http.delete(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, deviceId).expect(204);
-    const after = await http.get(api('/watchlist')).set(DEVICE_ID_HEADER, deviceId).expect(200);
+    await as(http.delete(api('/watchlist/AAPL'))).expect(204);
+    await as(http.delete(api('/watchlist/AAPL'))).expect(204);
+    const after = await as(http.get(api('/watchlist'))).expect(200);
     expect(after.body).toEqual({ symbols: ['NVDA'] });
   });
 
   it('404s for a symbol that does not exist', async () => {
-    await http.put(api('/watchlist/ZZZZ')).set(DEVICE_ID_HEADER, deviceId).expect(404);
+    await http.put(api('/watchlist/ZZZZ')).set('Authorization', bearer(customer)).expect(404);
   });
 
   it('404s for a stock the admin disabled', async () => {
@@ -128,7 +253,7 @@ describe('watchlist', () => {
       .send({ isEnabled: false })
       .expect(200);
 
-    await http.put(api('/watchlist/INTC')).set(DEVICE_ID_HEADER, deviceId).expect(404);
+    await as(http.put(api('/watchlist/INTC'))).expect(404);
 
     await http
       .patch(api('/admin/stocks/INTC'))
@@ -164,6 +289,15 @@ describe('health', () => {
     expect(fresh.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
     expect(reused.headers['x-request-id']).toBe('edge-1234');
     expect(unsafe.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('lets a cross-origin client read the request id and Retry-After', async () => {
+    const res = await http
+      .get(api('/health/live'))
+      .set('Origin', 'http://localhost:8081')
+      .expect(200);
+
+    expect(res.headers['access-control-expose-headers']).toBe('x-request-id,retry-after');
   });
 
   it('is live without touching the database', async () => {
@@ -206,8 +340,8 @@ describe('admin', () => {
     expect(res.body.detail).toBe('Invalid email or password');
   });
 
-  it('runs bcrypt even for an unknown email so timing does not reveal accounts', async () => {
-    const compare = jest.spyOn(bcrypt, 'compare');
+  it('checks a password even for an unknown email so timing does not reveal accounts', async () => {
+    const verify = jest.spyOn(app.get(PasswordHasher), 'verify');
 
     const res = await http
       .post(api('/admin/auth/login'))
@@ -216,7 +350,26 @@ describe('admin', () => {
       .expect(401);
 
     expect(res.body.detail).toBe('Invalid email or password');
-    expect(compare).toHaveBeenCalledTimes(1);
+    expect(verify).toHaveBeenCalledWith(undefined, 'whatever-123');
+  });
+
+  it('upgrades a bcrypt admin password to argon2id at the next sign-in', async () => {
+    const prisma = app.get(PrismaService);
+    const email = `legacy-${randomUUID().slice(0, 8)}@sarwa.dev`;
+    await prisma.adminUser.create({
+      data: {
+        email,
+        name: 'Legacy',
+        role: 'VIEWER',
+        passwordHash: await bcrypt.hash('legacy-pass-1', 4),
+      },
+    });
+
+    await login(email, 'legacy-pass-1', '198.51.100.31');
+
+    const { passwordHash } = await prisma.adminUser.findUniqueOrThrow({ where: { email } });
+    expect(passwordHash.startsWith('$argon2id$')).toBe(true);
+    await login(email, 'legacy-pass-1', '198.51.100.32');
   });
 
   it('ends the session on sign-out, so a copied cookie stops working', async () => {
@@ -236,12 +389,7 @@ describe('admin', () => {
 
   it('locks an account after 5 wrong passwords, even across IPs, and audits each failure', async () => {
     const admin = await login('admin@sarwa.dev', 'admin12345', '198.51.100.23');
-    const email = `locked-${randomUUID().slice(0, 8)}@sarwa.dev`;
-    await http
-      .post(api('/admin/users'))
-      .set('Cookie', admin)
-      .send({ email, name: 'Ops', role: 'VIEWER', password: 'correct-horse-1' })
-      .expect(201);
+    const { email, password } = await inviteAdmin(http, mailer, admin, 'VIEWER');
 
     for (let i = 0; i < 5; i++) {
       await http
@@ -253,7 +401,7 @@ describe('admin', () => {
     const locked = await http
       .post(api('/admin/auth/login'))
       .set('X-Forwarded-For', '198.51.101.99')
-      .send({ email, password: 'correct-horse-1' })
+      .send({ email, password })
       .expect(401);
 
     expect(locked.body.detail).toBe('Invalid email or password');
@@ -302,15 +450,10 @@ describe('admin', () => {
 
   it('logs one audit entry per field when role and status change together', async () => {
     const cookie = await login('admin@sarwa.dev', 'admin12345', '198.51.100.12');
-    const email = `analyst-${randomUUID().slice(0, 8)}@sarwa.dev`;
-    const created = await http
-      .post(api('/admin/users'))
-      .set('Cookie', cookie)
-      .send({ email, name: 'Analyst', role: 'VIEWER', password: 'analyst12345' })
-      .expect(201);
+    const { id, email } = await inviteAdmin(http, mailer, cookie, 'VIEWER');
 
     await http
-      .patch(api(`/admin/users/${String(created.body.id)}`))
+      .patch(api(`/admin/users/${id}`))
       .set('Cookie', cookie)
       .send({ role: 'ADMIN', status: 'disabled' })
       .expect(200);
@@ -320,7 +463,7 @@ describe('admin', () => {
       .filter((item) => item.entity.endsWith(email))
       .map((item) => item.action)
       .sort();
-    expect(forUser).toEqual(['user.create', 'user.role', 'user.status']);
+    expect(forUser).toEqual(['user.invite', 'user.invite_accepted', 'user.role', 'user.status']);
   });
 
   it('rejects an oversized user id before touching the database', async () => {
@@ -362,6 +505,31 @@ describe('admin', () => {
       actorEmail: 'admin@sarwa.dev',
       action: 'market.pause',
     });
+  });
+
+  it('filters the audit log by group, with dropped connections under market', async () => {
+    const cookie = await login('admin@sarwa.dev', 'admin12345', '198.51.100.60');
+    await http
+      .post(api('/admin/market'))
+      .set('Cookie', cookie)
+      .send({ action: 'dropConnections', confirm: 'DROP' })
+      .expect(201);
+
+    const market = await http
+      .get(api('/admin/audit?group=market&pageSize=100'))
+      .set('Cookie', cookie)
+      .expect(200);
+    const auth = await http
+      .get(api('/admin/audit?group=auth&pageSize=100'))
+      .set('Cookie', cookie)
+      .expect(200);
+
+    const actions = (page: request.Response) =>
+      new Set((page.body.items as { action: string }[]).map((item) => item.action));
+    expect(actions(market)).toContain('connections.drop');
+    expect([...actions(market)].every((a) => /^(market|connections)\./.test(a))).toBe(true);
+    expect([...actions(auth)].every((a) => a.startsWith('auth.'))).toBe(true);
+    expect(actions(auth)).toContain('auth.login');
   });
 
   it('lets a VIEWER read but not change anything', async () => {
@@ -430,17 +598,146 @@ describe('admin', () => {
       .send({ maintenanceMode: true })
       .expect(200);
 
+    const customer = await signUp(http, { ip: '198.51.100.41' });
     const res = await http
       .put(api('/watchlist/AAPL'))
-      .set(DEVICE_ID_HEADER, randomUUID())
+      .set('Authorization', bearer(customer))
       .expect(503);
     expect(res.body.code).toBe('MAINTENANCE');
-    await http.delete(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, randomUUID()).expect(503);
+    await http.delete(api('/watchlist/AAPL')).set('Authorization', bearer(customer)).expect(503);
+    const device = randomUUID();
+    await http.put(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, device).expect(503);
+    await http.delete(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, device).expect(503);
+    await http.get(api('/watchlist')).set(DEVICE_ID_HEADER, device).expect(200);
 
     await http
       .patch(api('/admin/config'))
       .set('Cookie', cookie)
       .send({ maintenanceMode: false })
       .expect(200);
+  });
+});
+
+describe('team invites', () => {
+  let admin: string;
+
+  beforeAll(async () => {
+    admin = await login('admin@sarwa.dev', 'admin12345', '198.51.100.50');
+  });
+
+  it('invites by an emailed 48-hour link that signs the new admin in once', async () => {
+    const viewer = await login('viewer@sarwa.dev', 'viewer12345', '198.51.100.51');
+    const email = `new-${randomUUID().slice(0, 8)}@sarwa.dev`;
+
+    await http
+      .post(api('/admin/invites'))
+      .set('Cookie', viewer)
+      .send({ email, role: 'ADMIN' })
+      .expect(403);
+    const created = await http
+      .post(api('/admin/invites'))
+      .set('Cookie', admin)
+      .send({ email, role: 'VIEWER' })
+      .expect(201);
+    const token = mailer.tokenFor(email, 'admin_invite');
+    const pending = await http.get(api('/admin/invites')).set('Cookie', admin).expect(200);
+    const info = await http.get(api(`/admin/invites/token/${token}`)).expect(200);
+    const accepted = await http
+      .post(api('/admin/invites/accept'))
+      .send({ token, name: 'New Analyst', password: 'analyst-pass-9' })
+      .expect(201);
+    const cookie = ([] as string[]).concat(accepted.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+    const again = await http
+      .post(api('/admin/invites/accept'))
+      .send({ token, name: 'Twice', password: 'analyst-pass-9' })
+      .expect(410);
+
+    expect(InviteResponseSchema.parse(created.body).invite).toMatchObject({
+      email,
+      role: 'VIEWER',
+      invitedBy: 'admin@sarwa.dev',
+      status: 'pending',
+    });
+    expect(mailer.sent.at(-1)?.link).toBe(`http://localhost:3001/invite/${token}`);
+    expect(pending.body.items.map((i: { email: string }) => i.email)).toContain(email);
+    expect(info.body).toMatchObject({ email, role: 'VIEWER' });
+    expect(accepted.body.user).toMatchObject({ email, name: 'New Analyst', role: 'VIEWER' });
+    expect(again.body.code).toBe('TOKEN_EXPIRED');
+    await http.get(api('/admin/auth/me')).set('Cookie', cookie).expect(200);
+    const audit = await http.get(api('/admin/audit?pageSize=100')).set('Cookie', admin).expect(200);
+    const actions = (audit.body.items as { action: string; entity: string }[])
+      .filter((item) => item.entity === `User · ${email}`)
+      .map((item) => item.action)
+      .sort();
+    expect(actions).toEqual(['user.invite', 'user.invite_accepted']);
+  });
+
+  it('resends an invite with a fresh link that replaces the old one', async () => {
+    const viewer = await login('viewer@sarwa.dev', 'viewer12345', '198.51.100.52');
+    const email = `again-${randomUUID().slice(0, 8)}@sarwa.dev`;
+    const created = await http
+      .post(api('/admin/invites'))
+      .set('Cookie', admin)
+      .send({ email, role: 'VIEWER' })
+      .expect(201);
+    const first = mailer.tokenFor(email, 'admin_invite');
+    const id = String(created.body.invite.id);
+
+    await http
+      .post(api(`/admin/invites/${id}/resend`))
+      .set('Cookie', viewer)
+      .expect(403);
+    const resent = await http
+      .post(api(`/admin/invites/${id}/resend`))
+      .set('Cookie', admin)
+      .expect(201);
+    const second = mailer.tokenFor(email, 'admin_invite');
+    await http
+      .post(api(`/admin/invites/${id}/resend`))
+      .set('Cookie', admin)
+      .expect(404);
+
+    expect(second).not.toBe(first);
+    expect(InviteResponseSchema.parse(resent.body).invite).toMatchObject({ email, role: 'VIEWER' });
+    expect(resent.body.invite.id).not.toBe(id);
+    await http.get(api(`/admin/invites/token/${first}`)).expect(410);
+    await http.get(api(`/admin/invites/token/${second}`)).expect(200);
+  });
+
+  it('refuses an email that already has an account, and revoked or expired links', async () => {
+    const revokedEmail = `gone-${randomUUID().slice(0, 8)}@sarwa.dev`;
+    const lateEmail = `late-${randomUUID().slice(0, 8)}@sarwa.dev`;
+
+    await http
+      .post(api('/admin/invites'))
+      .set('Cookie', admin)
+      .send({ email: 'viewer@sarwa.dev', role: 'ADMIN' })
+      .expect(409);
+    const revoked = await http
+      .post(api('/admin/invites'))
+      .set('Cookie', admin)
+      .send({ email: revokedEmail, role: 'ADMIN' })
+      .expect(201);
+    await http
+      .post(api('/admin/invites'))
+      .set('Cookie', admin)
+      .send({ email: lateEmail, role: 'ADMIN' })
+      .expect(201);
+    await http
+      .delete(api(`/admin/invites/${String(revoked.body.invite.id)}`))
+      .set('Cookie', admin)
+      .expect(204);
+    await app.get(PrismaService).adminInvite.updateMany({
+      where: { email: lateEmail },
+      data: { expiresAt: new Date(Date.now() - 1) },
+    });
+
+    await http
+      .get(api(`/admin/invites/token/${mailer.tokenFor(revokedEmail, 'admin_invite')}`))
+      .expect(410);
+    await http
+      .get(api(`/admin/invites/token/${mailer.tokenFor(lateEmail, 'admin_invite')}`))
+      .expect(410);
+    await http.post(api('/admin/users')).set('Cookie', admin).send({}).expect(404);
   });
 });

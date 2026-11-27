@@ -5,7 +5,6 @@ import {
   type AdminStocksResponse,
   type AuditQuery,
   type CreateStock,
-  type CreateUser,
   type UpdateStock,
   type UpdateUser,
 } from '@sarwa/contracts';
@@ -71,15 +70,6 @@ export function useAdminUsers({ enabled = true }: { enabled?: boolean } = {}) {
     queryKey: adminKeys.users,
     queryFn: async ({ signal }) => (await api.listUsers({ signal })).items,
     enabled,
-  });
-}
-
-export function useCreateUser() {
-  const { api } = useAdmin();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body: CreateUser) => api.createUser(body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminKeys.users }),
   });
 }
 

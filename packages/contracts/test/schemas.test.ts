@@ -13,12 +13,10 @@ import {
 } from '@sarwa/domain';
 
 import {
+  AccountResetEventSchema,
   AccountSchema,
   ADMIN_NAMESPACE,
   ADMIN_SESSION_COOKIE,
-  AdminAccountSchema,
-  AdminAccountsQuerySchema,
-  AdminAccountsResponseSchema,
   AdminOrderEventSchema,
   AdminOrderSchema,
   AdminOrdersQuerySchema,
@@ -28,6 +26,7 @@ import {
   AdminStatsSchema,
   AdminStockSchema,
   AdminStocksResponseSchema,
+  AdminTradingEventSchema,
   AdminTradingSchema,
   AdminUserSchema,
   AlertResponseSchema,
@@ -46,7 +45,6 @@ import {
   CandlesResponseSchema,
   CircuitBreakerSchema,
   CreateHaltSchema,
-  CreateUserSchema,
   DEVICE_ID_HEADER,
   EquityQuerySchema,
   EquityResponseSchema,
@@ -83,12 +81,13 @@ import {
   PushTokenRequestSchema,
   QUOTE_BATCH_MS,
   QuotesEventSchema,
-  ResetAccountSchema,
+  REQUEST_ID_HEADER,
   SessionResponseSchema,
   SocketAuthSchema,
   SocketErrorSchema,
   SocketEvent,
   StockDetailResponseSchema,
+  StocksQuerySchema,
   StocksResponseSchema,
   SymbolHaltedEventSchema,
   SymbolResumedEventSchema,
@@ -170,6 +169,13 @@ const status = {
   upcoming: [holiday],
   updatedAt: 1,
 };
+const adminTrading = {
+  ...status,
+  circuitBreaker: DEFAULT_CIRCUIT_BREAKER,
+  tripsToday: [{ symbol: 'TSLA', at: 1 }],
+  changedBy: 'maya@sarwa.dev',
+  changedAt: 1,
+};
 const alert = {
   id: 'al_1',
   symbol: 'AAPL',
@@ -233,19 +239,6 @@ const auditLog = {
   createdAt: '2026-11-01T10:00:00.000Z',
 };
 const adminOrder = { ...order, accountHandle: 'ACC-7F3A9C', latencyMs: 4 };
-const adminAccount = {
-  id: 'acc_1',
-  handle: 'ACC-7F3A9C',
-  createdAt: 1,
-  equityCents: 10_000_000,
-  cashCents: 9_000_000,
-  todayCents: -500,
-  allTimeCents: 0,
-  allTimeBps: 0,
-  positions: 1,
-  openOrders: 0,
-  lastTradeAt: null,
-};
 
 type Case = [name: string, schema: z.ZodType, valid: unknown, invalid: unknown[]];
 
@@ -341,6 +334,7 @@ const cases: Case[] = [
     },
     [{ kind: 'order_shipped' }, { ...filledPayload, priceTicks: 0 }],
   ],
+  ['WelcomeNotification', NotificationPayloadSchema, { kind: 'welcome' }, [{ kind: 'welcomed' }]],
   ['Notification', NotificationSchema, notification, [{ ...notification, readAt: 'never' }]],
   [
     'NotificationsQuery',
@@ -392,18 +386,7 @@ const cases: Case[] = [
   ['CalendarDay', CalendarDaySchema, holiday, [{ ...holiday, date: '25/12/2026' }]],
   ['TradingStatus', TradingStatusSchema, status, [{ ...status, sessionMode: 'never' }]],
   // Admin trading.
-  [
-    'AdminTrading',
-    AdminTradingSchema,
-    {
-      ...status,
-      circuitBreaker: DEFAULT_CIRCUIT_BREAKER,
-      tripsToday: [{ symbol: 'TSLA', at: 1 }],
-      changedBy: 'maya@sarwa.dev',
-      changedAt: 1,
-    },
-    [status],
-  ],
+  ['AdminTrading', AdminTradingSchema, adminTrading, [status]],
   [
     'CreateHalt',
     CreateHaltSchema,
@@ -439,25 +422,17 @@ const cases: Case[] = [
     },
     [{ ordersToday: 2 }],
   ],
-  ['AdminAccount', AdminAccountSchema, adminAccount, [{ ...adminAccount, positions: -1 }]],
-  [
-    'AdminAccountsQuery',
-    AdminAccountsQuerySchema,
-    { q: 'ACC', sort: 'equity', page: '2', pageSize: '50' },
-    [{ sort: 'cash' }, { page: '0' }],
-  ],
-  [
-    'AdminAccountsResponse',
-    AdminAccountsResponseSchema,
-    { items: [adminAccount], total: 1, page: 1, pageSize: 25 },
-    [{ items: [adminAccount], total: 1, page: 0, pageSize: 25 }],
-  ],
-  ['ResetAccount', ResetAccountSchema, { confirm: 'RESET ACC-7F3A9C' }, [{ confirm: '  ' }]],
   [
     'AdminOrderEvent',
     AdminOrderEventSchema,
     { v: 1, order: adminOrder },
     [{ v: 2, order: adminOrder }],
+  ],
+  [
+    'AdminTradingEvent',
+    AdminTradingEventSchema,
+    { v: 1, trading: adminTrading },
+    [{ v: 1, trading: status }],
   ],
   // Trading socket events.
   ['OrderUpdatedEvent', OrderUpdatedEventSchema, { v: 1, order }, [{ order }]],
@@ -476,6 +451,7 @@ const cases: Case[] = [
     [{ v: 1, symbol: 'tsla', at: 1 }],
   ],
   ['TradingStatusEvent', TradingStatusEventSchema, { v: 1, status }, [{ v: 1, status: {} }]],
+  ['AccountResetEvent', AccountResetEventSchema, { v: 1 }, [{}, { v: 2 }]],
   [
     'SocketAuth',
     SocketAuthSchema,
@@ -487,6 +463,7 @@ const cases: Case[] = [
   ['SocketError', SocketErrorSchema, { code: 'X', message: 'y' }, [{ code: 'X' }]],
   // REST responses.
   ['StocksResponse', StocksResponseSchema, { items: [] }, [{}]],
+  ['StocksQuery', StocksQuerySchema, { q: ' app ' }, [{ q: 'x'.repeat(65) }]],
   [
     'StockDetailResponse',
     StockDetailResponseSchema,
@@ -523,12 +500,6 @@ const cases: Case[] = [
   // Admin responses.
   ['AdminUser', AdminUserSchema, adminUser, [{ ...adminUser, role: 'OWNER' }]],
   ['SessionResponse', SessionResponseSchema, { user: adminUser }, [adminUser]],
-  [
-    'CreateUser',
-    CreateUserSchema,
-    { email: 'sam@sarwa.dev', name: 'Sam', role: 'VIEWER', password: 'long-enough' },
-    [{ email: 'sam', name: 'Sam', role: 'VIEWER', password: 'long-enough' }],
-  ],
   ['UsersResponse', UsersResponseSchema, { items: [adminUser] }, [{ items: [{}] }]],
   [
     'MarketCommandResponse',
@@ -620,16 +591,22 @@ describe('request refinements', () => {
   it('defaults list queries from an empty query string', () => {
     expect(OrdersQuerySchema.parse({})).toEqual({ filter: 'all', limit: 50 });
     expect(NotificationsQuerySchema.parse({})).toEqual({ limit: 30 });
-    expect(AdminAccountsQuerySchema.parse({})).toEqual({ sort: 'allTime', page: 1, pageSize: 25 });
   });
 });
 
 describe('wire constants', () => {
   it('names headers, namespaces and events the same on both sides', () => {
-    expect({ API_PREFIX, DEVICE_ID_HEADER, IDEMPOTENCY_KEY_HEADER, ADMIN_SESSION_COOKIE }).toEqual({
+    expect({
+      API_PREFIX,
+      DEVICE_ID_HEADER,
+      IDEMPOTENCY_KEY_HEADER,
+      REQUEST_ID_HEADER,
+      ADMIN_SESSION_COOKIE,
+    }).toEqual({
       API_PREFIX: 'api/v1',
       DEVICE_ID_HEADER: 'x-device-id',
       IDEMPOTENCY_KEY_HEADER: 'idempotency-key',
+      REQUEST_ID_HEADER: 'x-request-id',
       ADMIN_SESSION_COOKIE: 'sarwa_admin_session',
     });
     expect([MARKET_NAMESPACE, ADMIN_NAMESPACE]).toEqual(['/market', '/admin']);

@@ -7,7 +7,6 @@ import {
   useAdminUsers,
   useAuditLog,
   useCreateStock,
-  useCreateUser,
   useDeleteStock,
   useUpdateStock,
   useUpdateUser,
@@ -174,29 +173,19 @@ describe('catalog hooks', () => {
 
   it('skips the users list when not allowed and manages users otherwise', async () => {
     const listUsers = jest.fn(() => Promise.resolve({ items: [makeAdminUser()] }));
-    const createUser = jest.fn(() => Promise.resolve(makeAdminUser()));
     const updateUser = jest.fn(() => Promise.resolve(makeAdminUser()));
-    const { Wrapper } = createAdminWrapper({ listUsers, createUser, updateUser });
+    const { Wrapper } = createAdminWrapper({ listUsers, updateUser });
 
     const view = renderHook(() => useAdminUsers({ enabled: false }), { wrapper: Wrapper });
     expect(view.result.current.fetchStatus).toBe('idle');
     expect(listUsers).not.toHaveBeenCalled();
 
-    const { result } = renderHook(
-      () => ({ users: useAdminUsers(), create: useCreateUser(), update: useUpdateUser() }),
-      { wrapper: Wrapper },
-    );
+    const { result } = renderHook(() => ({ users: useAdminUsers(), update: useUpdateUser() }), {
+      wrapper: Wrapper,
+    });
     await waitFor(() => {
       expect(result.current.users.data).toHaveLength(1);
     });
-    await act(() =>
-      result.current.create.mutateAsync({
-        email: 'sam@minitrading.dev',
-        name: 'Sam',
-        role: 'VIEWER',
-        password: 'password1',
-      }),
-    );
     await act(() => result.current.update.mutateAsync({ id: 'u1', patch: { status: 'disabled' } }));
 
     expect(updateUser).toHaveBeenCalledWith('u1', { status: 'disabled' });

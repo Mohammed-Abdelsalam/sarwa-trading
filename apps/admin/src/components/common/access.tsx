@@ -9,16 +9,39 @@ import {
 } from 'react';
 
 import { type AdminUser } from '@sarwa/contracts';
-import { useAdminI18n } from '@sarwa/core/admin';
-import { Badge, Button, buttonVariants, Callout, cn, Switch, Tooltip } from '@sarwa/ui';
+import { useAdminI18n, useAdminSession } from '@sarwa/core/admin';
+import {
+  Badge,
+  Button,
+  buttonVariants,
+  Callout,
+  cn,
+  Switch,
+  Tooltip,
+  useHydrated,
+} from '@sarwa/ui';
 
 import { RoleBadge } from './identity';
 
-export function ViewerNotice() {
+// The session resolves on the client, so until it says VIEWER nothing renders as view-only.
+export function useAccess() {
+  const session = useAdminSession();
+  const hydrated = useHydrated();
+  return {
+    canEdit: hydrated && session.canEdit,
+    isViewer: hydrated && session.isViewer,
+  };
+}
+
+export function ViewerNotice({ message }: { message?: string }) {
   const { t } = useAdminI18n();
   return (
     <Callout tone="info" icon={<Eye />} role="status">
-      <b>{t.admin.viewer.title}</b> {t.admin.viewer.body}
+      {message ?? (
+        <>
+          <b>{t.admin.viewer.title}</b> {t.admin.viewer.body}
+        </>
+      )}
     </Callout>
   );
 }
@@ -41,16 +64,19 @@ const block = (event: SyntheticEvent) => {
 // Viewers keep every control in place and focusable, but inert and described as view-only, so layouts match between roles.
 export function Locked({
   locked,
+  reason,
   children,
 }: {
   locked: boolean;
+  reason?: string;
   children: ReactElement<Record<string, unknown>>;
 }) {
   const { t } = useAdminI18n();
   const id = useId();
   if (!locked) return children;
+  const why = reason ?? t.admin.viewer.locked;
   return (
-    <Tooltip content={t.admin.viewer.locked}>
+    <Tooltip content={why}>
       <span
         className="inline-flex cursor-not-allowed"
         onClickCapture={block}
@@ -61,7 +87,7 @@ export function Locked({
       >
         {cloneElement(children, { 'aria-disabled': true, 'aria-describedby': id })}
         <span id={id} className="sr-only">
-          {t.admin.viewer.locked}
+          {why}
         </span>
       </span>
     </Tooltip>
@@ -70,12 +96,13 @@ export function Locked({
 
 export function GuardedButton({
   locked,
+  reason,
   icon,
   disabled,
   ...props
-}: ComponentProps<typeof Button> & { locked: boolean }) {
+}: ComponentProps<typeof Button> & { locked: boolean; reason?: string }) {
   return (
-    <Locked locked={locked}>
+    <Locked locked={locked} reason={reason}>
       <Button
         {...props}
         disabled={!locked && disabled}

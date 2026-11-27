@@ -3,28 +3,36 @@ import { useCallback, useMemo, useSyncExternalStore } from 'react';
 
 import { sortStocks, type SortOption } from '../markets';
 import { useSarwa } from '../provider';
-import { queryKeys } from './keys';
 import { useAverageChange, useLiveSymbols } from './live';
 import { useStocks } from './market';
+import { usePrivateScope, useSessionState } from './session';
 
 export function usePendingRemoval(): string | null {
   const { removals } = useSarwa();
   return useSyncExternalStore(removals.subscribe, removals.getPending, removals.getPending);
 }
 
+// Guests star too (the server keeps their list on the device account), so only a loading session waits.
+function useWatchlistEnabled(): boolean {
+  return useSessionState((s) => s.status !== 'loading');
+}
+
 // Hiding the pending symbol here keeps every star, row and average in agreement during the undo
 // window, even if a refetch returns it before the delete is sent.
 export function useWatchlist(): UseQueryResult<string[]> {
   const { api } = useSarwa();
+  const { keys } = usePrivateScope();
+  const enabled = useWatchlistEnabled();
   const pending = usePendingRemoval();
   const select = useCallback(
     (symbols: string[]) => (pending ? symbols.filter((s) => s !== pending) : symbols),
     [pending],
   );
   return useQuery({
-    queryKey: queryKeys.watchlist,
+    queryKey: keys.watchlist,
     queryFn: async ({ signal }) => (await api.getWatchlist({ signal })).symbols,
     select,
+    enabled,
   });
 }
 
@@ -48,34 +56,35 @@ interface ToggleVariables {
 export function useToggleWatchlist() {
   const { api, removals } = useSarwa();
   const queryClient = useQueryClient();
+  const { keys } = usePrivateScope();
 
   const mutation = useMutation({
     mutationKey: TOGGLE_WATCHLIST_KEY,
     mutationFn: ({ symbol, watched }: ToggleVariables) =>
       watched ? api.removeFromWatchlist(symbol) : api.addToWatchlist(symbol),
     onMutate: async ({ symbol, watched }) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.watchlist });
-      const previous = queryClient.getQueryData<string[]>(queryKeys.watchlist);
-      queryClient.setQueryData<string[]>(queryKeys.watchlist, (list = []) =>
+      await queryClient.cancelQueries({ queryKey: keys.watchlist });
+      const previous = queryClient.getQueryData<string[]>(keys.watchlist);
+      queryClient.setQueryData<string[]>(keys.watchlist, (list = []) =>
         watched ? list.filter((s) => s !== symbol) : [...list, symbol],
       );
       return { previous };
     },
     onError: (_error, _variables, context) => {
       // Setting undefined is a no-op, so an optimistic star on an empty cache needs a refetch.
-      if (context?.previous) queryClient.setQueryData(queryKeys.watchlist, context.previous);
-      else void queryClient.invalidateQueries({ queryKey: queryKeys.watchlist });
+      if (context?.previous) queryClient.setQueryData(keys.watchlist, context.previous);
+      else void queryClient.invalidateQueries({ queryKey: keys.watchlist });
     },
     // Only the last toggle in flight refetches, so an early refetch can't undo a later optimistic star.
     onSettled: () =>
       queryClient.isMutating({ mutationKey: TOGGLE_WATCHLIST_KEY }) === 1
-        ? queryClient.invalidateQueries({ queryKey: queryKeys.watchlist })
+        ? queryClient.invalidateQueries({ queryKey: keys.watchlist })
         : undefined,
   });
 
   return {
     ...mutation,
-    // Starring a stock whose delete hasn't been sent yet just cancels the delete.
+    // Starring a stock whose delete hasn't been sent just cancels it.
     mutate: (variables: ToggleVariables) => {
       if (!variables.watched && removals.getPending() === variables.symbol) removals.undo();
       else mutation.mutate(variables);
@@ -97,6 +106,7 @@ export function useWatchToggle(symbol: string): { watched: boolean; toggle: () =
 export function useUndoableRemove() {
   const { api, removals } = useSarwa();
   const queryClient = useQueryClient();
+  const { keys } = usePrivateScope();
   const pending = usePendingRemoval();
 
   return {
@@ -104,12 +114,12 @@ export function useUndoableRemove() {
     // The commit captures the client and API, so it still runs after the screen unmounts.
     remove: (symbol: string) => {
       const commit = async () => {
-        queryClient.setQueryData<string[]>(queryKeys.watchlist, (list) =>
+        queryClient.setQueryData<string[]>(keys.watchlist, (list) =>
           list?.filter((s) => s !== symbol),
         );
         // A failed delete is corrected by the refetch, which brings the row back.
         await api.removeFromWatchlist(symbol).catch(() => undefined);
-        await queryClient.invalidateQueries({ queryKey: queryKeys.watchlist });
+        await queryClient.invalidateQueries({ queryKey: keys.watchlist });
       };
       removals.schedule(symbol, () => void commit());
     },
@@ -119,6 +129,7 @@ export function useUndoableRemove() {
 }
 
 export function useWatchlistStocks({ sort = null }: { sort?: SortOption | null } = {}) {
+  const enabled = useWatchlistEnabled();
   const watchlist = useWatchlist();
   const stocks = useStocks();
   const symbols = watchlist.data ?? [];
@@ -132,7 +143,7 @@ export function useWatchlistStocks({ sort = null }: { sort?: SortOption | null }
     rows: sort ? sortStocks(rows, sort) : rows,
     symbols,
     average,
-    isLoading: watchlist.isPending || stocks.isPending,
+    isLoading: (enabled && watchlist.isPending) || stocks.isPending,
     // Only a failure without cached data is an error; otherwise the cached list keeps showing.
     isError: (watchlist.isError && !watchlist.data) || (stocks.isError && !stocks.data),
     retry: () => {

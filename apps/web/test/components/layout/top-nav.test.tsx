@@ -14,7 +14,7 @@ import {
   useNotificationCenter,
 } from '../../../src/components/layout/use-notification-center';
 import { useTopNav } from '../../../src/components/layout/use-top-nav';
-import { testCopy } from '../../copy';
+import { providers, testCopy } from '../../copy';
 
 jest.mock('../../../src/components/layout/use-top-nav', () => ({
   ...jest.requireActual<object>('../../../src/components/layout/use-top-nav'),
@@ -47,6 +47,8 @@ function navModel(overrides: Partial<ReturnType<typeof useTopNav>> = {}) {
   return {
     links: links.map((link) => ({ ...link, active: link.href === '/portfolio' })),
     live: 'live',
+    account: 'member',
+    guest: { onCreate: jest.fn(), onSignIn: jest.fn() },
     pill: marketPill('live', session, copy),
     palette: { open: false, setOpen: jest.fn(), shortcut: 'Ctrl K' },
     labels: {
@@ -105,6 +107,7 @@ function centerModel(overrides: Partial<ReturnType<typeof useNotificationCenter>
 function accountModel(): ReturnType<typeof useAccountMenu> {
   return {
     theme: 'light',
+    user: { name: 'Sara Hassan', email: 'sara.h@example.com' },
     locale: 'en',
     digits: 'latn',
     handle: 'ACC-1A2B3C',
@@ -130,8 +133,15 @@ function accountModel(): ReturnType<typeof useAccountMenu> {
       language: 'Language',
       digits: 'Digits',
       disclosure: 'Simulated prices',
+      signOut: 'Sign out',
     },
-    actions: { toggleTheme: jest.fn(), setLocale: jest.fn(), setDigits: jest.fn(), go: jest.fn() },
+    actions: {
+      toggleTheme: jest.fn(),
+      setLocale: jest.fn(),
+      setDigits: jest.fn(),
+      go: jest.fn(),
+      signOut: jest.fn(),
+    },
   };
 }
 
@@ -177,6 +187,29 @@ describe('TopNav', () => {
     render(<TopNav />);
 
     expect(screen.getByRole('button', { name: 'Notifications, 3 unread' })).toHaveTextContent('3');
+  });
+
+  it('gives a guest Sign in, Create account and a bell that invites instead of the account menu', async () => {
+    const model = navModel({ account: 'guest' });
+    jest.mocked(useTopNav).mockReturnValue(model);
+    render(<TopNav />, { wrapper: providers().wrapper });
+
+    expect(screen.queryByRole('button', { name: 'Account menu' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/signin');
+    expect(screen.getByRole('link', { name: 'Create account' })).toHaveAttribute('href', '/signup');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Notifications — sign in to see yours' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Create free account' }));
+    expect(model.guest.onCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows neither set of controls while the session is still loading', () => {
+    jest.mocked(useTopNav).mockReturnValue(navModel({ account: null }));
+    render(<TopNav />);
+
+    expect(screen.queryByRole('button', { name: 'Account menu' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
   });
 });
 
@@ -282,5 +315,20 @@ describe('AccountMenu', () => {
     await userEvent.click(trigger);
     await userEvent.click(screen.getByRole('menuitemradio', { name: 'العربية' }));
     expect(model.actions.setLocale).toHaveBeenCalledWith('ar');
+  });
+
+  it('names the signed-in customer, opens security settings and signs out', async () => {
+    const model = accountModel();
+    jest.mocked(useAccountMenu).mockReturnValue(model);
+    render(<AccountMenu />);
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+
+    expect(screen.getByText('Sara Hassan')).toBeInTheDocument();
+    expect(screen.getByText('sara.h@example.com')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Settings' }));
+    expect(model.actions.go).toHaveBeenCalledWith('/settings/security');
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+    expect(model.actions.signOut).toHaveBeenCalledTimes(1);
   });
 });

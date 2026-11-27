@@ -18,6 +18,9 @@ const EnvSchema = z
       .default('http://localhost:3000,http://localhost:3001,http://localhost:8081')
       .transform((value) => value.split(',').map((origin) => origin.trim())),
     JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
+    // Where emailed links (verify, reset, admin invite) point.
+    WEB_URL: z.url().default('http://localhost:3000'),
+    ADMIN_URL: z.url().default('http://localhost:3001'),
     // Which proxies may set X-Forwarded-For, in Express syntax: "loopback", a hop count or a list.
     TRUST_PROXY: z
       .string()

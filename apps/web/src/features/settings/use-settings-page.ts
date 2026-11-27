@@ -1,12 +1,13 @@
 import { cents, digitOptions, languageOptions, usePortfolio } from '@sarwa/core';
 
 import { useNotificationPermission } from '../../lib/browser';
-import { useCopy } from '../../lib/i18n';
+import { useCopy, useSwitchLocale } from '../../lib/i18n';
 import { useTheme } from '../../lib/theme';
 
 export function useSettingsPage() {
   const copy = useCopy();
-  const { t, f, m, locale, digits, setLocale, setDigits } = copy;
+  const { t, f, m, locale, digits, setDigits } = copy;
+  const setLocale = useSwitchLocale();
   const { theme, toggle } = useTheme();
   const { permission, request } = useNotificationPermission();
   const { books } = usePortfolio();
@@ -24,7 +25,6 @@ export function useSettingsPage() {
         ]
       : [],
     labels: {
-      title: t.settings.title,
       appearance: t.settings.appearance,
       theme: t.settings.theme,
       themes: [

@@ -1,8 +1,11 @@
 module.exports = {
   preset: 'jest-expo',
   displayName: 'mobile',
-  coverageThreshold: { global: { statements: 55, branches: 46, functions: 58, lines: 57 } },
+  collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/app/**', '!src/**/*.d.ts'],
+  coverageThreshold: { global: { statements: 53, branches: 49, functions: 55, lines: 54 } },
   setupFiles: ['<rootDir>/test/setup.ts'],
+  // A suite's first render pays the cold jest-expo transform, which coverage slows further.
+  testTimeout: 20_000,
   testMatch: ['<rootDir>/test/**/*.test.{ts,tsx}'],
   // lucide ships ESM (.mjs) for React Native; Jest needs its CommonJS build.
   moduleNameMapper: {

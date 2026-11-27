@@ -6,9 +6,10 @@ import { type AlertsResponse, type TradingStatus } from '@sarwa/contracts';
 import { type AnalyticsProvider } from '../analytics';
 import { type TradingEvent } from '../market-socket';
 import { useSarwa } from '../provider';
-import { queryKeys } from './keys';
+import { type MeKeys, queryKeys } from './keys';
 import { prependNotification } from './notifications';
 import { applyOrderUpdate } from './order-cache';
+import { usePrivateScope } from './session';
 
 function updateStatus(queryClient: QueryClient, update: (status: TradingStatus) => TradingStatus) {
   queryClient.setQueryData<TradingStatus>(queryKeys.tradingStatus, (status) =>
@@ -18,19 +19,20 @@ function updateStatus(queryClient: QueryClient, update: (status: TradingStatus) 
 
 export function applyTradingEvent(
   queryClient: QueryClient,
+  keys: MeKeys,
   event: TradingEvent,
   track: AnalyticsProvider['track'],
 ): void {
   switch (event.name) {
     case 'order.updated':
-      applyOrderUpdate(queryClient, event.payload.order, track);
+      applyOrderUpdate(queryClient, keys, event.payload.order, track);
       return;
     case 'notification':
-      prependNotification(queryClient, event.payload.notification);
+      prependNotification(queryClient, keys, event.payload.notification);
       return;
     case 'alert.triggered': {
       const { alert } = event.payload;
-      queryClient.setQueryData<AlertsResponse>(queryKeys.alerts, (current) =>
+      queryClient.setQueryData<AlertsResponse>(keys.alerts, (current) =>
         current
           ? {
               ...current,
@@ -39,7 +41,7 @@ export function applyTradingEvent(
           : current,
       );
       // A once-alert disarms when it fires; only the server knows the new active count.
-      void queryClient.invalidateQueries({ queryKey: queryKeys.alerts });
+      void queryClient.invalidateQueries({ queryKey: keys.alerts });
       return;
     }
     case 'symbol.halted': {
@@ -66,35 +68,33 @@ export function applyTradingEvent(
       return;
     }
     case 'account.reset':
-      resync(queryClient);
+      resync(queryClient, keys);
+      return;
+    // The session hooks sign this client out; the cache follows the identity change.
+    case 'session.revoked':
       return;
   }
 }
 
-function resync(queryClient: QueryClient): void {
-  for (const queryKey of RESYNC_KEYS) void queryClient.invalidateQueries({ queryKey });
+// Everything personal plus the trading status, which events also patch.
+export function resync(queryClient: QueryClient, keys: MeKeys): void {
+  for (const queryKey of [keys.root, queryKeys.tradingStatus]) {
+    void queryClient.invalidateQueries({ queryKey });
+  }
 }
-
-const RESYNC_KEYS = [
-  queryKeys.allOrders,
-  queryKeys.portfolio,
-  queryKeys.account,
-  queryKeys.notifications,
-  queryKeys.alerts,
-  queryKeys.tradingStatus,
-];
 
 // Mount once per app, next to useMarketConnection: private socket events keep the caches current.
 export function useTradingEvents(): void {
   const { market, analytics, store } = useSarwa();
   const queryClient = useQueryClient();
+  const { keys } = usePrivateScope();
 
   useEffect(
     () =>
       market.onTradingEvent((event) => {
-        applyTradingEvent(queryClient, event, analytics.track);
+        applyTradingEvent(queryClient, keys, event, analytics.track);
       }),
-    [market, queryClient, analytics],
+    [market, queryClient, analytics, keys],
   );
 
   // Events sent while the socket was down are lost, so every reopen after the first refetches.
@@ -103,9 +103,9 @@ export function useTradingEvents(): void {
     let openedBefore = wasOpen;
     return store.subscribe(({ connection }) => {
       const open = connection.status === 'open';
-      if (open && !wasOpen && openedBefore) resync(queryClient);
+      if (open && !wasOpen && openedBefore) resync(queryClient, keys);
       if (open) openedBefore = true;
       wasOpen = open;
     });
-  }, [store, queryClient]);
+  }, [store, queryClient, keys]);
 }

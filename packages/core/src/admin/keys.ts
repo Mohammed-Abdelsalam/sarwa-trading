@@ -1,4 +1,4 @@
-import { type AdminAccountsQuery, type AdminOrdersQuery, type AuditQuery } from '@sarwa/contracts';
+import { type AdminOrdersQuery, type AuditQuery, type CustomersQuery } from '@sarwa/contracts';
 
 export const adminKeys = {
   all: ['admin'] as const,
@@ -15,6 +15,16 @@ export const adminKeys = {
   orderLists: ['admin', 'orders', 'list'] as const,
   orders: (query: AdminOrdersQuery) => ['admin', 'orders', 'list', query] as const,
   orderStats: ['admin', 'orders', 'stats'] as const,
-  accountPages: ['admin', 'accounts'] as const,
-  accounts: (query: AdminAccountsQuery) => ['admin', 'accounts', query] as const,
+  // Every list page, the KPIs and each customer's tabs share this prefix.
+  customersAll: ['admin', 'customers'] as const,
+  customers: (query: CustomersQuery) => ['admin', 'customers', 'list', query] as const,
+  customerKpis: ['admin', 'customers', 'kpis'] as const,
+  customer: (handle: string) => ['admin', 'customers', 'detail', handle] as const,
+  customerOrders: (handle: string) => ['admin', 'customers', 'detail', handle, 'orders'] as const,
+  customerSessions: (handle: string) =>
+    ['admin', 'customers', 'detail', handle, 'sessions'] as const,
+  customerActivity: (handle: string) =>
+    ['admin', 'customers', 'detail', handle, 'activity'] as const,
+  invites: ['admin', 'invites'] as const,
+  invite: (token: string) => ['admin', 'invites', 'token', token] as const,
 };

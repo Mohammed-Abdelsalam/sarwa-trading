@@ -66,21 +66,11 @@ export class NotificationsService {
   private async notifyBatch(accountIds: string[], payload: NotificationPayload): Promise<void> {
     const createdAt = new Date(this.clock.now());
     const json = JSON.stringify(payload);
-    const [rows, accounts] = await Promise.all([
-      this.prisma.notification.createManyAndReturn({
-        data: accountIds.map((accountId) => ({ accountId, payload: json, createdAt })),
-      }),
-      this.prisma.account.findMany({
-        where: { id: { in: accountIds } },
-        select: { id: true, deviceId: true },
-      }),
-    ]);
-    const deviceOf = new Map(accounts.map((account) => [account.id, account.deviceId]));
-    for (const row of rows) {
-      const deviceId = deviceOf.get(row.accountId);
-      if (deviceId) this.gateway.notification(deviceId, toNotification(row));
-    }
-    void this.sendPush([...deviceOf.values()], payload);
+    const rows = await this.prisma.notification.createManyAndReturn({
+      data: accountIds.map((accountId) => ({ accountId, payload: json, createdAt })),
+    });
+    for (const row of rows) this.gateway.notification(row.accountId, toNotification(row));
+    void this.sendPush(accountIds, payload);
   }
 
   async list(accountId: string, query: NotificationsQuery): Promise<NotificationsResponse> {
@@ -118,19 +108,19 @@ export class NotificationsService {
     });
   }
 
-  async registerToken(deviceId: string, { token, platform }: PushTokenRequest): Promise<void> {
+  async registerToken(accountId: string, { token, platform }: PushTokenRequest): Promise<void> {
     await this.prisma.pushToken.upsert({
       where: { token },
-      update: { deviceId, platform },
-      create: { token, deviceId, platform },
+      update: { accountId, platform },
+      create: { token, accountId, platform },
     });
   }
 
   // Best effort: a push that fails never blocks or fails the trade that caused it.
-  private async sendPush(deviceIds: string[], payload: NotificationPayload): Promise<void> {
+  private async sendPush(accountIds: string[], payload: NotificationPayload): Promise<void> {
     try {
       const targets = await this.prisma.pushToken.findMany({
-        where: { deviceId: { in: deviceIds } },
+        where: { accountId: { in: accountIds } },
       });
       if (targets.length > 0) await this.push.send(targets, pushMessage(payload));
     } catch (error) {

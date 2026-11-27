@@ -4,12 +4,12 @@ import { Card, Drawer, Sheet } from '@sarwa/ui';
 
 import { TicketEntry } from './ticket-entry';
 import { TicketResult, TicketReview } from './ticket-review';
-import { useOrderPanel } from './use-order-panel';
+import { type ResumedOrder, useOrderPanel, useResumedOrder } from './use-order-panel';
 
 // ≥1280 a sticky side panel; 768–1279 a right drawer; below that a bottom sheet with a trade bar.
 // The body is left out of the hidden panel while an overlay shows it, so it is never in the DOM twice.
-export function OrderPanel({ symbol }: { symbol: string }) {
-  const panel = useOrderPanel(symbol);
+function TicketPanel({ symbol, resumed }: { symbol: string; resumed: ResumedOrder | null }) {
+  const panel = useOrderPanel(symbol, resumed);
   const { labels, actions } = panel;
   const body =
     panel.step === 'entry' ? (
@@ -70,5 +70,17 @@ export function OrderPanel({ symbol }: { symbol: string }) {
         </Sheet>
       )}
     </>
+  );
+}
+
+// A resumed order remounts the ticket so it opens with what the guest had typed.
+export function OrderPanel({ symbol }: { symbol: string }) {
+  const resumed = useResumedOrder(symbol);
+  return (
+    <TicketPanel
+      key={resumed ? JSON.stringify(resumed) : 'fresh'}
+      symbol={symbol}
+      resumed={resumed}
+    />
   );
 }

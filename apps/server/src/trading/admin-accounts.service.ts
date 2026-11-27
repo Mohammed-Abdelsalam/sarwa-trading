@@ -1,13 +1,6 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { type z } from 'zod';
 
-import {
-  type AdminAccount,
-  type AdminAccountsResponse,
-  type AdminAccountsQuerySchema,
-  type Account,
-  resetConfirmation,
-} from '@sarwa/contracts';
+import { type Account, ErrorCode, resetConfirmation } from '@sarwa/contracts';
 import { POLICY } from '@sarwa/domain';
 
 import { type Actor, AuditService } from '../admin/audit.service';
@@ -17,15 +10,6 @@ import { PrismaService } from '../prisma.service';
 import { ExecutionQueue } from './execution-queue';
 import { ExecutionService } from './execution.service';
 import { toAccount, WORKING_STATUSES } from './mappers';
-import { PortfolioService } from './portfolio.service';
-
-type AccountsQuery = z.output<typeof AdminAccountsQuerySchema>;
-
-const SORTS: Record<AccountsQuery['sort'], (a: AdminAccount, b: AdminAccount) => number> = {
-  allTime: (a, b) => b.allTimeCents - a.allTimeCents,
-  equity: (a, b) => b.equityCents - a.equityCents,
-  lastTrade: (a, b) => (b.lastTradeAt ?? 0) - (a.lastTradeAt ?? 0),
-};
 
 @Injectable()
 export class AdminAccountsService {
@@ -34,61 +18,24 @@ export class AdminAccountsService {
     private readonly clock: Clock,
     private readonly queue: ExecutionQueue,
     private readonly execution: ExecutionService,
-    private readonly portfolio: PortfolioService,
     private readonly audit: AuditService,
     private readonly events: EventBus,
   ) {}
 
-  // Valued with live prices, so it's computed per account rather than sorted in SQL.
-  async list(query: AccountsQuery): Promise<AdminAccountsResponse> {
-    const q = query.q?.toUpperCase();
-    const accounts = await this.prisma.account.findMany({
-      where: q ? { handle: { contains: q } } : {},
-      include: {
-        _count: {
-          select: { positions: true, orders: { where: { status: { in: [...WORKING_STATUSES] } } } },
-        },
-        fills: { orderBy: { at: 'desc' }, take: 1, select: { at: true } },
-      },
-    });
-    const summaries = await this.portfolio.summaries(accounts);
-    const items = accounts.flatMap((account): AdminAccount[] => {
-      const summary = summaries.get(account.id);
-      if (!summary) return [];
-      return [
-        {
-          id: account.id,
-          handle: account.handle,
-          createdAt: account.createdAt.getTime(),
-          equityCents: summary.equityCents,
-          cashCents: summary.cashCents,
-          todayCents: summary.todayCents,
-          allTimeCents: summary.allTimeCents,
-          allTimeBps: summary.allTimeBps,
-          positions: account._count.positions,
-          openOrders: account._count.orders,
-          lastTradeAt: account.fills[0]?.at.getTime() ?? null,
-        },
-      ];
-    });
-    items.sort(SORTS[query.sort]);
-    const start = (query.page - 1) * query.pageSize;
-    return {
-      items: items.slice(start, start + query.pageSize),
-      total: items.length,
-      page: query.page,
-      pageSize: query.pageSize,
-    };
-  }
-
-  // Irreversible for the user, so it must be confirmed with the handle. History stays, under the old epoch.
-  reset(accountId: string, confirm: string, actor: Actor): Promise<Account> {
+  // Irreversible for the user, so it must be confirmed with the handle. History stays, under the old
+  // epoch. `context` (who asked, and why) is kept in the audit entry.
+  reset(
+    accountId: string,
+    confirm: string,
+    actor: Actor,
+    context: Record<string, unknown> = {},
+  ): Promise<Account> {
     return this.queue.run(async () => {
       const account = await this.prisma.account.findUnique({ where: { id: accountId } });
       if (!account) throw new NotFoundException('Account not found');
       if (confirm !== resetConfirmation(account.handle)) {
         throw new UnprocessableEntityException({
-          code: 'CONFIRMATION_MISMATCH',
+          code: ErrorCode.ConfirmationMismatch,
           message: `Type "${resetConfirmation(account.handle)}" to confirm`,
         });
       }
@@ -122,6 +69,7 @@ export class AdminAccountsService {
             action: 'account.reset',
             entity: `Account · ${account.handle}`,
             payload: {
+              ...context,
               before: {
                 cashCents: Number(account.cashCents),
                 epoch: account.epoch,
@@ -144,7 +92,7 @@ export class AdminAccountsService {
       for (const order of canceled) await this.execution.publish(order, 'order_canceled');
       this.events.publish({
         type: 'account.reset',
-        account: { accountId, deviceId: account.deviceId, handle: account.handle },
+        account: { accountId, handle: account.handle },
       });
       return toAccount(updated);
     });

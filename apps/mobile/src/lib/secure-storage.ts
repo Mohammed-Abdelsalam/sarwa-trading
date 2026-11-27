@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
-import { type KeyValueStorage } from '@sarwa/core';
+import { type KeyValueStorage, type TokenStorage } from '@sarwa/core';
 
 // Readable after the first unlock so a background reconnect can still identify the device.
 const OPTIONS: SecureStore.SecureStoreOptions = {
@@ -8,7 +8,7 @@ const OPTIONS: SecureStore.SecureStoreOptions = {
 };
 
 // A key an older build kept in plain storage moves into the keychain on its first read.
-export function createSecureStorage(legacy?: KeyValueStorage): KeyValueStorage {
+export function createSecureStorage(legacy?: KeyValueStorage): TokenStorage {
   return {
     async getItem(key) {
       const value = await SecureStore.getItemAsync(key, OPTIONS);
@@ -18,5 +18,6 @@ export function createSecureStorage(legacy?: KeyValueStorage): KeyValueStorage {
       return previous;
     },
     setItem: (key, value) => SecureStore.setItemAsync(key, value, OPTIONS),
+    removeItem: (key) => SecureStore.deleteItemAsync(key, OPTIONS),
   };
 }

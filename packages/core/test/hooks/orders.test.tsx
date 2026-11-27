@@ -9,7 +9,6 @@ import {
 
 import { ApiError } from '../../src/api';
 import {
-  queryKeys,
   useCancelOrder,
   useModifyOrder,
   useOrder,
@@ -18,7 +17,7 @@ import {
   usePlaceOrder,
 } from '../../src/hooks';
 import { makeFilledOrder, makeOrder } from '../trading-fixtures';
-import { createTestClient, createWrapper } from '../utils';
+import { createTestClient, createWrapper, deviceKeys } from '../utils';
 
 const REQUEST: PlaceOrderRequest = {
   symbol: 'AAPL',
@@ -45,7 +44,7 @@ describe('usePlaceOrder', () => {
     const answer = deferred<Order>();
     const client = createTestClient({ placeOrder: jest.fn(() => answer.promise) });
     const { Wrapper, queryClient } = createWrapper(client);
-    queryClient.setQueryData<OrdersResponse>(queryKeys.orders(), { items: [], nextCursor: null });
+    queryClient.setQueryData<OrdersResponse>(deviceKeys.orders(), { items: [], nextCursor: null });
     const { result } = renderHook(() => usePlaceOrder(), { wrapper: Wrapper });
 
     act(() => {
@@ -55,7 +54,7 @@ describe('usePlaceOrder', () => {
     await waitFor(() => {
       expect(result.current.status).toBe('sending');
     });
-    expect(queryClient.getQueryData<OrdersResponse>(queryKeys.orders())?.items).toEqual([]);
+    expect(queryClient.getQueryData<OrdersResponse>(deviceKeys.orders())?.items).toEqual([]);
 
     await act(async () => {
       answer.resolve(makeOrder());
@@ -66,7 +65,7 @@ describe('usePlaceOrder', () => {
       expect(result.current.status).toBe('done');
     });
     expect(result.current.order).toEqual(makeOrder());
-    expect(queryClient.getQueryData<OrdersResponse>(queryKeys.orders())?.items).toEqual([
+    expect(queryClient.getQueryData<OrdersResponse>(deviceKeys.orders())?.items).toEqual([
       makeOrder(),
     ]);
     expect(client.analytics.track).toHaveBeenCalledWith({
@@ -246,7 +245,7 @@ describe('useCancelOrder', () => {
       cancelOrder: () => Promise.resolve({ outcome: 'already_filled', order: makeFilledOrder() }),
     });
     const { Wrapper, queryClient } = createWrapper(client);
-    queryClient.setQueryData(queryKeys.order('ord-1'), makeOrder());
+    queryClient.setQueryData(deviceKeys.order('ord-1'), makeOrder());
     const { result } = renderHook(() => useCancelOrder(), { wrapper: Wrapper });
 
     act(() => {
@@ -256,7 +255,7 @@ describe('useCancelOrder', () => {
     await waitFor(() => {
       expect(result.current.data?.outcome).toBe('already_filled');
     });
-    expect(queryClient.getQueryData<Order>(queryKeys.order('ord-1'))?.status).toBe('filled');
+    expect(queryClient.getQueryData<Order>(deviceKeys.order('ord-1'))?.status).toBe('filled');
     expect(client.analytics.track).toHaveBeenCalledWith({
       name: 'order_canceled',
       outcome: 'already_filled',
@@ -294,7 +293,9 @@ describe('useModifyOrder, useOrders and useOrder', () => {
     });
 
     await waitFor(() => {
-      expect(queryClient.getQueryData<Order>(queryKeys.order('ord-1'))?.limitTicks).toBe(2_000_000);
+      expect(queryClient.getQueryData<Order>(deviceKeys.order('ord-1'))?.limitTicks).toBe(
+        2_000_000,
+      );
     });
     expect(listOrders).toHaveBeenCalledWith(
       { filter: 'open' },

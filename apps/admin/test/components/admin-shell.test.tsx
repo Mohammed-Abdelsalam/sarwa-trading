@@ -41,7 +41,7 @@ describe('AdminShell', () => {
       'page',
     );
     expect(screen.getByRole('main')).toHaveTextContent('Orders board');
-    expect(document.documentElement).toHaveAttribute('dir', 'ltr');
+    expect(screen.getByRole('button', { name: 'Language' })).toBeInTheDocument();
   });
 
   it('collapses the sidebar to icons and remembers it', async () => {

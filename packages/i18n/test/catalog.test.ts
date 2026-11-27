@@ -1,10 +1,14 @@
 import {
   ALERT_CONDITIONS,
+  AUTH_FIELD_ERRORS,
+  CANCEL_REASONS,
   cents,
   ORDER_STATUSES,
+  PASSWORD_POLICY,
   SESSION_MODES,
   SESSION_PHASES,
   SIDES,
+  SUSPENSION_CATEGORIES,
 } from '@sarwa/domain';
 
 import { createFormatter, getAdminMessages, getMessages } from '../src';
@@ -161,5 +165,90 @@ describe('message functions', () => {
   it('keeps tickers and order ids in Latin inside Arabic copy', () => {
     expect(ar.orders.orderA11y({ id: 'o_8ef3' })).toBe('الأمر o_8ef3');
     expect(ar.market.halted({ symbol: 'TSLA' })).toBe('تداول TSLA موقوف.');
+  });
+});
+
+describe('account copy', () => {
+  it('words every auth field error and cancel reason in both languages', () => {
+    for (const messages of [en, ar]) {
+      for (const code of AUTH_FIELD_ERRORS)
+        expect(messages.auth.fieldErrors[code]({ n: '8' })).toBeTruthy();
+      for (const reason of CANCEL_REASONS) expect(messages.orders.canceledBy[reason]).toBeTruthy();
+    }
+  });
+
+  it('fills the password limit into the field error', () => {
+    const n = String(PASSWORD_POLICY.minLength);
+    expect(en.auth.fieldErrors.PASSWORD_TOO_SHORT({ n })).toBe('Use at least 8 characters');
+    expect(ar.auth.fieldErrors.PASSWORD_TOO_SHORT({ n })).toBe('استخدم 8 أحرف على الأقل');
+  });
+
+  it('pluralises the counts the account dialogs are built from', () => {
+    expect(en.counts.positions({ count: 1, n: '1' })).toBe('1 position');
+    expect(en.counts.openOrders({ count: 2, n: '2' })).toBe('2 open orders');
+    expect(ar.counts.devices({ count: 2, n: '2' })).toBe('جهازان');
+    expect(ar.counts.sessions({ count: 3, n: '3' })).toBe('3 جلسات');
+  });
+
+  it('composes the guest-data warning from those counts', () => {
+    const positions = en.counts.positions({ count: 3, n: '3' });
+    const orders = en.counts.openOrders({ count: 1, n: '1' });
+    expect(en.discard.body({ positions, orders })).toBe(
+      '3 positions and 1 open order on this device will be discarded and your account’s portfolio loaded. They are never merged.',
+    );
+  });
+
+  it('labels every suspension category for admins and customers', () => {
+    for (const admin of [adminEn, adminAr]) {
+      for (const category of SUSPENSION_CATEGORIES)
+        expect(admin.customers.reasonCategories[category]).toBeTruthy();
+    }
+    for (const messages of [en, ar]) {
+      for (const category of SUSPENSION_CATEGORIES)
+        expect(messages.suspended.reasonCategories[category]).toBeTruthy();
+    }
+  });
+
+  it('splits each terms sentence into link pieces that rebuild the whole sentence', () => {
+    const join = ({ prefix, termsLink, and, privacyLink, suffix }: typeof en.auth.terms.page) =>
+      prefix + termsLink + and + privacyLink + suffix;
+
+    for (const messages of [en, ar]) {
+      expect(join(messages.auth.terms.page)).toBe(messages.auth.signUp.terms);
+      expect(join(messages.auth.terms.modal)).toBe(messages.auth.signUp.termsModal);
+    }
+    expect(join(en.auth.terms.mobile)).toBe(
+      'I agree to the Terms and Privacy Policy and understand money is virtual.',
+    );
+  });
+
+  it('gives a detailed revoke message for every plain one except suspension', () => {
+    const params = { device: 'iPhone 15', time: '5 min ago' };
+    for (const messages of [en, ar]) {
+      const plain = Object.keys(messages.revoked.reasons).filter((key) => key !== 'suspended');
+      expect(Object.keys(messages.revoked.reasonsDetailed).sort()).toEqual(plain.sort());
+    }
+    expect(en.revoked.reasonsDetailed.signed_out(params)).toBe(
+      'This session was ended from iPhone 15 5 min ago. Sign in again to continue.',
+    );
+    expect(ar.revoked.reasonsDetailed.revoked({ ...params, time: 'منذ ٥ دقائق' })).toBe(
+      'تم تسجيل خروج هذا الجهاز من iPhone 15 منذ ٥ دقائق.',
+    );
+  });
+
+  it('pluralises hours like the other counts', () => {
+    expect(en.common.hours({ count: 1, n: '1' })).toBe('1 hour');
+    expect(en.common.hours({ count: 3, n: '3' })).toBe('3 hours');
+    expect(ar.common.hours({ count: 2, n: '٢' })).toBe('ساعتين');
+    expect(ar.counts.hours({ count: 5, n: '٥' })).toBe('٥ ساعات');
+  });
+
+  it('fills the short guest step and the admin invite label', () => {
+    expect(en.home.guest.stepsShort.getCash({ amount: '$10,000' })).toBe('Get $10,000');
+    expect(adminEn.team.revokeInvite({ email: 'a@b.dev' })).toBe('Revoke the invite for a@b.dev');
+    expect(adminEn.states.requestId({ id: 'req-42' })).toBe('Request ID req-42');
+    expect(adminAr.states.requestId({ id: 'req-42' })).toBe('معرّف الطلب req-42');
+    expect(adminAr.team.revokeInvite({ email: 'a@b.dev' })).toBe('إلغاء دعوة a@b.dev');
+    expect(adminEn.team.resendInvite({ email: 'a@b.dev' })).toBe('Resend the invite to a@b.dev');
   });
 });

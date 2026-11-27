@@ -8,22 +8,16 @@ import { MarketStatusPill } from '../../components/trading/market-status-pill';
 import { StockRow } from '../../components/trading/stock-row';
 import { Badge } from '../../components/ui/badge';
 import { IconButton } from '../../components/ui/icon-button';
-import { Segmented } from '../../components/ui/segmented';
 import { Text } from '../../components/ui/text';
 import { useCopy } from '../../lib/i18n';
 import { OrderRow } from '../orders/order-row';
-import { BellButton, EquityCard, ShortcutCard } from './home-parts';
-import { type MoverTab, useHomeScreen } from './use-home-screen';
+import { BellButton, EquityCard, MoversHeader, ShortcutCard } from './home-parts';
+import { useHomeScreen } from './use-home-screen';
 
 export function HomeScreen() {
   const { t, m } = useCopy();
   const screen = useHomeScreen();
   const { actions } = screen;
-  const moverTabs: { value: MoverTab; label: string }[] = [
-    { value: 'gainers', label: t.portfolio.gainers },
-    { value: 'losers', label: t.portfolio.losers },
-    { value: 'active', label: t.portfolio.active },
-  ];
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
@@ -78,18 +72,7 @@ export function HomeScreen() {
           />
         </View>
 
-        <View className="flex-row flex-wrap items-center justify-between gap-2 px-5 pb-1 pt-4">
-          <Text variant="h3" accessibilityRole="header">
-            {t.portfolio.topMovers}
-          </Text>
-          <Segmented
-            size="sm"
-            label={t.portfolio.topMovers}
-            options={moverTabs}
-            value={screen.moverTab}
-            onChange={actions.setMoverTab}
-          />
-        </View>
+        <MoversHeader value={screen.moverTab} onChange={actions.setMoverTab} />
         {screen.movers.map((stock) => (
           <StockRow key={stock.symbol} stock={stock} />
         ))}

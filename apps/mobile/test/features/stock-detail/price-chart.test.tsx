@@ -1,10 +1,11 @@
-import { screen } from '@testing-library/react-native';
+import { renderHook, screen } from '@testing-library/react-native';
 import { type ReactNode } from 'react';
 import { Text } from 'react-native';
 
 import { PriceChart } from '../../../src/features/stock-detail/price-chart';
 import { usePriceChart } from '../../../src/features/stock-detail/use-price-chart';
-import { renderScreen } from '../../render';
+import { useCopy } from '../../../src/lib/i18n';
+import { layoutDirection, Providers, renderScreen } from '../../render';
 
 jest.mock('../../../src/features/stock-detail/use-price-chart', () => ({
   usePriceChart: jest.fn(),
@@ -80,5 +81,20 @@ describe('PriceChart', () => {
 
     expect(screen.getByLabelText('Loading chart')).toBeOnTheScreen();
     expect(screen.getByText('toolbar')).toBeOnTheScreen();
+  });
+
+  it('keeps the time axis oldest-left in Arabic, under the unmirrored plot', async () => {
+    const t = Date.UTC(2026, 0, 5);
+    const candle = { t, o: 1, h: 1, l: 1, c: 1, v: 1 };
+    const { result } = await renderHook(() => useCopy(), {
+      wrapper: ({ children }) => <Providers locale="ar">{children}</Providers>,
+    });
+    const label = result.current.f.chartTime(t, '1M');
+    mockedHook.mockReturnValue(chart({ axisLabels: [candle] }));
+    await renderScreen(<PriceChart symbol="AAPL" period="1M" type="area" onScrub={jest.fn()} />, {
+      locale: 'ar',
+    });
+
+    expect(layoutDirection(screen.getByText(label))).toBe('ltr');
   });
 });

@@ -17,31 +17,38 @@ import {
 
 import { shouldRetry } from '../api';
 import { useSarwa } from '../provider';
-import { type OrderListQuery, queryKeys } from './keys';
+import { type TicketForm } from '../ticket';
+import { useRequireAuth } from './gate';
+import { type OrderListQuery } from './keys';
 import { applyOrderUpdate } from './order-cache';
+import { usePrivateScope } from './session';
 
 export function useOrders(query: OrderListQuery = {}): UseQueryResult<OrdersResponse> {
   const { api } = useSarwa();
+  const { keys, enabled } = usePrivateScope();
   return useQuery({
-    queryKey: queryKeys.orders(query),
+    queryKey: keys.orders(query),
     queryFn: ({ signal }) => api.listOrders(query, { signal }),
     staleTime: 15_000,
+    enabled,
   });
 }
 
 // Every page of a list, newest first; the Orders screens load older pages on demand.
 export function useOrderPages(query: OrderListQuery = {}) {
   const { api } = useSarwa();
+  const { keys, enabled } = usePrivateScope();
   const result = useInfiniteQuery({
-    queryKey: queryKeys.orderPages(query),
+    queryKey: keys.orderPages(query),
     queryFn: ({ signal, pageParam }) => api.listOrders({ ...query, cursor: pageParam }, { signal }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     staleTime: 15_000,
+    enabled,
   });
   return {
     items: result.data?.pages.flatMap((page) => page.items) ?? [],
-    isLoading: result.isPending,
+    isLoading: enabled && result.isPending,
     isError: result.isError && !result.data,
     isRefreshing: result.isRefetching && !result.isFetchingNextPage,
     hasMore: result.hasNextPage,
@@ -55,10 +62,12 @@ export function useOrderPages(query: OrderListQuery = {}) {
 
 export function useOrder(id: string): UseQueryResult<Order> {
   const { api } = useSarwa();
+  const { keys, enabled } = usePrivateScope();
   return useQuery({
-    queryKey: queryKeys.order(id),
+    queryKey: keys.order(id),
     queryFn: ({ signal }) => api.getOrder(id, { signal }),
     staleTime: 15_000,
+    enabled,
   });
 }
 
@@ -86,6 +95,8 @@ const sameOrder = (a: PlaceOrderRequest, b: PlaceOrderRequest) =>
 export function usePlaceOrder() {
   const { api, analytics, newId } = useSarwa();
   const queryClient = useQueryClient();
+  const { keys } = usePrivateScope();
+  const { run } = useRequireAuth();
   const attempt = useRef<Attempt | null>(null);
   const inFlight = useRef(false);
 
@@ -97,7 +108,7 @@ export function usePlaceOrder() {
     retry: shouldRetry,
     // Business rejections come back as a stored rejected order (201); a 4xx is a request error.
     onSuccess: (order) => {
-      applyOrderUpdate(queryClient, order, analytics.track);
+      applyOrderUpdate(queryClient, keys, order, analytics.track);
       if (order.rejection) analytics.track({ name: 'order_rejected', code: order.rejection.code });
     },
   });
@@ -111,21 +122,24 @@ export function usePlaceOrder() {
     status: SUBMIT_STATUS[mutation.status],
     order: mutation.data ?? null,
     error: mutation.error,
-    submit: (request: PlaceOrderRequest) => {
-      if (inFlight.current) return;
-      const previous = attempt.current;
-      if (previous && mutation.status === 'error' && sameOrder(previous.request, request)) {
-        send(previous);
-        return;
-      }
-      attempt.current = { request, key: newId() };
-      analytics.track({
-        name: 'order_submitted',
-        side: request.side,
-        type: request.type,
-        sizeKind: request.size.kind,
+    // A guest gets the sign-in gate instead; the ticket reopens prefilled with `form`, never sent.
+    submit: (request: PlaceOrderRequest, form?: TicketForm) => {
+      run({ kind: 'order', symbol: request.symbol, side: request.side, form }, () => {
+        if (inFlight.current) return;
+        const previous = attempt.current;
+        if (previous && mutation.status === 'error' && sameOrder(previous.request, request)) {
+          send(previous);
+          return;
+        }
+        attempt.current = { request, key: newId() };
+        analytics.track({
+          name: 'order_submitted',
+          side: request.side,
+          type: request.type,
+          sizeKind: request.size.kind,
+        });
+        send(attempt.current);
       });
-      send(attempt.current);
     },
     retry: () => {
       if (attempt.current && !inFlight.current) send(attempt.current);
@@ -140,10 +154,11 @@ export function usePlaceOrder() {
 export function useCancelOrder() {
   const { api, analytics } = useSarwa();
   const queryClient = useQueryClient();
+  const { keys } = usePrivateScope();
   return useMutation({
     mutationFn: (id: string) => api.cancelOrder(id),
     onSuccess: ({ outcome, order }) => {
-      applyOrderUpdate(queryClient, order, analytics.track);
+      applyOrderUpdate(queryClient, keys, order, analytics.track);
       analytics.track({ name: 'order_canceled', outcome });
     },
   });
@@ -152,11 +167,12 @@ export function useCancelOrder() {
 export function useModifyOrder() {
   const { api, analytics } = useSarwa();
   const queryClient = useQueryClient();
+  const { keys } = usePrivateScope();
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: ModifyOrderRequest }) =>
       api.modifyOrder(id, patch),
     onSuccess: (order) => {
-      applyOrderUpdate(queryClient, order, analytics.track);
+      applyOrderUpdate(queryClient, keys, order, analytics.track);
     },
   });
 }

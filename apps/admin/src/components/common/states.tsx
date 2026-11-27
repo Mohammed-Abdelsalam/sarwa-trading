@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, RefreshCw, TriangleAlert } from 'lucide-react';
 import { type ReactNode } from 'react';
 
+import { ApiError } from '@sarwa/core';
 import { useAdminI18n } from '@sarwa/core/admin';
 import { Button, cn, IconButton, Skeleton, StateView } from '@sarwa/ui';
 
@@ -36,13 +37,17 @@ export function TableSkeleton({
 export function LoadError({
   what,
   onRetry,
+  error,
   className,
 }: {
   what: string;
   onRetry: () => void;
+  // Support traces a failure by the server's request id.
+  error?: unknown;
   className?: string;
 }) {
   const { t } = useAdminI18n();
+  const requestId = error instanceof ApiError ? error.requestId : null;
   return (
     <StateView
       className={cn('flex-1 justify-center', className)}
@@ -50,6 +55,7 @@ export function LoadError({
       icon={<TriangleAlert />}
       title={t.admin.states.loadError({ what })}
       description={t.admin.states.loadErrorBody}
+      footnote={requestId ? t.admin.states.requestId({ id: requestId }) : undefined}
       action={
         <Button icon={<RefreshCw aria-hidden className="size-4" />} onClick={onRetry}>
           {t.admin.states.retry}

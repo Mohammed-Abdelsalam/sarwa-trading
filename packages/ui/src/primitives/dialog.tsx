@@ -1,15 +1,21 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { type ReactNode } from 'react';
+import { X } from 'lucide-react';
+import { type ReactNode, useRef } from 'react';
 
 import { cn } from '../lib/cn';
+import { IconButton } from './button';
 
 export interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: ReactNode;
+  header?: ReactNode;
   children?: ReactNode;
   footer?: ReactNode;
+  closeLabel?: string;
+  // Screen readers start on the title instead of the first field (the auth gate).
+  focusTitle?: boolean;
   className?: string;
 }
 
@@ -18,10 +24,14 @@ export function Dialog({
   onOpenChange,
   title,
   description,
+  header,
   children,
   footer,
+  closeLabel,
+  focusTitle = false,
   className,
 }: DialogProps) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
@@ -32,14 +42,38 @@ export function Dialog({
             'border-border bg-surface-2 shadow-e3 rounded-dialog border p-6 focus:outline-none',
             className,
           )}
+          onOpenAutoFocus={
+            focusTitle
+              ? (event) => {
+                  event.preventDefault();
+                  titleRef.current?.focus();
+                }
+              : undefined
+          }
           {...(description ? {} : { 'aria-describedby': undefined })}
         >
-          <div className="flex flex-col gap-1.5">
-            <DialogPrimitive.Title className="type-h2 text-fg">{title}</DialogPrimitive.Title>
-            {description ? (
-              <DialogPrimitive.Description className="type-sm text-fg-2">
-                {description}
-              </DialogPrimitive.Description>
+          <div className="flex items-start gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              {header}
+              <DialogPrimitive.Title
+                ref={titleRef}
+                tabIndex={focusTitle ? -1 : undefined}
+                className="type-h2 text-fg focus:outline-none"
+              >
+                {title}
+              </DialogPrimitive.Title>
+              {description ? (
+                <DialogPrimitive.Description className="type-sm text-fg-2">
+                  {description}
+                </DialogPrimitive.Description>
+              ) : null}
+            </div>
+            {closeLabel ? (
+              <DialogPrimitive.Close asChild>
+                <IconButton label={closeLabel} size={32}>
+                  <X aria-hidden className="size-4" />
+                </IconButton>
+              </DialogPrimitive.Close>
             ) : null}
           </div>
           {children}

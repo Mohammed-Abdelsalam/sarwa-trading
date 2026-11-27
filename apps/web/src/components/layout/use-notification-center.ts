@@ -9,9 +9,11 @@ import {
   notificationRows as sharedRows,
   notificationTarget as sharedTarget,
   type NotificationTarget,
+  useGate,
   useMarkAllRead,
   useMarkNotificationRead,
   useNotifications,
+  useSession,
 } from '@sarwa/core';
 
 import { type Copy, useCopy } from '../../lib/i18n';
@@ -39,8 +41,13 @@ export function notificationTarget(payload: NotificationPayload) {
   return { tone: TONE[notificationKind(payload)], href: href(sharedTarget(payload)) };
 }
 
-export function notificationRows(items: readonly Notification[], now: number, copy: Copy) {
-  return sharedRows(items, now, copy).map(({ kind, target, ...row }) => ({
+export function notificationRows(
+  items: readonly Notification[],
+  now: number,
+  copy: Copy,
+  reader?: { name: string },
+) {
+  return sharedRows(items, now, copy, reader).map(({ kind, target, ...row }) => ({
     ...row,
     tone: TONE[kind],
     href: href(target),
@@ -56,9 +63,19 @@ export function useNotificationCenter() {
   const { items, unreadCount, hasMore, isLoadingMore, loadMore } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllRead();
-  const [open, setOpen] = useState(false);
+  const { user } = useSession();
+  const { resumed, consume } = useGate();
+  const [manualOpen, setManualOpen] = useState(false);
+  // A guest who signed in from the bell lands with the inbox open, until they close it.
+  const resumedHere = resumed?.kind === 'notifications';
+  const open = manualOpen || resumedHere;
   const [now, setNow] = useState(() => Date.now());
-  const rows = notificationRows(items, now, copy);
+  const rows = notificationRows(items, now, copy, user ?? undefined);
+  const setOpen = (next: boolean) => {
+    if (next) setNow(Date.now());
+    else if (resumedHere) consume();
+    setManualOpen(next);
+  };
 
   return {
     open,
@@ -78,10 +95,7 @@ export function useNotificationCenter() {
       settings: t.notifications.settings,
       loadMore: m.list.loadMore,
     },
-    setOpen: (next: boolean) => {
-      if (next) setNow(Date.now());
-      setOpen(next);
-    },
+    setOpen,
     loadMore,
     markAllRead: () => {
       markAll.mutate();

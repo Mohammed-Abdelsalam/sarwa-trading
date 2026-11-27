@@ -2,21 +2,21 @@ import { useState } from 'react';
 
 import {
   direction,
-  heatmapTiles,
-  type MoversTab,
   POLICY,
-  topMovers,
   useAlerts,
   useEquityCurve,
   useNotifications,
   useOrders,
   usePortfolio,
-  useStocks,
+  useHomeView,
+  useResendVerification,
+  useSession,
   useTradingStatus,
 } from '@sarwa/core';
 
 import { notificationRows } from '../../components/layout/use-notification-center';
 import { useCopy } from '../../lib/i18n';
+import { resendState } from '../auth/auth-view';
 
 export type { MoversTab } from '@sarwa/core';
 export type HeatmapView = 'map' | 'list';
@@ -30,19 +30,34 @@ export function useHomePage() {
   const equity = useEquityCurve('1D');
   const openOrders = useOrders({ filter: 'open' });
   const alerts = useAlerts();
-  const stocks = useStocks();
+  const home = useHomeView();
+  const { user } = useSession();
+  const resend = useResendVerification();
   const notifications = useNotifications();
   const session = useTradingStatus().data?.session;
-  const [moversTab, setMoversTab] = useState<MoversTab>('gainers');
   const [heatmapView, setHeatmapView] = useState<HeatmapView>('map');
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [now] = useState(() => Date.now());
   const summary = portfolio.summary;
-  const list = stocks.data ?? [];
-  const tiles = heatmapTiles(list, (bps) => f.percent(bps, { signed: true }));
+  const tiles = home.heatmap;
+  const checklist = home.checklist?.items;
 
   return {
+    mode: home.mode,
     isLoading: portfolio.isLoading,
+    // The landing pitch, once the session is known to be a guest; until then the dashboard's
+    // skeletons hold the space.
+    guest: home.isLoading ? null : home.guest,
+    checklist: checklist
+      ? {
+          emailVerified: checklist.find((item) => item.key === 'verify')?.done ?? true,
+          hasTraded: checklist.find((item) => item.key === 'firstTrade')?.done ?? false,
+          resend: resendState(resend),
+          onResend: () => {
+            resend.resend();
+          },
+        }
+      : null,
     banner:
       session?.isOpen && session.earlyClose && !bannerDismissed
         ? {
@@ -85,8 +100,13 @@ export function useHomePage() {
       tiles,
       rows: tiles.map((tile) => ({ ...tile, direction: direction(tile.change) })),
     },
-    movers: { tab: moversTab, rows: topMovers(list, moversTab), isLoading: stocks.isPending },
-    activity: notificationRows(notifications.items.slice(0, ACTIVITY), now, copy),
+    movers: { tab: home.movers.tab, rows: home.movers.rows, isLoading: home.movers.isLoading },
+    activity: notificationRows(
+      notifications.items.slice(0, ACTIVITY),
+      now,
+      copy,
+      user ?? undefined,
+    ),
     labels: {
       totalEquity: t.portfolio.totalEquity,
       portfolioLink: m.portfolio.viewAll,
@@ -111,7 +131,7 @@ export function useHomePage() {
       }),
     },
     actions: {
-      setMoversTab,
+      setMoversTab: home.movers.setTab,
       setHeatmapView,
       dismissBanner: () => {
         setBannerDismissed(true);

@@ -78,6 +78,7 @@ function viewModel(
     isLoading: false,
     isError: false,
     sort: null,
+    isGuest: false,
     removed: null,
     actions: {
       retry: jest.fn(),
@@ -85,6 +86,7 @@ function viewModel(
       remove: jest.fn(),
       undo: jest.fn(),
       dismissUndo: jest.fn(),
+      signUp: jest.fn(),
     },
     ...overrides,
   };
@@ -166,5 +168,58 @@ describe('WatchlistScreen', () => {
     );
 
     expect(model.actions.cycleSort).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a guest on the normal empty state, with a note that leads to sign-up', async () => {
+    const model = viewModel({ isGuest: true });
+    mockedHook.mockReturnValue(model);
+    await renderScreen(<WatchlistScreen />);
+
+    expect(screen.getByText('Your watchlist is empty')).toBeOnTheScreen();
+    await fireEvent.press(
+      screen.getByRole('link', {
+        name: 'Create an account to keep your watchlist on all your devices',
+      }),
+    );
+    expect(model.actions.signUp).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists a guest’s stars with the note under them, and still removes by swipe', async () => {
+    const model = viewModel({ isGuest: true, rows: [stock('AAPL')] });
+    mockedHook.mockReturnValue(model);
+    await renderScreen(<WatchlistScreen />);
+
+    expect(screen.getByText('AAPL')).toBeOnTheScreen();
+    expect(
+      screen.getByText('Create an account to keep your watchlist on all your devices'),
+    ).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Remove AAPL from watchlist' }));
+    expect(model.actions.remove).toHaveBeenCalledWith('AAPL');
+  });
+
+  it('shows the note in Arabic', async () => {
+    mockedHook.mockReturnValue(viewModel({ isGuest: true }));
+    await renderScreen(<WatchlistScreen />, { locale: 'ar' });
+
+    expect(screen.getByText('أنشئ حسابًا لتحتفظ بقائمة المفضلة على كل أجهزتك')).toBeOnTheScreen();
+  });
+
+  it('never shows the note to a member', async () => {
+    mockedHook.mockReturnValue(viewModel({ rows: [stock('AAPL')] }));
+    await renderScreen(<WatchlistScreen />);
+
+    expect(
+      screen.queryByText('Create an account to keep your watchlist on all your devices'),
+    ).not.toBeOnTheScreen();
+  });
+
+  it('shows neither the empty state nor the note while loading', async () => {
+    mockedHook.mockReturnValue(viewModel({ isLoading: true, isGuest: true }));
+    await renderScreen(<WatchlistScreen />);
+
+    expect(screen.queryByText('Your watchlist is empty')).not.toBeOnTheScreen();
+    expect(
+      screen.queryByText('Create an account to keep your watchlist on all your devices'),
+    ).not.toBeOnTheScreen();
   });
 });

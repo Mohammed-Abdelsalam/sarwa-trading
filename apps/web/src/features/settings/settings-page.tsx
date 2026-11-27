@@ -24,13 +24,35 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export function SettingsPage() {
+export type PreferenceSection = 'notifications' | 'appearance' | 'trading';
+
+// The device preferences behind the settings nav; guests have them too.
+export function PreferenceSettings({ section }: { section: PreferenceSection }) {
   const page = useSettingsPage();
   const { labels, actions } = page;
 
+  if (section === 'notifications')
+    return (
+      <Section title={labels.notifications}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="type-sm text-fg-2 max-w-110">{labels.permission[page.permission]}</p>
+          {page.permission === 'default' ? (
+            <Button variant="secondary" onClick={actions.enableNotifications}>
+              {labels.enable}
+            </Button>
+          ) : null}
+        </div>
+      </Section>
+    );
+  if (section === 'trading')
+    return (
+      <Section title={labels.account}>
+        <EstimateRows rows={page.account} />
+        <p className="type-caption text-fg-3">{labels.disclosure}</p>
+      </Section>
+    );
   return (
-    <div className="mx-auto flex w-full max-w-180 flex-col gap-4 px-4 py-6 md:px-8">
-      <h1 className="type-h1">{labels.title}</h1>
+    <>
       <Section title={labels.appearance}>
         <Row label={labels.theme}>
           <SegmentedControl
@@ -59,20 +81,6 @@ export function SettingsPage() {
           />
         </Row>
       </Section>
-      <Section title={labels.notifications}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="type-sm text-fg-2 max-w-110">{labels.permission[page.permission]}</p>
-          {page.permission === 'default' ? (
-            <Button variant="secondary" onClick={actions.enableNotifications}>
-              {labels.enable}
-            </Button>
-          ) : null}
-        </div>
-      </Section>
-      <Section title={labels.account}>
-        <EstimateRows rows={page.account} />
-        <p className="type-caption text-fg-3">{labels.disclosure}</p>
-      </Section>
-    </div>
+    </>
   );
 }

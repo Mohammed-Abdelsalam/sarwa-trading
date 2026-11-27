@@ -6,16 +6,13 @@ import {
   Get,
   Headers,
   HttpCode,
-  Injectable,
   Patch,
-  type PipeTransform,
   Post,
   Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { type Account as AccountRow } from '@prisma/client';
 import { type Response } from 'express';
 
 import {
@@ -33,23 +30,11 @@ import {
   TRADING_ROUTES,
 } from '@sarwa/contracts';
 
-import { DeviceId, WritableGuard } from '../common/device';
+import { CurrentAccountId } from '../auth/customer.guard';
+import { WritableGuard } from '../common/device';
 import { IdParam } from '../common/params';
 import { ValidationException, ZodValidationPipe } from '../common/zod-validation.pipe';
-import { AccountsService } from './accounts.service';
 import { OrdersService } from './orders.service';
-
-// Resolves the X-Device-Id header to its account, opening one on first use.
-@Injectable()
-export class AccountPipe implements PipeTransform<string, Promise<AccountRow>> {
-  constructor(private readonly accounts: AccountsService) {}
-
-  transform(deviceId: string): Promise<AccountRow> {
-    return this.accounts.forDevice(deviceId);
-  }
-}
-
-export const DeviceAccount = () => DeviceId(AccountPipe);
 
 function idempotencyKey(value: string | undefined): string {
   const parsed = IdempotencyKeySchema.safeParse(value);
@@ -70,7 +55,7 @@ export class OrdersController {
   @UseGuards(WritableGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async place(
-    @DeviceAccount() account: AccountRow,
+    @CurrentAccountId() accountId: string,
     @Headers(IDEMPOTENCY_KEY_HEADER) key: string | undefined,
     @Body(new ZodValidationPipe(PlaceOrderRequestSchema)) request: PlaceOrderRequest,
     @Res({ passthrough: true }) response: Response,
@@ -78,7 +63,7 @@ export class OrdersController {
     const receivedAt = performance.now();
     const hash = createHash('sha256').update(JSON.stringify(request)).digest('hex');
     const { order, replayed } = await this.orders.place(
-      account,
+      accountId,
       idempotencyKey(key),
       hash,
       request,
@@ -90,37 +75,37 @@ export class OrdersController {
 
   @Get(TRADING_ROUTES.orders)
   list(
-    @DeviceAccount() account: AccountRow,
+    @CurrentAccountId() accountId: string,
     @Query(new ZodValidationPipe(OrdersQuerySchema)) query: OrdersQuery,
   ): Promise<OrdersResponse> {
-    return this.orders.list(account, query);
+    return this.orders.list(accountId, query);
   }
 
   @Get(TRADING_ROUTES.order)
   async get(
-    @DeviceAccount() account: AccountRow,
+    @CurrentAccountId() accountId: string,
     @IdParam() id: string,
   ): Promise<PlaceOrderResponse> {
-    return { order: await this.orders.get(account, id) };
+    return { order: await this.orders.get(accountId, id) };
   }
 
   @Post(TRADING_ROUTES.cancelOrder)
   @UseGuards(WritableGuard)
   @HttpCode(200)
   cancel(
-    @DeviceAccount() account: AccountRow,
+    @CurrentAccountId() accountId: string,
     @IdParam() id: string,
   ): Promise<CancelOrderResponse> {
-    return this.orders.cancel(account, id);
+    return this.orders.cancel(accountId, id);
   }
 
   @Patch(TRADING_ROUTES.order)
   @UseGuards(WritableGuard)
   async modify(
-    @DeviceAccount() account: AccountRow,
+    @CurrentAccountId() accountId: string,
     @IdParam() id: string,
     @Body(new ZodValidationPipe(ModifyOrderRequestSchema)) patch: ModifyOrderRequest,
   ): Promise<PlaceOrderResponse> {
-    return { order: await this.orders.modify(account, id, patch) };
+    return { order: await this.orders.modify(accountId, id, patch) };
   }
 }

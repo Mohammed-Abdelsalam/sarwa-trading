@@ -2,6 +2,7 @@ export { createAdminApi, type AdminApi } from './api';
 export { isApiError } from '../api';
 export { SEARCH_DEBOUNCE_MS, useDebouncedValue } from '../hooks/time';
 export * from './catalog';
+export * from './customers';
 export * from './format';
 export { type AdminI18n, haltDurationLabel, useAdminI18n } from './i18n';
 export { type AdminMessages, getAdminMessages } from '@sarwa/i18n';

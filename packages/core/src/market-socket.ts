@@ -14,6 +14,8 @@ import {
   type Quote,
   QuotesEventSchema,
   type ServerToClientEvents,
+  SessionRevokedEventSchema,
+  type SessionServerToClientEvents,
   type SocketAuth,
   SocketEvent,
   StocksChangedEventSchema,
@@ -26,16 +28,17 @@ import {
 
 import { type ConnectionState, type LiveStore } from './store';
 
-type MarketIo = Socket<ServerToClientEvents & TradingServerToClientEvents, ClientToServerEvents>;
+type PrivateEvents = TradingServerToClientEvents & SessionServerToClientEvents;
+type MarketIo = Socket<ServerToClientEvents & PrivateEvents, ClientToServerEvents>;
 
 export type SocketAuthProvider = (callback: (auth: Partial<SocketAuth>) => void) => void;
 
 export type TradingEvent = {
-  [Name in keyof TradingServerToClientEvents]: {
+  [Name in keyof PrivateEvents]: {
     name: Name;
-    payload: Parameters<TradingServerToClientEvents[Name]>[0];
+    payload: Parameters<PrivateEvents[Name]>[0];
   };
-}[keyof TradingServerToClientEvents];
+}[keyof PrivateEvents];
 
 export type TradingEventListener = (event: TradingEvent) => void;
 
@@ -43,6 +46,8 @@ export interface MarketSocketOptions {
   url: string;
   store: LiveStore;
   getDeviceId: () => Promise<string>;
+  // A signed-in mobile client's access token; the web handshake carries the access cookie.
+  getToken?: () => Promise<string | undefined>;
   flushMs?: number;
   syncDelayMs?: number;
   reconnectJitterMs?: number;
@@ -59,6 +64,14 @@ export interface MarketSocket {
   acquire(symbols: string[]): () => void;
   subscribedSymbols(): string[];
   onTradingEvent(listener: TradingEventListener): () => void;
+}
+
+// The server reads the identity only at the handshake, so a live socket reconnects to present a new one.
+export function reauthenticate(market: MarketSocket, store: LiveStore) {
+  const { status } = store.getState().connection;
+  if (status === 'idle' || status === 'offline') return;
+  market.disconnect();
+  market.connect();
 }
 
 const defaultCreateSocket = (
@@ -79,17 +92,18 @@ export function createMarketSocket({
   url,
   store,
   getDeviceId,
+  getToken = () => Promise.resolve(undefined),
   flushMs = 100,
   syncDelayMs = 200,
   reconnectJitterMs = 1_000,
   transports = ['websocket'],
   createSocket = defaultCreateSocket,
 }: MarketSocketOptions): MarketSocket {
-  // Resolved on every (re)connect, so the handshake always carries the stored device id.
+  // Resolved on every (re)connect, so the handshake always carries the current identity.
   const auth: SocketAuthProvider = (callback) => {
-    getDeviceId().then(
-      (deviceId) => {
-        callback({ deviceId });
+    Promise.all([getDeviceId(), getToken()]).then(
+      ([deviceId, token]) => {
+        callback(token ? { deviceId, token } : { deviceId });
       },
       () => {
         callback({});
@@ -210,6 +224,7 @@ export function createMarketSocket({
   relay(TradingSocketEvent.SymbolResumed, SymbolResumedEventSchema);
   relay(TradingSocketEvent.TradingStatus, TradingStatusEventSchema);
   relay(TradingSocketEvent.AccountReset, AccountResetEventSchema);
+  relay(TradingSocketEvent.SessionRevoked, SessionRevokedEventSchema);
 
   return {
     connect() {

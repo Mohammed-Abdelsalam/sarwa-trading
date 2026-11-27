@@ -1,14 +1,13 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { type AdminUser as AdminUserRow } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 import { Clock } from '../common/clock';
+import { PasswordHasher } from '../common/password-hasher';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from './audit.service';
 import { ADMIN_AUDIENCE, type AdminToken, REMEMBER_TTL_SECONDS, SESSION_TTL_SECONDS } from './auth';
 
-const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 10);
 const MAX_FAILED_LOGINS = 5;
 const LOCK_MS = 15 * 60_000;
 
@@ -25,14 +24,15 @@ export class AdminAuthService {
     private readonly jwt: JwtService,
     private readonly audit: AuditService,
     private readonly clock: Clock,
+    private readonly hasher: PasswordHasher,
   ) {}
 
   // Unknown emails, wrong passwords, disabled and locked accounts all get the same answer, and
-  // bcrypt always runs, so neither the message nor the timing reveals which emails exist.
+  // the hash check always runs, so neither the message nor the timing reveals which emails exist.
   async signIn(email: string, password: string, remember: boolean, ip?: string): Promise<SignedIn> {
     const now = this.clock.now();
     const user = await this.prisma.adminUser.findUnique({ where: { email } });
-    const valid = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
+    const valid = await this.hasher.verify(user?.passwordHash, password);
     const locked = (user?.lockedUntil?.getTime() ?? 0) > now;
     if (!user || !valid || locked || user.status !== 'active') {
       await this.recordFailure(email, locked ? null : user, now, ip);
@@ -41,16 +41,27 @@ export class AdminAuthService {
 
     const updated = await this.prisma.adminUser.update({
       where: { id: user.id },
-      data: { lastActiveAt: new Date(now), failedLogins: 0, lockedUntil: null },
+      data: {
+        lastActiveAt: new Date(now),
+        failedLogins: 0,
+        lockedUntil: null,
+        ...(this.hasher.needsRehash(user.passwordHash) && {
+          passwordHash: await this.hasher.hash(password),
+        }),
+      },
     });
+    await this.audit.log({ actorEmail: user.email, action: 'auth.login', entity: 'Session', ip });
+    return this.issue(updated, remember);
+  }
+
+  async issue(user: AdminUserRow, remember: boolean): Promise<SignedIn> {
     const ttlSeconds = remember ? REMEMBER_TTL_SECONDS : SESSION_TTL_SECONDS;
     const claims: AdminToken = { sub: user.id, ver: user.tokenVersion };
     const token = await this.jwt.signAsync(claims, {
       expiresIn: ttlSeconds,
       audience: ADMIN_AUDIENCE,
     });
-    await this.audit.log({ actorEmail: user.email, action: 'auth.login', entity: 'Session', ip });
-    return { user: updated, token, ttlSeconds };
+    return { user, token, ttlSeconds };
   }
 
   // Ends every session of this admin: tokens carry the version they were issued with.

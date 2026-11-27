@@ -129,7 +129,7 @@ export function NotificationCenter() {
           ) : null}
         </div>
         <Link
-          href="/settings"
+          href="/settings/notifications"
           onClick={() => {
             center.setOpen(false);
           }}

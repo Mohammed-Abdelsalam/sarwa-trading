@@ -17,4 +17,13 @@ describe('web next config', () => {
     });
     expect(headers['Permissions-Policy']).toContain('camera=()');
   });
+
+  it('proxies the API and the socket through this origin so session cookies stay first-party', async () => {
+    const rewrites = await nextConfig.rewrites?.();
+
+    expect(rewrites).toEqual([
+      { source: '/api/:path*', destination: 'http://localhost:4000/api/:path*' },
+      { source: '/socket.io/', destination: 'http://localhost:4000/socket.io/' },
+    ]);
+  });
 });

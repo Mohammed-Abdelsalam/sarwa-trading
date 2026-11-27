@@ -29,23 +29,29 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const problem = this.toProblem(exception);
-    host
-      .switchToHttp()
-      .getResponse<Response>()
-      .status(problem.status)
-      .type('application/problem+json')
-      .json(problem);
+    const response = host.switchToHttp().getResponse<Response>();
+    if (typeof problem.retryAfterSeconds === 'number') {
+      response.setHeader('Retry-After', String(problem.retryAfterSeconds));
+    }
+    response.status(problem.status).type('application/problem+json').json(problem);
   }
 
-  private toProblem(exception: unknown): Problem {
+  // Extra fields on an exception body (a ticket, a suspension, retryAfterSeconds) are kept.
+  private toProblem(exception: unknown): Problem & Record<string, unknown> {
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const body = exception.getResponse();
-      const { message, code } =
-        typeof body === 'object'
-          ? (body as { message?: unknown; code?: ErrorCodeValue })
-          : { message: body };
+      const {
+        message,
+        code,
+        error: _error,
+        statusCode: _statusCode,
+        ...extra
+      } = typeof body === 'object'
+        ? (body as { message?: unknown; code?: ErrorCodeValue } & Record<string, unknown>)
+        : { message: body };
       return {
+        ...extra,
         type: 'about:blank',
         title: HttpStatus[status]?.replaceAll('_', ' ') ?? 'Error',
         status,

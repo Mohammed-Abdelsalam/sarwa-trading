@@ -1,14 +1,14 @@
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { AccountsPage } from '../../src/features/accounts/accounts-page';
 import { AuditPage } from '../../src/features/audit/audit-page';
+import { CustomersScreen } from '../../src/features/customers/customers-page';
 import { OrdersPage } from '../../src/features/orders/orders-page';
 import { StocksPage } from '../../src/features/stocks/stocks-page';
-import { UsersPage } from '../../src/features/users/users-page';
+import { TeamScreen } from '../../src/features/team/team-page';
 import {
   type ApiCall,
-  makeAccount,
+  makeCustomer,
   makeStock,
   makeUser,
   me,
@@ -32,85 +32,75 @@ function back() {
 const lastQuery = (calls: ApiCall[], path: string) =>
   calls.filter((call) => call.path === path).at(-1)?.query;
 
-const accounts = {
-  'GET admin/accounts': (call: ApiCall) => ({
-    items: [makeAccount()],
-    total: 60,
-    page: Number(call.query.get('page') ?? 1),
-    pageSize: 25,
-  }),
+const customers = {
+  'GET admin/customers': { items: [makeCustomer()], nextCursor: null, total: 1 },
 };
 
-describe('Accounts URL state', () => {
-  it('restores search, sort and page from a shared link', async () => {
-    const { calls } = open('/accounts?q=acc&sort=equity&page=2', <AccountsPage />, accounts);
-
-    expect(await screen.findByRole('region', { name: 'Accounts' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Search accounts')).toHaveValue('acc');
-    expect(screen.getByRole('columnheader', { name: 'Equity' })).toHaveAttribute(
-      'aria-sort',
-      'descending',
+describe('Customers URL state', () => {
+  it('restores the filters from a shared link and sends them to the API', async () => {
+    const { calls } = open(
+      '/customers?q=sara&status=suspended&verified=1&open=1',
+      <CustomersScreen />,
+      customers,
     );
-    expect(screen.getByText('Page 2 / 3')).toBeInTheDocument();
-    const query = lastQuery(calls, 'admin/accounts');
-    expect(query?.get('q')).toBe('acc');
-    expect(query?.get('sort')).toBe('equity');
-    expect(query?.get('page')).toBe('2');
+
+    expect(screen.getByLabelText('Search customers')).toHaveValue('sara');
+    expect(screen.getByRole('radio', { name: /^Suspended/ })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Verified' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Has open orders' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await waitFor(() => {
+      expect(lastQuery(calls, 'admin/customers')?.toString()).toBe(
+        'q=sara&status=suspended&verified=true&hasOpenOrders=true&limit=50',
+      );
+    });
   });
 
-  it('pushes sort and page changes so Back undoes them', async () => {
-    open('/accounts', <AccountsPage />, accounts);
+  it('pushes filter changes so Back undoes them, and clears them all at once', async () => {
+    open('/customers', <CustomersScreen />, customers);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Next page' }));
-    expect(search().get('page')).toBe('2');
-    await userEvent.click(screen.getByRole('button', { name: 'Equity' }));
-    expect(search().get('sort')).toBe('equity');
-    expect(search().get('page')).toBeNull();
+    await userEvent.click(await screen.findByRole('radio', { name: 'Active' }));
+    expect(search().get('status')).toBe('active');
+    await userEvent.click(screen.getByRole('button', { name: 'Verified' }));
+    expect(search().get('verified')).toBe('1');
+    await userEvent.click(screen.getByRole('button', { name: 'Has open orders' }));
+    expect(search().get('open')).toBe('1');
+    await userEvent.click(screen.getByRole('button', { name: 'Has open orders' }));
+    expect(search().get('open')).toBeNull();
 
     back();
     await waitFor(() => {
-      expect(search().get('page')).toBe('2');
+      expect(search().get('open')).toBe('1');
     });
-    expect(screen.getByRole('columnheader', { name: 'All-time' })).toHaveAttribute(
-      'aria-sort',
-      'descending',
+    expect(screen.getByRole('button', { name: 'Has open orders' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
     );
   });
 
-  it('writes the search to the URL once typing pauses and resets the page', async () => {
+  it('writes the search to the URL once typing pauses', async () => {
     jest.useFakeTimers();
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
-    const { calls } = open('/accounts?page=3', <AccountsPage />, accounts);
+    const { calls } = open('/customers', <CustomersScreen />, customers);
     const searched = () => calls.map((call) => call.query.get('q'));
 
-    await user.type(await screen.findByLabelText('Search accounts'), 'acc');
+    await user.type(screen.getByLabelText('Search customers'), 'sar');
     expect(search().get('q')).toBeNull();
 
     act(() => {
       jest.advanceTimersByTime(300);
     });
-    expect(search().get('q')).toBe('acc');
-    expect(search().get('page')).toBeNull();
-    expect(screen.getByLabelText('Search accounts')).toHaveValue('acc');
+    expect(search().get('q')).toBe('sar');
     await waitFor(() => {
-      expect(searched()).toContain('acc');
+      expect(searched()).toContain('sar');
     });
-    expect(searched()).not.toContain('a');
-    expect(searched()).not.toContain('ac');
+    expect(searched()).not.toContain('s');
     jest.useRealTimers();
-  });
-
-  it('puts the search box back in step when Back changes the URL', async () => {
-    window.history.replaceState(null, '', '/accounts?q=first');
-    window.history.pushState(null, '', '/accounts?q=second');
-    renderWithApi(<AccountsPage />, { 'GET admin/auth/me': me(), ...accounts });
-    expect(await screen.findByLabelText('Search accounts')).toHaveValue('second');
-
-    back();
-
-    await waitFor(() => {
-      expect(screen.getByLabelText('Search accounts')).toHaveValue('first');
-    });
   });
 });
 
@@ -206,9 +196,10 @@ describe('Stocks URL state', () => {
   });
 });
 
-describe('Users URL state', () => {
+describe('Team URL state', () => {
   it('keeps the status filter and search in the URL', async () => {
-    open('/users?status=disabled&q=lee', <UsersPage />, {
+    open('/team?status=disabled&q=lee', <TeamScreen />, {
+      'GET admin/invites': { items: [] },
       'GET admin/users': {
         items: [
           makeUser(),

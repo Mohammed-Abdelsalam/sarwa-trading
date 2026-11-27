@@ -20,6 +20,7 @@ import {
 } from '@sarwa/ui';
 
 import { RoleBadge, UserAvatar } from '../common/identity';
+import { LanguageMenu } from './language-menu';
 import { type NavKey } from './nav';
 
 const AppLink: LinkComponent = ({ href, ...props }) => <Link href={href as Route} {...props} />;
@@ -69,6 +70,7 @@ export function Topbar({
         label={t.admin.shell.live[status]}
         className="max-sm:sr-only"
       />
+      <LanguageMenu />
       <IconButton label={t.admin.shell.switchTheme} onClick={onToggleTheme}>
         {theme === 'dark' ? (
           <Sun aria-hidden className="size-5" />

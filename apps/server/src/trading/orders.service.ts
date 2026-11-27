@@ -7,6 +7,7 @@ import {
 import { type Account as AccountRow, type Prisma } from '@prisma/client';
 
 import {
+  ErrorCode,
   type CancelOrderResponse,
   type ModifyOrderRequest,
   type Order,
@@ -66,14 +67,14 @@ export class OrdersService {
   ) {}
 
   place(
-    requester: AccountRow,
+    accountId: string,
     idempotencyKey: string,
     requestHash: string,
     request: PlaceOrderRequest,
     receivedAt: number,
   ): Promise<Placement> {
     return this.queue.run(async () => {
-      const account = await this.fresh(requester);
+      const account = await this.account(accountId);
       const previous = await this.prisma.order.findUnique({
         where: { accountId_idempotencyKey: { accountId: account.id, idempotencyKey } },
         include: { fills: true },
@@ -81,7 +82,7 @@ export class OrdersService {
       if (previous) {
         if (previous.requestHash !== requestHash) {
           throw new UnprocessableEntityException({
-            code: 'IDEMPOTENCY_MISMATCH',
+            code: ErrorCode.IdempotencyMismatch,
             message: 'This Idempotency-Key was already used for a different order',
           });
         }
@@ -147,11 +148,17 @@ export class OrdersService {
     });
   }
 
-  async list(account: AccountRow, query: OrdersQuery): Promise<OrdersResponse> {
+  // The customer sees the current epoch; an admin can ask for history from before resets too.
+  async list(
+    accountId: string,
+    query: OrdersQuery,
+    epochs: 'current' | 'all' = 'current',
+  ): Promise<OrdersResponse> {
+    const account = await this.account(accountId);
     const rows = await this.prisma.order.findMany({
       where: {
         accountId: account.id,
-        epoch: account.epoch,
+        ...(epochs === 'current' && { epoch: account.epoch }),
         ...FILTERS[query.filter],
         ...(query.symbol && { symbol: query.symbol }),
       },
@@ -167,14 +174,14 @@ export class OrdersService {
     };
   }
 
-  async get(account: AccountRow, id: string): Promise<Order> {
-    return toOrder(await this.owned(account, id));
+  async get(accountId: string, id: string): Promise<Order> {
+    return toOrder(await this.owned(accountId, id));
   }
 
   // Losing the race to a fill isn't an error: the answer says it already filled.
-  cancel(account: AccountRow, id: string): Promise<CancelOrderResponse> {
+  cancel(accountId: string, id: string): Promise<CancelOrderResponse> {
     return this.queue.run(async () => {
-      const row = await this.owned(account, id);
+      const row = await this.owned(accountId, id);
       const outcome = cancelOutcome(row.status as Order['status']);
       if (outcome !== 'canceled') return { outcome, order: toOrder(row) };
       const closed = await this.execution.close(row, 'canceled', { cancelReason: 'user' });
@@ -182,10 +189,10 @@ export class OrdersService {
     });
   }
 
-  modify(requester: AccountRow, id: string, patch: ModifyOrderRequest): Promise<Order> {
+  modify(accountId: string, id: string, patch: ModifyOrderRequest): Promise<Order> {
     return this.queue.run(async () => {
-      const account = await this.fresh(requester);
-      const row = await this.owned(account, id);
+      const account = await this.account(accountId);
+      const row = await this.owned(accountId, id);
       const changeable =
         (row.type === 'limit' || row.type === 'stop') &&
         (row.status === 'open' || row.status === 'partially_filled');
@@ -290,14 +297,14 @@ export class OrdersService {
     };
   }
 
-  // The request's account row was read before it waited in the queue; a fill or reset may have moved on.
-  private fresh(account: AccountRow): Promise<AccountRow> {
-    return this.prisma.account.findUniqueOrThrow({ where: { id: account.id } });
+  // Read inside the queue: a fill or reset that ran before this task has moved the books on.
+  private account(accountId: string): Promise<AccountRow> {
+    return this.prisma.account.findUniqueOrThrow({ where: { id: accountId } });
   }
 
-  private async owned(account: AccountRow, id: string) {
+  private async owned(accountId: string, id: string) {
     const row = await this.prisma.order.findFirst({
-      where: { id, accountId: account.id },
+      where: { id, accountId },
       include: { fills: true },
     });
     if (!row) throw new NotFoundException('Order not found');

@@ -5,12 +5,15 @@ import { useState } from 'react';
 import { type Order } from '@sarwa/contracts';
 import {
   applyKeypadKey,
+  AuthIntentSchema,
+  POLICY,
   bps,
   type KeypadKey,
   marketPill,
   micros,
   type QuickAmount,
   type SizeMode,
+  type TicketForm,
   ticketEntryView,
   ticketResultView,
   ticketReviewView,
@@ -18,6 +21,9 @@ import {
   useLiveStatus,
   useOrderTicket,
   usePortfolio,
+  useGate,
+  useRequireAuth,
+  useSession,
   useStockIndex,
   useTradingStatus,
 } from '@sarwa/core';
@@ -40,13 +46,36 @@ import { reviewRows, reviewSubline } from './ticket-review-model';
 type Side = Order['side'];
 type Focus = 'size' | 'price';
 
+// The ticket a guest filled in before signing in, from the route; anything malformed is dropped.
+export function parseTicketForm(
+  symbol: string,
+  side: Side,
+  param: string | undefined,
+): TicketForm | undefined {
+  if (!param) return undefined;
+  try {
+    const parsed = AuthIntentSchema.safeParse({
+      kind: 'order',
+      symbol,
+      side,
+      form: JSON.parse(param) as unknown,
+    });
+    return parsed.success && parsed.data.kind === 'order' ? parsed.data.form : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const MONEY_DECIMALS = 2;
 const SHARE_DECIMALS = 6;
 
-export function useOrderTicketScreen(symbol: string, initialSide: Side) {
+export function useOrderTicketScreen(symbol: string, initialSide: Side, initialForm?: TicketForm) {
   const copy = useCopy();
   const { t, f } = copy;
-  const ticket = useOrderTicket({ symbol, initialSide });
+  const ticket = useOrderTicket({ symbol, initialSide, initialForm });
+  const { run } = useRequireAuth();
+  const gate = useGate();
+  const { isGuest } = useSession();
   const status = useTradingStatus().data;
   const halt = useHalt(symbol);
   const portfolio = usePortfolio();
@@ -81,9 +110,25 @@ export function useOrderTicketScreen(symbol: string, initialSide: Side) {
     }
   };
 
+  // What the guest typed waits in the intent; replacing the ticket means the resumed order opens the only one.
+  const signUpFirst = (path: '/sign-up' | '/sign-in') => () => {
+    run(ticket.intent, () => undefined);
+    gate.close();
+    router.replace(path);
+  };
+
   return {
     step: ticket.step,
     symbol,
+    guest: isGuest
+      ? {
+          symbol,
+          side: form.side,
+          startingCash: f.money(POLICY.startingCashCents, { whole: true }),
+          onCreateAccount: signUpFirst('/sign-up'),
+          onSignIn: signUpFirst('/sign-in'),
+        }
+      : null,
     sector: sectorOf(symbol),
     header: { title: confirmLabel, pill },
     entry: {

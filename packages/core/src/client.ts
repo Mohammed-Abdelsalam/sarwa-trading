@@ -1,7 +1,16 @@
 import { noopAnalytics, type AnalyticsProvider } from './analytics';
-import { createApiClient, type RequestAuth } from './api';
+import { type ApiClient, createApiClient, type RequestAuth } from './api';
+import {
+  type ClientAuth,
+  createGateStore,
+  createIntentStorage,
+  createSessionAuth,
+  createSessionStore,
+  type SessionStatus,
+} from './auth/session';
+import { type AuthTransport } from './auth/transport';
 import { createDeviceIdGetter, type KeyValueStorage } from './device';
-import { createMarketSocket, type SocketTransport } from './market-socket';
+import { createMarketSocket, reauthenticate, type SocketTransport } from './market-socket';
 import { type SarwaClient } from './provider';
 import { createLiveStore } from './store';
 import { createRemovalQueue } from './undo';
@@ -16,6 +25,13 @@ export interface SarwaClientOptions {
   randomUUID: () => string;
   transports?: SocketTransport[];
   auth?: RequestAuth;
+  // Customer sign-in: webCookieAuth on the web, bearerAuth on mobile. Without it the device id is
+  // the only identity, as before accounts.
+  authTransport?: AuthTransport;
+  // Where a gated action waits while the guest signs in; the web passes sessionStorage.
+  intentStorage?: KeyValueStorage;
+  // 'guest' when the server render already knows there is no session, so both renders agree on it.
+  initialStatus?: Extract<SessionStatus, 'loading' | 'guest'>;
   analytics?: AnalyticsProvider;
 }
 
@@ -28,14 +44,50 @@ export function createSarwaClient({
   randomUUID,
   transports,
   auth,
+  authTransport,
+  intentStorage = storage,
+  initialStatus = 'loading',
   analytics = noopAnalytics,
 }: SarwaClientOptions): SarwaClient {
   const store = createLiveStore();
   const getDeviceId = createDeviceIdGetter(identityStorage, randomUUID);
+  const session: ClientAuth | undefined = authTransport && {
+    transport: authTransport,
+    session: createSessionStore({
+      status: initialStatus,
+      user: null,
+      suspension: null,
+      revokedReason: null,
+    }),
+    gate: createGateStore(),
+    intents: createIntentStorage(intentStorage),
+  };
+  const market = createMarketSocket({
+    url: socketUrl,
+    store,
+    getDeviceId,
+    getToken: session && (() => session.transport.socketToken()),
+    transports,
+  });
+  const api: ApiClient = createApiClient({
+    baseUrl: apiUrl,
+    getDeviceId,
+    auth: session
+      ? createSessionAuth({
+          auth: session,
+          refreshSession: (body) => api.refreshSession(body),
+          // A socket admitted with the old token turned guest when it expired.
+          onRenewed: () => {
+            reauthenticate(market, store);
+          },
+        })
+      : auth,
+  });
   return {
     store,
-    api: createApiClient({ baseUrl: apiUrl, getDeviceId, auth }),
-    market: createMarketSocket({ url: socketUrl, store, getDeviceId, transports }),
+    api,
+    auth: session,
+    market,
     storage,
     removals: createRemovalQueue(),
     analytics,

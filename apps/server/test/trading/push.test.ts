@@ -10,6 +10,13 @@ describe('push', () => {
     expect(pushSenderProvider.useFactory()).toBeInstanceOf(LogPushSender);
   });
 
+  it('greets a new account', () => {
+    expect(pushMessage({ kind: 'welcome' })).toMatchObject({
+      title: 'Your $100,000 practice account is ready',
+      data: { kind: 'welcome' },
+    });
+  });
+
   it('writes lock-screen text from a notification payload', () => {
     const message = pushMessage({
       kind: 'order_filled',

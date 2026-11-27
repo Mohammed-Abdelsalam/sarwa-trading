@@ -1,11 +1,12 @@
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
-import { ChevronDown } from 'lucide-react';
-import { type ComponentProps, type ReactNode, useId } from 'react';
+import { Check, ChevronDown, Eye, EyeOff, X } from 'lucide-react';
+import { type ComponentProps, type ReactNode, useId, useState } from 'react';
 
 import { type InputSize } from '@sarwa/tokens';
 
 import { cn } from '../lib/cn';
+import { IconButton } from './button';
 
 const inputBase = [
   'h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-sm text-fg outline-none dark:bg-surface-2',
@@ -136,5 +137,110 @@ export function Slider({ className, ...props }: ComponentProps<typeof SliderPrim
       </SliderPrimitive.Track>
       <SliderPrimitive.Thumb className="border-brand shadow-e2 focus-visible:outline-focus size-thumb block rounded-full border-2 bg-white focus-visible:outline-2 focus-visible:outline-offset-4" />
     </SliderPrimitive.Root>
+  );
+}
+
+export interface PasswordInputProps extends Omit<InputProps, 'type' | 'suffix'> {
+  showLabel: string;
+  hideLabel: string;
+}
+
+// The show/hide toggle is its own tab stop and reports its state with aria-pressed.
+export function PasswordInput({ showLabel, hideLabel, className, ...props }: PasswordInputProps) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative flex w-full items-center">
+      <Input type={visible ? 'text' : 'password'} className={cn('pe-12', className)} {...props} />
+      <IconButton
+        size={32}
+        label={visible ? hideLabel : showLabel}
+        aria-pressed={visible}
+        className="absolute end-1.5"
+        disabled={props.disabled}
+        onClick={() => {
+          setVisible((shown) => !shown);
+        }}
+      >
+        {visible ? (
+          <EyeOff aria-hidden className="size-4" />
+        ) : (
+          <Eye aria-hidden className="size-4" />
+        )}
+      </IconButton>
+    </div>
+  );
+}
+
+export type PasswordStrengthLevel = 0 | 1 | 2 | 3 | 4;
+
+const STRENGTH_FILL: Record<PasswordStrengthLevel, string> = {
+  0: '',
+  1: 'bg-neg',
+  2: 'bg-warn',
+  3: 'bg-pos',
+  4: 'bg-pos',
+};
+
+export interface PasswordStrengthMeterProps {
+  strength: PasswordStrengthLevel;
+  label: string;
+  levelLabel?: string;
+  rules?: readonly { label: string; ok: boolean }[];
+  className?: string;
+}
+
+export function PasswordStrengthMeter({
+  strength,
+  label,
+  levelLabel,
+  rules = [],
+  className,
+}: PasswordStrengthMeterProps) {
+  return (
+    <div className={cn('flex flex-col gap-1.5', className)}>
+      <div
+        role="meter"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={4}
+        aria-valuenow={strength}
+        aria-valuetext={levelLabel}
+        className="grid grid-cols-4 gap-1"
+      >
+        {[1, 2, 3, 4].map((segment) => (
+          <span
+            key={segment}
+            className={cn(
+              'h-1 rounded-full transition-colors duration-200 motion-reduce:transition-none',
+              segment <= strength ? STRENGTH_FILL[strength] : 'bg-surface-3',
+            )}
+          />
+        ))}
+      </div>
+      {levelLabel ? (
+        <div aria-hidden className="type-caption flex justify-between">
+          <span className="text-fg-3">{label}</span>
+          <b className="text-fg">{levelLabel}</b>
+        </div>
+      ) : null}
+      {rules.length > 0 ? (
+        <ul className="type-caption flex flex-col gap-1">
+          {rules.map((rule) => (
+            <li
+              key={rule.label}
+              data-ok={rule.ok}
+              className={cn('flex items-center gap-1.5', rule.ok ? 'text-pos' : 'text-fg-3')}
+            >
+              {rule.ok ? (
+                <Check aria-hidden className="size-3.5" />
+              ) : (
+                <X aria-hidden className="size-3.5" />
+              )}
+              {rule.label}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }

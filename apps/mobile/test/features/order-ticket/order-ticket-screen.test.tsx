@@ -24,6 +24,21 @@ async function mountTicket(vm = ticketVm()) {
 }
 
 describe('OrderTicketScreen · entry', () => {
+  it('swaps review for sign-up when a guest explores the ticket', async () => {
+    const guest = {
+      symbol: 'AAPL',
+      side: 'buy' as const,
+      startingCash: '$100,000',
+      onCreateAccount: jest.fn(),
+      onSignIn: jest.fn(),
+    };
+    await mountTicket(ticketVm({ guest }));
+
+    expect(screen.queryByRole('button', { name: 'Review' })).not.toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign up to buy AAPL' }));
+    expect(guest.onCreateAccount).toHaveBeenCalled();
+  });
+
   it('shows the side, quote line, amount and live estimate', async () => {
     await mountTicket();
 

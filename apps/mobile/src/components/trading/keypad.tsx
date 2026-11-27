@@ -26,7 +26,8 @@ export function Keypad({ onKey }: { onKey: (key: KeypadKey) => void }) {
         : f.localDigits(key);
 
   return (
-    <View className="gap-1">
+    // A phone pad reads 1-2-3 left to right in every locale.
+    <View className="gap-1" style={{ direction: 'ltr' }}>
       {ROWS.map((row) => (
         <View key={row.join('')} className="flex-row gap-1">
           {row.map((key) => (

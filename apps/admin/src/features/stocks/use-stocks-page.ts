@@ -15,7 +15,6 @@ import {
   type StockDraft,
   type StockErrors,
   stockToDraft,
-  useAdminSession,
   useAdminStocks,
   useCreateStock,
   useDeleteStock,
@@ -23,6 +22,7 @@ import {
   validateStockDraft,
 } from '@sarwa/core/admin';
 
+import { useAccess } from '../../components/common/access';
 import { oneOf, setSearchParams, useSearchParamText } from '../../lib/search-params';
 
 const SORT_KEYS = ['symbol', 'name', 'sector', 'exchange', 'basePrice', 'volatility'] as const;
@@ -112,7 +112,7 @@ function useStockDialog(existing: readonly string[]) {
 }
 
 export function useStocksPage() {
-  const { canEdit } = useAdminSession();
+  const { canEdit, isViewer } = useAccess();
   const stocks = useAdminStocks();
   const toggle = useUpdateStock();
   const remove = useDeleteStock();
@@ -141,6 +141,7 @@ export function useStocksPage() {
 
   return {
     canEdit,
+    isViewer,
     rows,
     total: all.length,
     enabledCount: all.filter((stock) => stock.isEnabled).length,

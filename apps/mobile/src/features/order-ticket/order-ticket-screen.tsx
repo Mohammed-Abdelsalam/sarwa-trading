@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { type Order } from '@sarwa/contracts';
+import { type TicketForm } from '@sarwa/core';
 
 import { TopBar } from '../../components/layout/top-bar';
 import { MarketStatusPill } from '../../components/trading/market-status-pill';
@@ -11,9 +12,17 @@ import { TicketResult } from './ticket-result';
 import { TicketReview } from './ticket-review';
 import { useOrderTicketScreen } from './use-order-ticket-screen';
 
-export function OrderTicketScreen({ symbol, side }: { symbol: string; side: Order['side'] }) {
+export function OrderTicketScreen({
+  symbol,
+  side,
+  initialForm,
+}: {
+  symbol: string;
+  side: Order['side'];
+  initialForm?: TicketForm;
+}) {
   const { t } = useCopy();
-  const screen = useOrderTicketScreen(symbol, side);
+  const screen = useOrderTicketScreen(symbol, side, initialForm);
   const { step, header, actions } = screen;
 
   return (
@@ -39,7 +48,7 @@ export function OrderTicketScreen({ symbol, side }: { symbol: string; side: Orde
         <TopBar close onLeave={actions.close} />
       )}
       {step === 'entry' ? (
-        <TicketEntry entry={screen.entry} actions={actions} />
+        <TicketEntry entry={screen.entry} guest={screen.guest} actions={actions} />
       ) : step === 'review' ? (
         <TicketReview
           symbol={symbol}

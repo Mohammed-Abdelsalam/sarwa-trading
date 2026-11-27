@@ -15,6 +15,7 @@ import {
   SideToggle,
 } from '@sarwa/ui';
 
+import { GuestTicketFooter } from '../gating/guest-ticket-footer';
 import { type OrderPanelModel } from './use-order-panel';
 
 const TYPES = ['market', 'limit', 'stop'] as const;
@@ -137,11 +138,22 @@ export function TicketEntry({ panel }: { panel: OrderPanelModel }) {
         </Callout>
       ) : null}
 
-      <Button type="submit" size="lg" className="w-full" disabled={!entry.canReview}>
-        <span className={cn('truncate')}>{entry.reviewLabel}</span>
-        {entry.canReview ? <Kbd variant="inverse">{labels.enterKey}</Kbd> : null}
-      </Button>
-      <p className="type-caption text-fg-3 text-center">{labels.disclosure}</p>
+      {panel.guest ? (
+        <GuestTicketFooter
+          side={entry.side}
+          symbol={panel.symbol}
+          onSignUp={panel.guest.onSignUp}
+          onSignIn={panel.guest.onSignIn}
+        />
+      ) : (
+        <>
+          <Button type="submit" size="lg" className="w-full" disabled={!entry.canReview}>
+            <span className={cn('truncate')}>{entry.reviewLabel}</span>
+            {entry.canReview ? <Kbd variant="inverse">{labels.enterKey}</Kbd> : null}
+          </Button>
+          <p className="type-caption text-fg-3 text-center">{labels.disclosure}</p>
+        </>
+      )}
     </form>
   );
 }

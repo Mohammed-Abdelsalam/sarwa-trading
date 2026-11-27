@@ -6,11 +6,12 @@ import { IBM_Plex_Sans_Arabic, Inter, JetBrains_Mono, Manrope } from 'next/font/
 import { cookies, headers } from 'next/headers';
 import { type ReactNode } from 'react';
 
+import { CSRF_COOKIE } from '@sarwa/contracts';
 import { isRtl, queryKeys } from '@sarwa/core/server';
 import { themes } from '@sarwa/tokens';
+import { readLocalePreferences } from '@sarwa/ui/locale-cookie';
 
 import { AppShell } from '../components/layout/app-shell';
-import { readLocalePreferences } from '../lib/locale-cookie';
 import { appMessages } from '../lib/messages';
 import { serverCopy, siteJsonLd, SITE_URL } from '../lib/seo';
 import { getStocks, getTradingStatus } from '../lib/server-api';
@@ -94,7 +95,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         />
       </head>
       <body className="flex min-h-dvh flex-col" suppressHydrationWarning>
-        <AppProviders preferences={preferences}>
+        <AppProviders
+          preferences={preferences}
+          initialStatus={cookieStore.has(CSRF_COOKIE) ? 'loading' : 'guest'}
+        >
           <HydrationBoundary state={dehydrate(queryClient)}>
             <AppShell>{children}</AppShell>
           </HydrationBoundary>

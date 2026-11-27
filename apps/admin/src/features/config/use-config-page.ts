@@ -7,13 +7,14 @@ import {
   configToDraft,
   togglePeriod,
   useAdminConfig,
-  useAdminSession,
   useAdminStats,
   useUpdateConfig,
 } from '@sarwa/core/admin';
 
+import { useAccess } from '../../components/common/access';
+
 export function useConfigPage() {
-  const { canEdit } = useAdminSession();
+  const { canEdit, isViewer } = useAccess();
   const config = useAdminConfig();
   const stats = useAdminStats();
   const save = useUpdateConfig();
@@ -26,6 +27,7 @@ export function useConfigPage() {
 
   return {
     canEdit,
+    isViewer,
     draft: current,
     changes: changes.count,
     maxLength: BANNER_MAX_LENGTH,

@@ -54,7 +54,8 @@ jobs:
         run: pnpm exec turbo run lint typecheck build
 
       - name: Test (with coverage)
-        run: pnpm exec turbo run test -- --coverage --ci
+        # The same script developers run locally, so coverage floors fail before they reach CI.
+        run: pnpm test:coverage
 
       - name: Upload coverage
         if: always()

@@ -55,7 +55,10 @@ class FakeSocket extends EventEmitter {
 
 const DEVICE_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 
-function setup(getDeviceId = () => Promise.resolve(DEVICE_ID)) {
+function setup(
+  getDeviceId = () => Promise.resolve(DEVICE_ID),
+  getToken?: () => Promise<string | undefined>,
+) {
   jest.useFakeTimers();
   const fake = new FakeSocket();
   const store = createLiveStore();
@@ -64,6 +67,7 @@ function setup(getDeviceId = () => Promise.resolve(DEVICE_ID)) {
     url: 'http://api',
     store,
     getDeviceId,
+    getToken,
     createSocket: (_url, provider) => {
       auth = provider;
       return fake as never;
@@ -297,6 +301,15 @@ describe('market socket', () => {
 
     await expect(handshake()).resolves.toEqual({});
   });
+
+  it('adds the signed-in access token to the handshake when there is one', async () => {
+    let token: string | undefined = 'access-1';
+    const { handshake } = setup(undefined, () => Promise.resolve(token));
+    await expect(handshake()).resolves.toEqual({ deviceId: DEVICE_ID, token: 'access-1' });
+
+    token = undefined;
+    await expect(handshake()).resolves.toEqual({ deviceId: DEVICE_ID });
+  });
 });
 
 describe('market socket trading events', () => {
@@ -359,6 +372,8 @@ describe('market socket trading events', () => {
     fake.emit('symbol.halted', { v: 1, halt });
     fake.emit('symbol.resumed', { v: 1, symbol: 'AAPL', at: 2 });
     fake.emit('account.reset', { v: 1 });
+    fake.emit('session.revoked', { v: 1, reason: 'password_changed' });
+    fake.emit('session.revoked', { v: 1, reason: 'bored' });
 
     expect(names).toEqual([
       'alert.triggered',
@@ -366,6 +381,7 @@ describe('market socket trading events', () => {
       'symbol.halted',
       'symbol.resumed',
       'account.reset',
+      'session.revoked',
     ]);
   });
 

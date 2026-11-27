@@ -18,6 +18,7 @@ import { useAppConfig } from '@sarwa/core';
 
 import { ErrorFallback } from '../components/layout/route-fallbacks';
 import { fontName } from '../components/ui/text';
+import { AccountOverlays } from '../features/gating/account-overlays';
 import { MaintenanceScreen } from '../features/maintenance/maintenance-screen';
 import { useColors } from '../lib/theme';
 import { AppProviders } from '../providers/app-providers';
@@ -59,6 +60,8 @@ function RootNavigator() {
       >
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(auth)" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="suspended" options={{ gestureEnabled: false }} />
           <Stack.Screen name="stocks/[symbol]" />
           <Stack.Screen name="order/new" options={{ presentation: 'modal' }} />
           <Stack.Screen name="orders/index" />
@@ -68,6 +71,7 @@ function RootNavigator() {
           <Stack.Screen name="search" />
           <Stack.Screen name="settings" />
         </Stack>
+        <AccountOverlays />
       </View>
       {maintenance ? (
         <View className="absolute inset-0" accessibilityViewIsModal>

@@ -2,6 +2,7 @@ import { createContext, type ReactNode, useContext } from 'react';
 
 import { type AnalyticsProvider } from './analytics';
 import { type ApiClient } from './api';
+import { type ClientAuth } from './auth/session';
 import { type KeyValueStorage } from './device';
 import { type MarketSocket } from './market-socket';
 import { type LiveStore } from './store';
@@ -15,6 +16,8 @@ export interface SarwaClient {
   removals: RemovalQueue;
   analytics: AnalyticsProvider;
   newId: () => string;
+  // Customer sessions; absent, the device itself is the identity (tests and pre-account wiring).
+  auth?: ClientAuth;
 }
 
 const SarwaContext = createContext<SarwaClient | null>(null);

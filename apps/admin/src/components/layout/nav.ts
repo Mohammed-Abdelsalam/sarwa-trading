@@ -21,11 +21,11 @@ export const NAV: readonly { key: NavKey; href: Route; icon: LucideIcon }[] = [
   { key: 'market', href: '/market', icon: Activity },
   { key: 'trading', href: '/trading', icon: Zap },
   { key: 'orders', href: '/orders', icon: List },
-  { key: 'accounts', href: '/accounts', icon: User },
+  { key: 'customers', href: '/customers', icon: User },
   { key: 'stocks', href: '/stocks', icon: Database },
   { key: 'config', href: '/config', icon: SlidersHorizontal },
   { key: 'audit', href: '/audit', icon: FileText },
-  { key: 'users', href: '/users', icon: Users },
+  { key: 'team', href: '/team', icon: Users },
 ];
 
 export function navKeyFor(pathname: string): NavKey {

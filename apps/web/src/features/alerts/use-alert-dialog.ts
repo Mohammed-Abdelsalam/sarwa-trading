@@ -9,27 +9,38 @@ import {
   DIRECTION_ARROW,
   POLICY,
   toTradeQuote,
+  type AuthIntent,
   useAlertForm,
   useStocks,
 } from '@sarwa/core';
 
 import { useCopy } from '../../lib/i18n';
+import { useResumedIntent } from '../gating/auth-ui';
 
 export type AlertCondition = Alert['condition'];
 export type AlertRepeat = Alert['repeat'];
 
+export type ResumedAlert = Extract<AuthIntent, { kind: 'alert' }>;
+
+// A guest's alert, back after sign-in with its condition and price, waiting to be created.
+export function useResumedAlert(): ResumedAlert | null {
+  return useResumedIntent((intent): intent is ResumedAlert => intent.kind === 'alert');
+}
+
 export function useAlertDialog({
   initialSymbol,
   onClose,
+  resumed = null,
 }: {
   initialSymbol: string | null;
   onClose: () => void;
+  resumed?: ResumedAlert | null;
 }) {
   const copy = useCopy();
   const { t, f, m } = copy;
   const stocks = useStocks();
-  const [symbol, setSymbol] = useState(initialSymbol ?? '');
-  const form = useAlertForm(symbol);
+  const [symbol, setSymbol] = useState(resumed?.symbol ?? initialSymbol ?? '');
+  const form = useAlertForm(symbol, resumed ?? undefined);
   const { condition, target, repeat } = form;
   const [invalid, setInvalid] = useState(false);
   const stock = stocks.data?.find((s) => s.symbol === symbol);
