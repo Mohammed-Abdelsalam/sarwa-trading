@@ -1,5 +1,11 @@
 import { COLOR_ROLES, SECTORS, sectorColors, themes, type ThemeName } from './colors';
 import {
+  componentContainer,
+  componentRadius,
+  componentSpacing,
+  componentTypography,
+} from './components';
+import {
   cubicBezier,
   fontFamily,
   motion,
@@ -49,7 +55,7 @@ export function colorNames(): string[] {
 }
 
 function typographyUtilities(): string {
-  return Object.entries(typography as Record<string, TypeToken>)
+  return Object.entries({ ...typography, ...componentTypography } as Record<string, TypeToken>)
     .map(([name, t]) => {
       const rules = [
         `font-family: var(--font-${t.family});`,
@@ -72,6 +78,11 @@ export function buildWebThemeCss(): string {
   const radii = Object.entries(radius)
     .map(([k, v]) => `  --radius-${k}: ${k === 'full' ? '9999px' : px(v)};`)
     .join('\n');
+  const componentSizes = [
+    ...Object.entries(componentSpacing).map(([k, v]) => `  --spacing-${k}: ${px(v)};`),
+    ...Object.entries(componentRadius).map(([k, v]) => `  --radius-${k}: ${px(v)};`),
+    ...Object.entries(componentContainer).map(([k, v]) => `  --container-${k}: ${px(v)};`),
+  ].join('\n');
   const shadowsCss = Object.keys(shadows.dark)
     .map((level) => `  --shadow-${level}: var(${cssVarName(`shadow-${level}`)});`)
     .join('\n');
@@ -83,6 +94,7 @@ export function buildWebThemeCss(): string {
 @theme inline {
 ${colors}
 ${radii}
+${componentSizes}
 ${shadowsCss}
   --font-sans: ${familyList(fontFamily.sans)};
   --font-display: ${familyList(fontFamily.display)};
@@ -144,6 +156,11 @@ ${block(themeVariables('dark'), '  ')}
 
 ${typographyUtilities()}
 
+@utility skeleton-shimmer {
+  background: linear-gradient(90deg, var(${cssVarName('skel-a')}) 25%, var(${cssVarName('skel-b')}) 40%, var(${cssVarName('skel-a')}) 60%);
+  background-size: 400% 100%;
+}
+
 /* Reduced motion: no background fade — a 2 px underline in pos/neg instead (design system rule). */
 @media (prefers-reduced-motion: reduce) {
   .animate-flash-up { animation: none; box-shadow: inset 0 -${motion.reduced.flashUnderlinePx}px 0 var(${cssVarName('pos')}); }
@@ -168,5 +185,13 @@ ${block(themeVariables('dark'), '    ')}
 }
 
 export function spacingPx(): Record<string, string> {
-  return Object.fromEntries(Object.entries(spacing).map(([k, v]) => [k, `${v}px`]));
+  return Object.fromEntries(
+    Object.entries({ ...spacing, ...componentSpacing }).map(([k, v]) => [k, `${v}px`]),
+  );
+}
+
+export function radiusPx(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries({ ...radius, ...componentRadius }).map(([k, v]) => [k, `${v}px`]),
+  );
 }

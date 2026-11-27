@@ -1,5 +1,5 @@
-import { colorNames, cssVarName, spacingPx } from './css';
-import { fontFamily, radius } from './scale';
+import { colorNames, cssVarName, radiusPx, spacingPx } from './css';
+import { fontFamily } from './scale';
 
 const preset = {
   content: [] as string[],
@@ -7,7 +7,7 @@ const preset = {
     extend: {
       colors: Object.fromEntries(colorNames().map((name) => [name, `var(${cssVarName(name)})`])),
       spacing: spacingPx(),
-      borderRadius: Object.fromEntries(Object.entries(radius).map(([k, v]) => [k, `${v}px`])),
+      borderRadius: radiusPx(),
       fontFamily: {
         sans: ['Inter'],
         display: ['Manrope'],
