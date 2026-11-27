@@ -1,12 +1,6 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import bcrypt from 'bcryptjs';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
-import {
-  type AdminUser,
-  type CreateUser,
-  type UpdateUser,
-  type UsersResponse,
-} from '@sarwa/contracts';
+import { type AdminUser, type UpdateUser, type UsersResponse } from '@sarwa/contracts';
 
 import { PrismaService } from '../prisma.service';
 import { AdminGateway } from './admin.gateway';
@@ -24,31 +18,6 @@ export class AdminUsersService {
   async list(): Promise<UsersResponse> {
     const rows = await this.prisma.adminUser.findMany({ orderBy: { createdAt: 'asc' } });
     return { items: rows.map(toAdminUser) };
-  }
-
-  async create(input: CreateUser, actor: Actor): Promise<AdminUser> {
-    const email = input.email.toLowerCase();
-    if (await this.prisma.adminUser.findUnique({ where: { email } })) {
-      throw new ConflictException(`${email} already has an account`);
-    }
-    const passwordHash = await bcrypt.hash(input.password, 10);
-    const row = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.adminUser.create({
-        data: { email, name: input.name, role: input.role, passwordHash },
-      });
-      await this.audit.log(
-        {
-          actorEmail: actor.email,
-          action: 'user.create',
-          entity: `User · ${email}`,
-          payload: { email, role: input.role },
-          ip: actor.ip,
-        },
-        tx,
-      );
-      return created;
-    });
-    return toAdminUser(row);
   }
 
   async update(id: string, changes: UpdateUser, adminId: string, actor: Actor): Promise<AdminUser> {

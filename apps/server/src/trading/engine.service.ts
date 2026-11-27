@@ -4,7 +4,7 @@ import { type Subscription } from 'rxjs';
 import { type Quote } from '@sarwa/contracts';
 import { MARKET_TIME_ZONE, marketClock, marketSession, micros } from '@sarwa/domain';
 
-import { Clock } from '../common/clock';
+import { Clock, Ticker } from '../common/clock';
 import { MarketService } from '../market/market.service';
 import { PrismaService } from '../prisma.service';
 import { TradingConfigService } from '../trading-config/trading-config.service';
@@ -36,13 +36,14 @@ export class TradingEngine implements OnModuleInit, OnModuleDestroy {
   private quotesQueued = false;
   private housekeepingQueued = false;
   private subscription?: Subscription;
-  private timer?: NodeJS.Timeout;
+  private stopHousekeeping?: () => void;
   private wasOpen = false;
   private loaded = false;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly clock: Clock,
+    private readonly ticker: Ticker,
     private readonly queue: ExecutionQueue,
     private readonly market: MarketService,
     private readonly config: TradingConfigService,
@@ -76,9 +77,9 @@ export class TradingEngine implements OnModuleInit, OnModuleDestroy {
           });
       }),
     );
-    this.timer = setInterval(() => {
+    this.stopHousekeeping = this.ticker.every(HOUSEKEEPING_MS, () => {
       this.scheduleHousekeeping();
-    }, HOUSEKEEPING_MS);
+    });
     this.loaded = true;
     this.logger.log(`Loaded ${this.book.size()} working orders`);
   }
@@ -90,7 +91,7 @@ export class TradingEngine implements OnModuleInit, OnModuleDestroy {
   // Stops taking new work, then lets queued fills finish before the database disconnects.
   async onModuleDestroy(): Promise<void> {
     this.subscription?.unsubscribe();
-    clearInterval(this.timer);
+    this.stopHousekeeping?.();
     await this.queue.idle();
   }
 

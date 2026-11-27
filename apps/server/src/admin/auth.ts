@@ -9,10 +9,11 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { type AdminUser as AdminUserRow } from '@prisma/client';
-import { type Request } from 'express';
+import { type Request, type Response } from 'express';
 
 import { ADMIN_SESSION_COOKIE, type AdminUser, type Role } from '@sarwa/contracts';
 
+import { env } from '../env';
 import { PrismaService } from '../prisma.service';
 import { type Actor } from './audit.service';
 
@@ -93,6 +94,19 @@ export class AdminGuard implements CanActivate {
     request.admin = admin;
     return true;
   }
+}
+
+export function setAdminSession(
+  response: Response,
+  { token, ttlSeconds }: { token: string; ttlSeconds: number },
+): void {
+  response.cookie(ADMIN_SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: env.NODE_ENV === 'production',
+    maxAge: ttlSeconds * 1000,
+    path: '/',
+  });
 }
 
 export function toAdminUser(row: AdminUserRow): AdminUser {

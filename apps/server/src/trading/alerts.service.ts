@@ -5,9 +5,10 @@ import {
   type OnModuleInit,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { type Account as AccountRow, type Alert as AlertRow } from '@prisma/client';
+import { type Alert as AlertRow } from '@prisma/client';
 
 import {
+  ErrorCode,
   type Alert,
   type AlertsResponse,
   type CreateAlertRequest,
@@ -58,9 +59,9 @@ export class AlertsService implements OnModuleInit {
     for (const row of rows) this.index(row);
   }
 
-  async list(account: AccountRow): Promise<AlertsResponse> {
+  async list(accountId: string): Promise<AlertsResponse> {
     const rows = await this.prisma.alert.findMany({
-      where: { accountId: account.id },
+      where: { accountId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
     return {
@@ -70,9 +71,9 @@ export class AlertsService implements OnModuleInit {
     };
   }
 
-  create(account: AccountRow, request: CreateAlertRequest): Promise<Alert> {
+  create(accountId: string, request: CreateAlertRequest): Promise<Alert> {
     return this.queue.run(async () => {
-      await this.assertBelowLimit(account.id);
+      await this.assertBelowLimit(accountId);
       const rule: AlertRule = {
         condition: request.condition,
         thresholdTicks: request.thresholdTicks === undefined ? null : ticks(request.thresholdTicks),
@@ -81,7 +82,7 @@ export class AlertsService implements OnModuleInit {
       this.assertNotAlreadyMet(rule, request.symbol);
       const row = await this.prisma.alert.create({
         data: {
-          accountId: account.id,
+          accountId,
           symbol: request.symbol,
           condition: rule.condition,
           thresholdTicks: rule.thresholdTicks === null ? null : BigInt(rule.thresholdTicks),
@@ -95,12 +96,12 @@ export class AlertsService implements OnModuleInit {
     });
   }
 
-  update(account: AccountRow, id: string, patch: UpdateAlertRequest): Promise<Alert> {
+  update(accountId: string, id: string, patch: UpdateAlertRequest): Promise<Alert> {
     return this.queue.run(async () => {
-      const current = await this.owned(account, id);
+      const current = await this.owned(accountId, id);
       const enabling = patch.enabled === true && !current.enabled;
       if (enabling) {
-        await this.assertBelowLimit(account.id);
+        await this.assertBelowLimit(accountId);
         this.assertNotAlreadyMet(ruleOf(current), current.symbol);
       }
       const row = await this.prisma.alert.update({
@@ -112,9 +113,9 @@ export class AlertsService implements OnModuleInit {
     });
   }
 
-  remove(account: AccountRow, id: string): Promise<void> {
+  remove(accountId: string, id: string): Promise<void> {
     return this.queue.run(async () => {
-      const row = await this.owned(account, id);
+      const row = await this.owned(accountId, id);
       await this.prisma.alert.delete({ where: { id } });
       this.bySymbol.get(row.symbol)?.delete(id);
     });
@@ -165,7 +166,7 @@ export class AlertsService implements OnModuleInit {
     const active = await this.prisma.alert.count({ where: { accountId, enabled: true } });
     if (active >= POLICY.maxActiveAlerts) {
       throw new ConflictException({
-        code: 'ALERT_LIMIT',
+        code: ErrorCode.AlertLimit,
         message: `At most ${POLICY.maxActiveAlerts} active alerts`,
       });
     }
@@ -184,8 +185,15 @@ export class AlertsService implements OnModuleInit {
     }
   }
 
-  private async owned(account: AccountRow, id: string): Promise<AlertRow> {
-    const row = await this.prisma.alert.findFirst({ where: { id, accountId: account.id } });
+  // The account's alerts are being deleted with it: the index must not evaluate them again.
+  forget(accountId: string): void {
+    for (const alerts of this.bySymbol.values()) {
+      for (const [id, row] of alerts) if (row.accountId === accountId) alerts.delete(id);
+    }
+  }
+
+  private async owned(accountId: string, id: string): Promise<AlertRow> {
+    const row = await this.prisma.alert.findFirst({ where: { id, accountId } });
     if (!row) throw new NotFoundException('Alert not found');
     return row;
   }

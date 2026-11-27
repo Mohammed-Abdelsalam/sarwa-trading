@@ -35,26 +35,126 @@ model Stock {
   alerts    Alert[]
 }
 
+// A browser or phone; until it signs in, its paper account (if any) is the guest's.
 model Device {
   id         String   @id
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
 
-  watchlist  WatchlistItem[]
-  account    Account?
-  pushTokens PushToken[]
+  account Account?
+
+  @@index([lastSeenAt])
 }
 
 model WatchlistItem {
-  deviceId  String
+  accountId String
   symbol    String
   createdAt DateTime @default(now())
 
-  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  stock  Stock  @relation(fields: [symbol], references: [symbol], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  stock   Stock   @relation(fields: [symbol], references: [symbol], onDelete: Cascade)
 
-  @@id([deviceId, symbol])
+  @@id([accountId, symbol])
   @@index([symbol])
+}
+
+// A customer. Purging a deleted account anonymizes the row; its trading history stays.
+model User {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  name                String
+  passwordHash        String
+  status              String    @default("active")
+  emailVerifiedAt     DateTime?
+  passwordChangedAt   DateTime?
+  failedLogins        Int       @default(0)
+  lockedUntil         DateTime?
+  deletionRequestedAt DateTime?
+  signupPlatform      String    @default("web")
+  suspensionCategory  String?
+  suspensionReason    String?
+  suspendedAt         DateTime?
+  suspendedBy         String?
+  createdAt           DateTime
+  lastActiveAt        DateTime?
+
+  account      Account?
+  sessions     Session[]
+  resetTokens  PasswordResetToken[]
+  verifyTokens EmailVerificationToken[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([lastActiveAt])
+  @@index([deletionRequestedAt])
+}
+
+// One row per refresh token. Rows of one sign-in share a familyId, which is the session's public
+// id; rotating marks the old row so presenting it again revokes the whole family.
+model Session {
+  id           String    @id @default(cuid())
+  familyId     String
+  userId       String
+  refreshHash  String    @unique
+  keepSignedIn Boolean
+  platform     String
+  label        String
+  browser      String?
+  os           String?
+  model        String?
+  ip           String?
+  ipMasked     String
+  createdAt    DateTime
+  lastUsedAt   DateTime
+  expiresAt    DateTime
+  rotatedAt    DateTime?
+  revokedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  createdAt DateTime
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  createdAt DateTime
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AdminInvite {
+  id         String    @id @default(cuid())
+  email      String
+  role       String
+  tokenHash  String    @unique
+  invitedBy  String
+  createdAt  DateTime
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([email])
 }
 
 model AdminUser {
@@ -93,12 +193,15 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([action])
+  @@index([entity, createdAt])
 }
 
 // Money, quantities and prices are integers in their smallest unit (cents, micros, ticks).
+// Owned by a user, or by a device while its visitor is a guest.
 model Account {
   id        String    @id @default(cuid())
-  deviceId  String    @unique
+  deviceId  String?   @unique
+  userId    String?   @unique
   handle    String    @unique
   cashCents BigInt
   // Bumped by a reset: history is kept and the books start again in the new epoch.
@@ -106,13 +209,16 @@ model Account {
   createdAt DateTime
   resetAt   DateTime?
 
-  device        Device              @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  device        Device?             @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  user          User?               @relation(fields: [userId], references: [id])
   positions     Position[]
   orders        Order[]
   fills         Fill[]
   alerts        Alert[]
   notifications Notification[]
   snapshots     PortfolioSnapshot[]
+  watchlist     WatchlistItem[]
+  pushTokens    PushToken[]
 }
 
 model Position {
@@ -150,7 +256,7 @@ model Order {
   heldMicros          BigInt    @default(0)
   holdPriceTicks      BigInt?
   holdBudgetCents     BigInt?
-  rejection          String?
+  rejection           String?
   cancelReason        String?
   idempotencyKey      String
   requestHash         String
@@ -242,13 +348,13 @@ model PortfolioSnapshot {
 
 model PushToken {
   token     String   @id
-  deviceId  String
+  accountId String
   platform  String
   updatedAt DateTime @updatedAt
 
-  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  @@index([deviceId])
+  @@index([accountId])
 }
 
 model Halt {

@@ -3,12 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 
-import {
-  DEVICE_ID_HEADER,
-  type Order,
-  PlaceOrderResponseSchema,
-  PortfolioResponseSchema,
-} from '@sarwa/contracts';
+import { type Order, PlaceOrderResponseSchema, PortfolioResponseSchema } from '@sarwa/contracts';
 import {
   bps,
   dollarsToTicks,
@@ -26,6 +21,7 @@ import { MarketService } from '../src/market/market.service';
 import { TradingEngine } from '../src/trading/engine.service';
 import { ExecutionService } from '../src/trading/execution.service';
 import { FakeClock, pinned, startApp } from './app';
+import { bearer, type Customer, signUp } from './customers';
 
 // Tuesday 1 Dec 2026, 10:00 in New York; Saturday; and the next Monday at 10:00.
 const T0 = Date.UTC(2026, 11, 1, 15, 0);
@@ -45,12 +41,9 @@ let ipCounter = 10;
 const api = (path: string) => `/api/v1${path}`;
 const nextIp = () => `198.19.0.${String(ipCounter++)}`;
 
-interface Device {
-  id: string;
-  ip: string;
-}
+type Device = Customer;
 
-const newDevice = (): Device => ({ id: randomUUID(), ip: nextIp() });
+const newDevice = (): Promise<Device> => signUp(http, { ip: nextIp() });
 
 const admin = (method: 'post' | 'patch', path: string) =>
   http[method](api(path)).set('Cookie', adminCookie).set('X-Forwarded-For', '127.0.0.1');
@@ -58,7 +51,7 @@ const admin = (method: 'post' | 'patch', path: string) =>
 async function placed(device: Device, body: object): Promise<Order> {
   const res = await http
     .post(api('/orders'))
-    .set(DEVICE_ID_HEADER, device.id)
+    .set('Authorization', bearer(device))
     .set('X-Forwarded-For', device.ip)
     .set('Idempotency-Key', randomUUID().replaceAll('-', ''))
     .send(body)
@@ -69,7 +62,7 @@ async function placed(device: Device, body: object): Promise<Order> {
 async function order(device: Device, id: string): Promise<Order> {
   const res = await http
     .get(api(`/orders/${id}`))
-    .set(DEVICE_ID_HEADER, device.id)
+    .set('Authorization', bearer(device))
     .set('X-Forwarded-For', device.ip)
     .expect(200);
   return (res.body as { order: Order }).order;
@@ -78,7 +71,7 @@ async function order(device: Device, id: string): Promise<Order> {
 async function books(device: Device) {
   const res = await http
     .get(api('/portfolio'))
-    .set(DEVICE_ID_HEADER, device.id)
+    .set('Authorization', bearer(device))
     .set('X-Forwarded-For', device.ip)
     .expect(200);
   const parsed = PortfolioResponseSchema.parse(res.body);
@@ -135,7 +128,7 @@ afterEach(async () => {
 
 describe('a buy that gaps past its hold', () => {
   it('rejects a buy stop with INSUFFICIENT_FUNDS when the price gaps 15% past the stop', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('XOM', 100);
     const qty = allIn(scaleBps(dollarsToTicks(105), bps(500), 'up'));
     const stop = await placed(device, {
@@ -160,7 +153,7 @@ describe('a buy that gaps past its hold', () => {
   });
 
   it('rejects a market buy filled on a later tick after the ask moved past the slippage cap', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('UNH', 500);
     const { askTicks } = spreadAround(dollarsToTicks(500), SPREAD_BPS);
     const qty = allIn(scaleBps(askTicks, bps(5), 'up'));
@@ -186,7 +179,7 @@ describe('a buy that gaps past its hold', () => {
   });
 
   it('rejects a queued market buy whose open gaps past the closed-market buffer', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('AMD', 150);
     await admin('patch', '/admin/trading').send({ sessionMode: 'calendar' }).expect(200);
     clock.set(SATURDAY);
@@ -211,7 +204,7 @@ describe('a buy that gaps past its hold', () => {
   });
 
   it('still fills a gapped stop that the free cash covers', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('XOM', 100);
     const stop = await placed(device, {
       ...shareBuy('XOM', 'stop', 10 * MICROS_PER_SHARE, 100),

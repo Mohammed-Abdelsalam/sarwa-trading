@@ -1,7 +1,13 @@
 import { Global, Injectable, Module } from '@nestjs/common';
 import { type AuditLog as AuditLogRow } from '@prisma/client';
 
-import { type AuditAction, type AuditLog, type AuditPage, type AuditQuery } from '@sarwa/contracts';
+import {
+  type AuditAction,
+  type AuditGroup,
+  type AuditLog,
+  type AuditPage,
+  type AuditQuery,
+} from '@sarwa/contracts';
 
 import { maskDeep, maskEmail, maskIp, type PiiView } from '../common/pii';
 import { PrismaService, type Tx } from '../prisma.service';
@@ -34,11 +40,12 @@ export class AuditService {
   }
 
   async list(
-    { page = 1, pageSize = 25, action, actor }: AuditQuery,
+    { page = 1, pageSize = 25, action, group, actor }: AuditQuery,
     view: PiiView,
   ): Promise<AuditPage> {
     const where = {
       ...(action && { action }),
+      ...(group && { OR: prefixesOf(group).map((prefix) => ({ action: { startsWith: prefix } })) }),
       ...(actor && { actorEmail: { contains: actor } }),
     };
     const [rows, total] = await this.prisma.$transaction([
@@ -63,6 +70,10 @@ export class AuditService {
     return rows.map((row) => present(toAuditLog(row), view));
   }
 }
+
+// A group is an action prefix; dropping every connection is a market control too.
+const prefixesOf = (group: AuditGroup): string[] =>
+  group === 'market' ? ['market.', 'connections.'] : [`${group}.`];
 
 function present(log: AuditLog, view: PiiView): AuditLog {
   if (view === 'full') return log;

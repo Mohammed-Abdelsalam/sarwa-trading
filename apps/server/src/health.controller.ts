@@ -6,6 +6,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 
 import { ErrorCode, type HealthResponse } from '@sarwa/contracts';
 
+import { Public } from './auth/customer.guard';
 import { PrismaService } from './prisma.service';
 import { TradingEngine } from './trading/engine.service';
 
@@ -20,6 +21,7 @@ type Check = 'ok' | 'down';
 
 // Probes poll often from one address, so they are never rate limited.
 @SkipThrottle()
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(

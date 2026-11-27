@@ -11,9 +11,11 @@ import {
   SymbolSchema,
 } from '@sarwa/contracts';
 
+import { Public } from '../auth/customer.guard';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { MarketService } from './market.service';
 
+@Public()
 @Controller('stocks')
 export class StocksController {
   constructor(private readonly market: MarketService) {}

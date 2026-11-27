@@ -8,7 +8,7 @@ export class Clock {
   }
 }
 
-// Runs the simulator's ticks; tests that set every price themselves swap in one that never fires.
+// Runs recurring work (price ticks, housekeeping); pinned tests swap in one that never fires.
 @Injectable()
 export class Ticker {
   every(ms: number, task: () => void): () => void {

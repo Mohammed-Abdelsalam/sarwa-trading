@@ -7,6 +7,7 @@ import {
   type MarketStatus,
 } from '@sarwa/contracts';
 
+import { CustomerMetrics } from '../auth/customer-metrics.service';
 import { piiViewOf } from '../common/pii';
 import { MarketGateway } from '../market/market.gateway';
 import { MarketService } from '../market/market.service';
@@ -21,19 +22,24 @@ export class AdminService {
     private readonly market: MarketService,
     private readonly gateway: MarketGateway,
     private readonly audit: AuditService,
+    private readonly customers: CustomerMetrics,
   ) {}
 
   async stats(viewerRole: string): Promise<AdminStats> {
-    const [devices, watchlistItems, top, recentActivity] = await Promise.all([
+    // Guests' device accounts are not customers, so their stars are left out.
+    const customerStars = { account: { userId: { not: null } } };
+    const [devices, watchlistItems, top, recentActivity, kpis] = await Promise.all([
       this.prisma.device.count(),
-      this.prisma.watchlistItem.count(),
+      this.prisma.watchlistItem.count({ where: customerStars }),
       this.prisma.watchlistItem.groupBy({
         by: ['symbol'],
+        where: customerStars,
         _count: { symbol: true },
         orderBy: { _count: { symbol: 'desc' } },
         take: 10,
       }),
       this.audit.recent(5, piiViewOf(viewerRole)),
+      this.customers.kpis(),
     ]);
     const { enabled, total } = this.market.counts();
     return {
@@ -48,6 +54,10 @@ export class AdminService {
         totalSymbols: total,
       },
       recentActivity,
+      registeredCustomers: kpis.registered,
+      signedUpToday: kpis.signedUpToday,
+      guestVisitors24h: kpis.guests24h,
+      guestConversionBps: kpis.conversionBps,
     };
   }
 

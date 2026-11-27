@@ -1,4 +1,10 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
 import {
   type Account as AccountRow,
   type Fill as FillRow,
@@ -47,6 +53,8 @@ const SNAPSHOT_RETENTION = [
   { after: 2 * DAY_MS, bucketMs: DAY_MS / 24 },
   { after: 90 * DAY_MS, bucketMs: DAY_MS },
 ] as const;
+
+type AccountKey = Pick<AccountRow, 'id'>;
 
 interface AccountBooks {
   row: AccountRow;
@@ -105,28 +113,36 @@ export class PortfolioService implements OnModuleInit, OnModuleDestroy {
   }
 
   // The raw books; clients value them with live prices through @sarwa/domain.
-  async books(account: AccountRow): Promise<PortfolioResponse> {
-    const [books] = await this.booksFor([account]);
-    if (!books) throw new Error(`Account ${account.id} not found`);
+  async books(accountId: string): Promise<PortfolioResponse> {
+    const [books] = await this.booksFor([{ id: accountId }]);
+    if (!books) throw new NotFoundException('Account not found');
     return books;
   }
 
-  async summary(account: AccountRow): Promise<PortfolioSummary> {
-    return this.summarize(await this.books(account));
+  async summary(accountId: string): Promise<PortfolioSummary> {
+    return (await this.snapshot(accountId)).summary;
   }
 
-  async summaries(accounts: readonly AccountRow[]): Promise<Map<string, PortfolioSummary>> {
+  // The raw books and their live valuation from one read.
+  async snapshot(
+    accountId: string,
+  ): Promise<{ books: PortfolioResponse; summary: PortfolioSummary }> {
+    const books = await this.books(accountId);
+    return { books, summary: this.summarize(books) };
+  }
+
+  async summaries(accounts: readonly AccountKey[]): Promise<Map<string, PortfolioSummary>> {
     const books = await this.booksFor(accounts);
     return new Map(books.map((entry) => [entry.account.id, this.summarize(entry)]));
   }
 
   // A fixed number of queries for any number of accounts; an account deleted meanwhile is skipped.
   // The reads share one short batch transaction, so a fill can't land between cash and holds.
-  async booksFor(requested: readonly AccountRow[]): Promise<PortfolioResponse[]> {
+  async booksFor(requested: readonly AccountKey[]): Promise<PortfolioResponse[]> {
     return (await this.read(requested)).map((entry) => entry.books);
   }
 
-  private async read(requested: readonly AccountRow[]): Promise<AccountBooks[]> {
+  private async read(requested: readonly AccountKey[]): Promise<AccountBooks[]> {
     const entries: AccountBooks[] = [];
     for (let start = 0; start < requested.length; start += BATCH_SIZE) {
       entries.push(...(await this.readBatch(requested.slice(start, start + BATCH_SIZE))));
@@ -134,7 +150,7 @@ export class PortfolioService implements OnModuleInit, OnModuleDestroy {
     return entries;
   }
 
-  private async readBatch(requested: readonly AccountRow[]): Promise<AccountBooks[]> {
+  private async readBatch(requested: readonly AccountKey[]): Promise<AccountBooks[]> {
     const now = this.clock.now();
     const today = marketClock(now).date;
     const ids = requested.map((account) => account.id);
@@ -233,7 +249,9 @@ export class PortfolioService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async equity(account: AccountRow, period: EquityPeriod): Promise<EquityResponse> {
+  async equity(accountId: string, period: EquityPeriod): Promise<EquityResponse> {
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new NotFoundException('Account not found');
     const now = this.clock.now();
     const epochStart = (account.resetAt ?? account.createdAt).getTime();
     const start = Math.max(epochStart, now - PERIOD_MS[period]);
@@ -247,7 +265,7 @@ export class PortfolioService implements OnModuleInit, OnModuleDestroy {
       const t = row.t.getTime();
       sampled.set(Math.floor((t - start) / bucketMs), { t, equityCents: Number(row.equityCents) });
     }
-    const { equityCents } = await this.summary(account);
+    const { equityCents } = await this.summary(accountId);
     return {
       period,
       points: [

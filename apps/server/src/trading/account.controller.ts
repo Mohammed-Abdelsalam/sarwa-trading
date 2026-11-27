@@ -9,7 +9,6 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { type Account as AccountRow } from '@prisma/client';
 import { z } from 'zod';
 
 import {
@@ -32,42 +31,45 @@ import {
   UpdateAlertRequestSchema,
 } from '@sarwa/contracts';
 
+import { CurrentAccountId, Public } from '../auth/customer.guard';
 import { WritableGuard } from '../common/device';
 import { IdParam } from '../common/params';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
+import { AccountsService } from './accounts.service';
 import { AlertsService } from './alerts.service';
 import { toAccount } from './mappers';
 import { NotificationsService } from './notifications.service';
-import { DeviceAccount } from './orders.controller';
 import { PortfolioService } from './portfolio.service';
 import { StatusService } from './status.service';
 
 @Controller()
 export class AccountController {
   constructor(
+    private readonly accounts: AccountsService,
     private readonly portfolio: PortfolioService,
     private readonly status: StatusService,
   ) {}
 
   @Get(TRADING_ROUTES.account)
-  account(@DeviceAccount() account: AccountRow): Account {
-    return toAccount(account);
+  async account(@CurrentAccountId() accountId: string): Promise<Account> {
+    return toAccount(await this.accounts.get(accountId));
   }
 
   @Get(TRADING_ROUTES.portfolio)
-  books(@DeviceAccount() account: AccountRow): Promise<PortfolioResponse> {
-    return this.portfolio.books(account);
+  books(@CurrentAccountId() accountId: string): Promise<PortfolioResponse> {
+    return this.portfolio.books(accountId);
   }
 
   @Get(TRADING_ROUTES.equity)
   equity(
-    @DeviceAccount() account: AccountRow,
+    @CurrentAccountId() accountId: string,
     @Query(new ZodValidationPipe(EquityQuerySchema)) { period }: z.output<typeof EquityQuerySchema>,
   ): Promise<EquityResponse> {
-    return this.portfolio.equity(account, period);
+    return this.portfolio.equity(accountId, period);
   }
 
   @Get(TRADING_ROUTES.tradingStatus)
+  @Public()
   tradingStatus(): TradingStatus {
     return this.status.status();
   }
@@ -78,34 +80,34 @@ export class AlertsController {
   constructor(private readonly alerts: AlertsService) {}
 
   @Get(TRADING_ROUTES.alerts)
-  list(@DeviceAccount() account: AccountRow): Promise<AlertsResponse> {
-    return this.alerts.list(account);
+  list(@CurrentAccountId() accountId: string): Promise<AlertsResponse> {
+    return this.alerts.list(accountId);
   }
 
   @Post(TRADING_ROUTES.alerts)
   @UseGuards(WritableGuard)
   async create(
-    @DeviceAccount() account: AccountRow,
+    @CurrentAccountId() accountId: string,
     @Body(new ZodValidationPipe(CreateAlertRequestSchema)) request: CreateAlertRequest,
   ): Promise<AlertResponse> {
-    return { alert: await this.alerts.create(account, request) };
+    return { alert: await this.alerts.create(accountId, request) };
   }
 
   @Patch(TRADING_ROUTES.alert)
   @UseGuards(WritableGuard)
   async update(
-    @DeviceAccount() account: AccountRow,
+    @CurrentAccountId() accountId: string,
     @IdParam() id: string,
     @Body(new ZodValidationPipe(UpdateAlertRequestSchema)) patch: UpdateAlertRequest,
   ): Promise<AlertResponse> {
-    return { alert: await this.alerts.update(account, id, patch) };
+    return { alert: await this.alerts.update(accountId, id, patch) };
   }
 
   @Delete(TRADING_ROUTES.alert)
   @UseGuards(WritableGuard)
   @HttpCode(204)
-  remove(@DeviceAccount() account: AccountRow, @IdParam() id: string): Promise<void> {
-    return this.alerts.remove(account, id);
+  remove(@CurrentAccountId() accountId: string, @IdParam() id: string): Promise<void> {
+    return this.alerts.remove(accountId, id);
   }
 }
 
@@ -115,33 +117,33 @@ export class NotificationsController {
 
   @Get(TRADING_ROUTES.notifications)
   list(
-    @DeviceAccount() account: AccountRow,
+    @CurrentAccountId() accountId: string,
     @Query(new ZodValidationPipe(NotificationsQuerySchema)) query: NotificationsQuery,
   ): Promise<NotificationsResponse> {
-    return this.notifications.list(account.id, query);
+    return this.notifications.list(accountId, query);
   }
 
   @Post(TRADING_ROUTES.notificationsReadAll)
   @UseGuards(WritableGuard)
   @HttpCode(204)
-  readAll(@DeviceAccount() account: AccountRow): Promise<void> {
-    return this.notifications.markAllRead(account.id);
+  readAll(@CurrentAccountId() accountId: string): Promise<void> {
+    return this.notifications.markAllRead(accountId);
   }
 
   @Post(TRADING_ROUTES.notificationRead)
   @UseGuards(WritableGuard)
   @HttpCode(204)
-  read(@DeviceAccount() account: AccountRow, @IdParam() id: string): Promise<void> {
-    return this.notifications.markRead(account.id, id);
+  read(@CurrentAccountId() accountId: string, @IdParam() id: string): Promise<void> {
+    return this.notifications.markRead(accountId, id);
   }
 
   @Post(TRADING_ROUTES.pushTokens)
   @UseGuards(WritableGuard)
   @HttpCode(204)
   async registerToken(
-    @DeviceAccount() account: AccountRow,
+    @CurrentAccountId() accountId: string,
     @Body(new ZodValidationPipe(PushTokenRequestSchema)) request: PushTokenRequest,
   ): Promise<void> {
-    await this.notifications.registerToken(account.deviceId, request);
+    await this.notifications.registerToken(accountId, request);
   }
 }

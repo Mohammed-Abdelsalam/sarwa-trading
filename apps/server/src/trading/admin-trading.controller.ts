@@ -12,10 +12,7 @@ import {
 import { z } from 'zod';
 
 import {
-  type Account,
   ADMIN_ROUTES,
-  type AdminAccountsResponse,
-  AdminAccountsQuerySchema,
   type AdminOrderStats,
   type AdminOrdersResponse,
   AdminOrdersQuerySchema,
@@ -24,8 +21,6 @@ import {
   CreateHaltSchema,
   type Halt,
   type HaltImpact,
-  type ResetAccount,
-  ResetAccountSchema,
   SymbolSchema,
   type UpdateTrading,
   UpdateTradingSchema,
@@ -33,10 +28,8 @@ import {
 
 import { type Actor } from '../admin/audit.service';
 import { AdminGuard, CurrentActor, Roles } from '../admin/auth';
-import { IdParam } from '../common/params';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { TradingConfigService } from '../trading-config/trading-config.service';
-import { AdminAccountsService } from './admin-accounts.service';
 import { AdminOrdersService } from './admin-orders.service';
 import { HaltsService } from './halts.service';
 import { StatusService } from './status.service';
@@ -109,30 +102,5 @@ export class AdminOrdersController {
   @Get(ADMIN_ROUTES.orderStats)
   stats(): Promise<AdminOrderStats> {
     return this.orders.stats();
-  }
-}
-
-@Controller()
-@UseGuards(AdminGuard)
-export class AdminAccountsController {
-  constructor(private readonly accounts: AdminAccountsService) {}
-
-  @Get(ADMIN_ROUTES.accounts)
-  list(
-    @Query(new ZodValidationPipe(AdminAccountsQuerySchema))
-    query: z.output<typeof AdminAccountsQuerySchema>,
-  ): Promise<AdminAccountsResponse> {
-    return this.accounts.list(query);
-  }
-
-  @Post(ADMIN_ROUTES.resetAccount)
-  @Roles(['ADMIN'])
-  @HttpCode(200)
-  reset(
-    @IdParam() id: string,
-    @Body(new ZodValidationPipe(ResetAccountSchema)) { confirm }: ResetAccount,
-    @CurrentActor() actor: Actor,
-  ): Promise<Account> {
-    return this.accounts.reset(id, confirm, actor);
   }
 }

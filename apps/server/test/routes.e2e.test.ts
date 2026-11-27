@@ -9,7 +9,6 @@ import {
   AlertResponseSchema,
   AlertsResponseSchema,
   CancelOrderResponseSchema,
-  DEVICE_ID_HEADER,
   EquityResponseSchema,
   HealthResponseSchema,
   IDEMPOTENCY_KEY_HEADER,
@@ -27,8 +26,9 @@ import { MarketService } from '../src/market/market.service';
 import { TradingEngine } from '../src/trading/engine.service';
 import { TradingConfigService } from '../src/trading-config/trading-config.service';
 import { FakeClock, pinned, startApp } from './app';
+import { bearer, type Customer, signUp } from './customers';
 
-// Every device endpoint, called through the shared route table and parsed with the schema the
+// Every personal endpoint, called through the shared route table and parsed with the schema the
 // core API client parses it with, so a path or shape drift fails here before it reaches a client.
 
 // Tuesday 1 Dec 2026, 10:00 in New York: a regular session in calendar mode.
@@ -40,7 +40,7 @@ let app: INestApplication;
 let http: ReturnType<typeof request>;
 let market: MarketService;
 let engine: TradingEngine;
-const device = randomUUID();
+let customer: Customer;
 const covered = new Set<string>();
 
 type Method = 'get' | 'post' | 'patch' | 'delete';
@@ -54,7 +54,7 @@ async function call<S extends z.ZodType>(
 ): Promise<z.output<S>> {
   covered.add(`${method} ${route}`);
   let req = http[method](`/api/v1${path}`)
-    .set(DEVICE_ID_HEADER, device)
+    .set('Authorization', bearer(customer))
     .set('X-Forwarded-For', '198.19.0.1');
   if (route === 'orders' && method === 'post') {
     req = req.set(IDEMPOTENCY_KEY_HEADER, randomUUID().replaceAll('-', ''));
@@ -92,6 +92,7 @@ beforeAll(async () => {
   http = request(app.getHttpServer());
   market = app.get(MarketService);
   engine = app.get(TradingEngine);
+  customer = await signUp(http, { ip: '198.19.0.1' });
   await app
     .get(TradingConfigService)
     .update({ circuitBreaker: { enabled: false } }, { email: 'test@sarwa.dev' });
@@ -103,7 +104,7 @@ afterAll(async () => {
   await app.close();
 });
 
-describe('device endpoints', () => {
+describe('personal endpoints', () => {
   it('answers every read with the shape the client parses', async () => {
     const account = await call('get', 'account', routePath(R.account), AccountSchema);
     const books = await call('get', 'portfolio', routePath(R.portfolio), PortfolioResponseSchema);

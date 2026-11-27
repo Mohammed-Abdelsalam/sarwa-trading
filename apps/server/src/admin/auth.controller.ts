@@ -12,9 +12,8 @@ import {
 } from '@sarwa/contracts';
 
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
-import { env } from '../env';
 import { AdminAuthService } from './admin-auth.service';
-import { AdminGuard, CurrentAdmin, toAdminUser } from './auth';
+import { AdminGuard, CurrentAdmin, setAdminSession, toAdminUser } from './auth';
 
 @Controller()
 export class AuthController {
@@ -30,20 +29,9 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<SessionResponse> {
-    const { user, token, ttlSeconds } = await this.auth.signIn(
-      email.toLowerCase(),
-      password,
-      remember,
-      request.ip,
-    );
-    response.cookie(ADMIN_SESSION_COOKIE, token, {
-      httpOnly: true,
-      sameSite: 'strict',
-      secure: env.NODE_ENV === 'production',
-      maxAge: ttlSeconds * 1000,
-      path: '/',
-    });
-    return { user: toAdminUser(user) };
+    const signedIn = await this.auth.signIn(email.toLowerCase(), password, remember, request.ip);
+    setAdminSession(response, signedIn);
+    return { user: toAdminUser(signedIn.user) };
   }
 
   @Post(ADMIN_ROUTES.logout)

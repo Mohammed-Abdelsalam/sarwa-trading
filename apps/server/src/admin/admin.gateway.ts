@@ -8,17 +8,10 @@ import {
   type AdminServerToClientEvents,
 } from '@sarwa/contracts';
 
+import { readCookie } from '../common/cookies';
 import { EventBus } from '../common/events';
 import { env } from '../env';
 import { AdminSessions } from './auth';
-
-function readCookie(header: string | undefined, name: string): string | undefined {
-  for (const part of (header ?? '').split(';')) {
-    const [key, ...value] = part.trim().split('=');
-    if (key === name) return decodeURIComponent(value.join('='));
-  }
-  return undefined;
-}
 
 // Live order flow and control changes for the dashboard; only a signed-in admin may connect.
 @WebSocketGateway({

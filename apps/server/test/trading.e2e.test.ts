@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { type INestApplication } from '@nestjs/common';
+import { type INestApplication, UnprocessableEntityException } from '@nestjs/common';
 import { io, type Socket } from 'socket.io-client';
 import request from 'supertest';
 
@@ -8,13 +8,11 @@ import {
   AccountResetEventSchema,
   ADMIN_NAMESPACE,
   ADMIN_SESSION_COOKIE,
-  AdminAccountsResponseSchema,
   AdminOrderStatsSchema,
   AdminStatsSchema,
   AuditPageSchema,
   AlertResponseSchema,
   CancelOrderResponseSchema,
-  DEVICE_ID_HEADER,
   EquityResponseSchema,
   MARKET_NAMESPACE,
   NotificationsResponseSchema,
@@ -43,12 +41,15 @@ import {
 
 import { MarketService } from '../src/market/market.service';
 import { PrismaService } from '../src/prisma.service';
+import { AdminAccountsService } from '../src/trading/admin-accounts.service';
 import { TradingEngine } from '../src/trading/engine.service';
 import { ExecutionService } from '../src/trading/execution.service';
 import { NotificationsService } from '../src/trading/notifications.service';
 import { OrdersService } from '../src/trading/orders.service';
 import { PortfolioService } from '../src/trading/portfolio.service';
-import { FakeClock, pinned, startApp } from './app';
+import { inviteAdmin } from './admins';
+import { CapturingMailer, FakeClock, pinned, startApp } from './app';
+import { bearer, type Customer, signUp } from './customers';
 
 // Tuesday 1 Dec 2026, 10:00 in New York: a regular session in calendar mode.
 const T0 = Date.UTC(2026, 11, 1, 15, 0);
@@ -57,6 +58,7 @@ const SPREAD_BPS = bps(2);
 const DISPLAYED_SHARES = 900;
 
 const clock = new FakeClock(T0);
+const mailer = new CapturingMailer();
 let app: INestApplication;
 let url: string;
 let http: ReturnType<typeof request>;
@@ -69,20 +71,17 @@ let ipCounter = 10;
 const api = (path: string) => `/api/v1${path}`;
 const nextIp = () => `198.18.${Math.floor(ipCounter / 250)}.${String((ipCounter++ % 250) + 1)}`;
 
-interface Device {
-  id: string;
-  ip: string;
-}
+type Device = Customer;
 
-const newDevice = (): Device => ({ id: randomUUID(), ip: nextIp() });
+const newDevice = (): Promise<Device> => signUp(http, { ip: nextIp() });
 const key = () => randomUUID().replaceAll('-', '');
 
 const get = (device: Device, path: string) =>
-  http.get(api(path)).set(DEVICE_ID_HEADER, device.id).set('X-Forwarded-For', device.ip);
+  http.get(api(path)).set('Authorization', bearer(device)).set('X-Forwarded-For', device.ip);
 const post = (device: Device, path: string, body?: object) =>
   http
     .post(api(path))
-    .set(DEVICE_ID_HEADER, device.id)
+    .set('Authorization', bearer(device))
     .set('X-Forwarded-For', device.ip)
     .send(body);
 
@@ -120,6 +119,13 @@ async function portfolio(device: Device) {
 }
 
 // Written straight to the database: hundreds of accounts, each holding 10 KO and $1,000 less cash.
+async function accountId(handle: string): Promise<string> {
+  return (await app.get(PrismaService).account.findUniqueOrThrow({ where: { handle } })).id;
+}
+
+const resetAccount = (id: string, confirm: string) =>
+  app.get(AdminAccountsService).reset(id, confirm, { email: 'admin@sarwa.dev' });
+
 async function seedAccounts(count: number, firstHandle: number): Promise<string[]> {
   const prisma = app.get(PrismaService);
   const deviceIds = Array.from({ length: count }, () => randomUUID());
@@ -157,13 +163,7 @@ async function login(email: string, password: string, remember = false): Promise
 const admin = (method: 'get' | 'post' | 'patch' | 'delete', path: string, cookie = adminCookie) =>
   http[method](api(path)).set('Cookie', cookie).set('X-Forwarded-For', '127.0.0.1');
 
-async function newAdmin(role: 'ADMIN' | 'VIEWER'): Promise<{ id: string; cookie: string }> {
-  const email = `user-${randomUUID().slice(0, 8)}@sarwa.dev`;
-  const res = await admin('post', '/admin/users')
-    .send({ email, name: 'Ops', role, password: 'user12345678' })
-    .expect(201);
-  return { id: res.body.id as string, cookie: await login(email, 'user12345678') };
-}
+const newAdmin = (role: 'ADMIN' | 'VIEWER') => inviteAdmin(http, mailer, adminCookie, role);
 
 function waitFor<T>(socket: Socket, event: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -191,7 +191,7 @@ async function connect(namespace: string, options: object): Promise<Socket> {
 }
 
 beforeAll(async () => {
-  ({ app, url } = await startApp({ clock, ...pinned }));
+  ({ app, url } = await startApp({ clock, mailer, ...pinned }));
   http = request(app.getHttpServer());
   market = app.get(MarketService);
   engine = app.get(TradingEngine);
@@ -208,7 +208,7 @@ afterAll(async () => {
 
 describe('market orders', () => {
   it('fills a $500 market buy at the ask and balances the books', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('AAPL', 200);
     const { askTicks } = spreadAround(dollarsToTicks(200), SPREAD_BPS);
     const qty = sharesForCents(cents(50_000), askTicks);
@@ -250,7 +250,7 @@ describe('market orders', () => {
   });
 
   it('answers a cancel after the fill with already_filled', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('KO', 70);
     const order = await placed(
       device,
@@ -268,7 +268,7 @@ describe('market orders', () => {
 
 describe('limit orders', () => {
   it('rests a limit sell above the market, fills it by displayed size, then fully', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('PFE', 25);
     const bought = await placed(
       device,
@@ -325,7 +325,7 @@ describe('rejections', () => {
 
   it('stores a rejected order when the kill switch is off', async () => {
     await admin('patch', '/admin/trading').send({ tradingEnabled: false }).expect(200);
-    const order = await placed(newDevice(), buyOne());
+    const order = await placed(await newDevice(), buyOne());
     await admin('patch', '/admin/trading').send({ tradingEnabled: true }).expect(200);
 
     expect(order).toMatchObject({ status: 'rejected', rejection: { code: 'TRADING_DISABLED' } });
@@ -333,15 +333,17 @@ describe('rejections', () => {
 
   it('stores a rejected order while the market is paused', async () => {
     await admin('post', '/admin/market').send({ action: 'pause' }).expect(201);
-    const order = await placed(newDevice(), buyOne());
+    const order = await placed(await newDevice(), buyOne());
     await admin('post', '/admin/market').send({ action: 'resume' }).expect(201);
 
     expect(order).toMatchObject({ status: 'rejected', rejection: { code: 'MARKET_PAUSED' } });
   });
 
   it('halts a symbol, tells everyone, rejects orders and resumes', async () => {
-    const device = newDevice();
-    const socket = await connect(MARKET_NAMESPACE, { auth: { deviceId: device.id } });
+    const device = await newDevice();
+    const socket = await connect(MARKET_NAMESPACE, {
+      auth: { deviceId: device.id, token: device.token },
+    });
     const halted = waitFor<{ v: number; halt: { symbol: string } }>(socket, 'symbol.halted');
 
     await admin('post', '/admin/halts')
@@ -370,7 +372,7 @@ describe('closed market', () => {
   });
 
   it('queues a market order with the closed-market buffer hold and releases it on cancel', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('KO', 70);
     await admin('patch', '/admin/trading').send({ sessionMode: 'calendar' }).expect(200);
     clock.set(SATURDAY);
@@ -407,7 +409,7 @@ describe('idempotency', () => {
   });
 
   it('places one order for a retried key and replays it with 200', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     const idempotencyKey = key();
 
     const first = await place(device, body, idempotencyKey).expect(201);
@@ -419,7 +421,7 @@ describe('idempotency', () => {
   });
 
   it('rejects the same key with a different body', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     const idempotencyKey = key();
     await place(device, body, idempotencyKey).expect(201);
 
@@ -433,7 +435,7 @@ describe('idempotency', () => {
   });
 
   it('requires the Idempotency-Key header', async () => {
-    const res = await post(newDevice(), '/orders', body).expect(400);
+    const res = await post(await newDevice(), '/orders', body).expect(400);
     expect(res.body.errors).toHaveProperty('Idempotency-Key');
   });
 });
@@ -444,7 +446,7 @@ describe('expiry', () => {
   });
 
   it('expires a day limit order at New York midnight and releases its hold', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('DIS', 110);
     const order = await placed(device, {
       symbol: 'DIS',
@@ -467,7 +469,7 @@ describe('expiry', () => {
   });
 
   it('never fills a day order past its expiry, even before housekeeping runs', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('NFLX', 600);
     const order = await placed(device, {
       symbol: 'NFLX',
@@ -487,7 +489,7 @@ describe('expiry', () => {
   });
 
   it('gives a market order the day expiry so a stuck one releases its hold', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('TSLA', 250);
     jest.spyOn(app.get(ExecutionService), 'work').mockResolvedValueOnce(micros(0));
 
@@ -509,7 +511,7 @@ describe('displayed size', () => {
   });
 
   it("shares one quote's displayed size between resting limits, oldest first", async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('V', 30);
     const limitBuy = async () => {
       clock.advance(1);
@@ -536,7 +538,7 @@ describe('displayed size', () => {
 
 describe('changing a partly filled buy', () => {
   it('holds the rest at the new price after the limit is lowered', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('JPM', 21);
     const order = await placed(device, {
       symbol: 'JPM',
@@ -551,7 +553,7 @@ describe('changing a partly filled buy', () => {
 
     await http
       .patch(api(`/orders/${order.id}`))
-      .set(DEVICE_ID_HEADER, device.id)
+      .set('Authorization', bearer(device))
       .set('X-Forwarded-For', device.ip)
       .send({ qtyMicros: sharesToMicros(2_000), limitTicks: dollarsToTicks(18) })
       .expect(200);
@@ -566,7 +568,7 @@ describe('changing a partly filled buy', () => {
   });
 
   it('keeps the original expiry, so editing a GTC order never extends its life', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('BAC', 45);
     const order = await placed(device, {
       symbol: 'BAC',
@@ -583,7 +585,7 @@ describe('changing a partly filled buy', () => {
     try {
       await http
         .patch(api(`/orders/${order.id}`))
-        .set(DEVICE_ID_HEADER, device.id)
+        .set('Authorization', bearer(device))
         .set('X-Forwarded-For', device.ip)
         .send({ limitTicks: dollarsToTicks(43) })
         .expect(200);
@@ -601,19 +603,19 @@ describe('changing a partly filled buy', () => {
 describe('requests that waited in the queue', () => {
   const staleAccount = async (device: Device) => {
     await get(device, '/account').expect(200);
-    return app.get(PrismaService).account.findUniqueOrThrow({ where: { deviceId: device.id } });
+    return app.get(PrismaService).account.findUniqueOrThrow({ where: { id: device.accountId } });
   };
   const changeAccount = (id: string, data: object) =>
     app.get(PrismaService).account.update({ where: { id }, data });
 
   it('places with the account as it is when the order runs', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('GOOGL', 150);
     const stale = await staleAccount(device);
     await changeAccount(stale.id, { epoch: { increment: 1 }, cashCents: 1_000n });
 
     const { order } = await app.get(OrdersService).place(
-      stale,
+      stale.id,
       key(),
       'hash',
       {
@@ -633,7 +635,7 @@ describe('requests that waited in the queue', () => {
   });
 
   it('changes an order against the account as it is when the change runs', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('GOOGL', 150);
     const resting = await placed(device, {
       symbol: 'GOOGL',
@@ -648,12 +650,12 @@ describe('requests that waited in the queue', () => {
     await changeAccount(stale.id, { cashCents: 20_000n });
 
     await expect(
-      app.get(OrdersService).modify(stale, resting.id, { qtyMicros: sharesToMicros(10) }),
+      app.get(OrdersService).modify(stale.id, resting.id, { qtyMicros: sharesToMicros(10) }),
     ).rejects.toMatchObject({ response: { code: 'INSUFFICIENT_FUNDS' } });
   });
 
   it('reads cash and positions from the same moment', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('META', 300);
     const stale = await staleAccount(device);
     await placed(
@@ -661,7 +663,7 @@ describe('requests that waited in the queue', () => {
       marketBuy('META', { kind: 'shares', micros: sharesToMicros(10) }, dollarsToTicks(300)),
     );
 
-    const books = await app.get(PortfolioService).books(stale);
+    const books = await app.get(PortfolioService).books(stale.id);
 
     expect(books.account.cashCents).toBe(
       POLICY.startingCashCents - books.positions[0]!.costBasisCents,
@@ -669,7 +671,7 @@ describe('requests that waited in the queue', () => {
   });
 
   it('values a position with no quote at its average cost', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('AMZN', 180);
     await placed(
       device,
@@ -678,7 +680,7 @@ describe('requests that waited in the queue', () => {
     const account = await staleAccount(device);
     jest.spyOn(market, 'quoteOf').mockReturnValue(undefined);
 
-    const summary = await app.get(PortfolioService).summary(account);
+    const summary = await app.get(PortfolioService).summary(account.id);
 
     expect(Math.abs(summary.equityCents - POLICY.startingCashCents)).toBeLessThanOrEqual(1);
   });
@@ -690,9 +692,11 @@ describe('alerts', () => {
   });
 
   it('fires once on the crossing and re-arms only after crossing back and the cooldown', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('MSFT', 400);
-    const socket = await connect(MARKET_NAMESPACE, { auth: { deviceId: device.id } });
+    const socket = await connect(MARKET_NAMESPACE, {
+      auth: { deviceId: device.id, token: device.token },
+    });
     const { alert: created } = AlertResponseSchema.parse(
       (
         await post(device, '/alerts', {
@@ -724,12 +728,13 @@ describe('alerts', () => {
       1,
     );
     expect(after.items.filter((n) => n.payload.kind === 'alert_triggered')).toHaveLength(2);
-    expect(after.unreadCount).toBe(2);
+    // The welcome notification from sign-up, then the two alerts.
+    expect(after.unreadCount).toBe(3);
   });
 
   it('refuses an alert that is already true', async () => {
     await moveTo('MSFT', 400);
-    const res = await post(newDevice(), '/alerts', {
+    const res = await post(await newDevice(), '/alerts', {
       symbol: 'MSFT',
       condition: 'price_below',
       thresholdTicks: dollarsToTicks(410),
@@ -771,7 +776,7 @@ describe('circuit breaker', () => {
 
 describe('admin', () => {
   it('cancels working orders and releases their holds when a stock is disabled', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('DIS', 110);
     const before = await portfolio(device);
     const resting = await placed(device, {
@@ -795,7 +800,7 @@ describe('admin', () => {
     expect(after.holds).toEqual(before.holds);
   });
 
-  it('lets a viewer read but not change trading, halts, resets or users', async () => {
+  it('lets a viewer read but not change trading, halts or users', async () => {
     await admin('get', '/admin/trading', viewerCookie).expect(200);
     await admin('get', '/admin/orders', viewerCookie).expect(200);
     await admin('patch', '/admin/trading', viewerCookie)
@@ -803,9 +808,6 @@ describe('admin', () => {
       .expect(403);
     await admin('post', '/admin/halts', viewerCookie)
       .send({ symbol: 'AAPL', message: 'x', duration: '5m', notify: false })
-      .expect(403);
-    await admin('post', '/admin/accounts/any/reset', viewerCookie)
-      .send({ confirm: 'x' })
       .expect(403);
     const users = await admin('get', '/admin/users', viewerCookie).expect(403);
     expect(users.body.code).toBe('FORBIDDEN');
@@ -828,31 +830,16 @@ describe('admin', () => {
 
     expect(full.actorEmail).toBe('admin@sarwa.dev');
     expect(full.ip).toBe('127.0.0.1');
-    expect(masked).toMatchObject({ id: full.id, actorEmail: 'a•••@sarwa.dev', ip: '127.0.x.x' });
+    expect(masked).toMatchObject({ id: full.id, actorEmail: 'a•••@sarwa.dev', ip: '127.0.•.•' });
     expect(JSON.stringify(masked.payload)).not.toMatch(/[^•]@sarwa\.dev/);
     expect(overview.recentActivity.every((entry) => entry.actorEmail.includes('•••'))).toBe(true);
   });
 
-  it('values hundreds of accounts in one listing and one snapshot run', async () => {
+  it('values hundreds of accounts in one snapshot run', async () => {
     await seedAccounts(300, 0xf00000);
-    await moveTo('KO', 70);
 
-    const list = AdminAccountsResponseSchema.parse(
-      (await admin('get', '/admin/accounts?pageSize=100').expect(200)).body,
-    );
-    const one = AdminAccountsResponseSchema.parse(
-      (await admin('get', '/admin/accounts?q=ACC-F00000').expect(200)).body,
-    );
     const snapshots = await app.get(PortfolioService).takeSnapshots();
 
-    expect(list.total).toBeGreaterThanOrEqual(300);
-    expect(list.items).toHaveLength(100);
-    expect(one.items[0]).toMatchObject({
-      handle: 'ACC-F00000',
-      cashCents: POLICY.startingCashCents - 100_000,
-      equityCents: POLICY.startingCashCents - 100_000 + 70_000,
-      positions: 1,
-    });
     expect(snapshots).toBeGreaterThanOrEqual(300);
   });
 
@@ -874,7 +861,7 @@ describe('admin', () => {
   });
 
   it('resets an account only with the exact confirmation and audits before and after', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('NKE', 80);
     await placed(
       device,
@@ -890,14 +877,10 @@ describe('admin', () => {
       quotedTicks: dollarsToTicks(80),
     });
     const { handle } = (await get(device, '/account').expect(200)).body as { handle: string };
-    const list = await admin('get', `/admin/accounts?q=${handle}`).expect(200);
-    const id = list.body.items[0].id as string;
-    expect(list.body.items[0]).toMatchObject({ handle, positions: 1, openOrders: 1 });
+    const id = await accountId(handle);
 
-    await admin('post', `/admin/accounts/${id}/reset`).send({ confirm: handle }).expect(422);
-    await admin('post', `/admin/accounts/${id}/reset`)
-      .send({ confirm: resetConfirmation(handle) })
-      .expect(200);
+    await expect(resetAccount(id, handle)).rejects.toThrow(UnprocessableEntityException);
+    await resetAccount(id, resetConfirmation(handle));
 
     const books = await portfolio(device);
     const canceled = (await get(device, `/orders/${resting.id}`).expect(200)).body.order as Order;
@@ -917,17 +900,16 @@ describe('admin', () => {
   });
 
   it("tells the account's open clients to resync after a reset", async () => {
-    const device = newDevice();
+    const device = await newDevice();
     const { handle } = (await get(device, '/account').expect(200)).body as { handle: string };
-    const id = (await admin('get', `/admin/accounts?q=${handle}`).expect(200)).body.items[0]
-      .id as string;
-    const socket = await connect(MARKET_NAMESPACE, { auth: { deviceId: device.id } });
+    const id = await accountId(handle);
+    const socket = await connect(MARKET_NAMESPACE, {
+      auth: { deviceId: device.id, token: device.token },
+    });
     const reset = waitFor<unknown>(socket, 'account.reset');
 
     try {
-      await admin('post', `/admin/accounts/${id}/reset`)
-        .send({ confirm: resetConfirmation(handle) })
-        .expect(200);
+      await resetAccount(id, resetConfirmation(handle));
       expect(AccountResetEventSchema.parse(await reset)).toEqual({ v: 1 });
     } finally {
       socket.disconnect();
@@ -941,7 +923,7 @@ describe('admin', () => {
 
     await moveTo('WMT', 86);
     await placed(
-      newDevice(),
+      await newDevice(),
       marketBuy('WMT', { kind: 'shares', micros: sharesToMicros(1) }, dollarsToTicks(86)),
     );
     const received = await event;
@@ -1076,7 +1058,7 @@ describe('portfolio history and stats', () => {
   });
 
   it('records equity snapshots and ends the curve at the live equity', async () => {
-    const device = newDevice();
+    const device = await newDevice();
     await moveTo('JNJ', 150);
     await placed(
       device,

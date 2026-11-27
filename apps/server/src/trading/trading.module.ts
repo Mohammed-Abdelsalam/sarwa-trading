@@ -5,15 +5,12 @@ import { AppConfigModule } from '../app-config/app-config.module';
 import { WritableGuard } from '../common/device';
 import { MarketModule } from '../market/market.module';
 import { TradingConfigModule } from '../trading-config/trading-config.module';
+import { AccountLifecycleService } from './account-lifecycle.service';
 import { AccountController, AlertsController, NotificationsController } from './account.controller';
 import { AccountsService } from './accounts.service';
 import { AdminAccountsService } from './admin-accounts.service';
 import { AdminOrdersService } from './admin-orders.service';
-import {
-  AdminAccountsController,
-  AdminOrdersController,
-  AdminTradingController,
-} from './admin-trading.controller';
+import { AdminOrdersController, AdminTradingController } from './admin-trading.controller';
 import { AlertsService } from './alerts.service';
 import { CircuitBreaker } from './circuit-breaker';
 import { TradingEngine } from './engine.service';
@@ -22,7 +19,7 @@ import { ExecutionService } from './execution.service';
 import { HaltsService } from './halts.service';
 import { NotificationsService } from './notifications.service';
 import { OrderBook } from './order-book';
-import { AccountPipe, OrdersController } from './orders.controller';
+import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { PortfolioService } from './portfolio.service';
 import { pushSenderProvider } from './push';
@@ -38,10 +35,8 @@ import { TradingGateway } from './trading.gateway';
     NotificationsController,
     AdminTradingController,
     AdminOrdersController,
-    AdminAccountsController,
   ],
   providers: [
-    AccountPipe,
     WritableGuard,
     ExecutionQueue,
     OrderBook,
@@ -49,6 +44,7 @@ import { TradingGateway } from './trading.gateway';
     pushSenderProvider,
     TradingGateway,
     AccountsService,
+    AccountLifecycleService,
     NotificationsService,
     HaltsService,
     StatusService,
@@ -60,6 +56,15 @@ import { TradingGateway } from './trading.gateway';
     AdminOrdersService,
     TradingEngine,
   ],
-  exports: [TradingEngine],
+  exports: [
+    TradingEngine,
+    AccountsService,
+    ExecutionQueue,
+    AccountLifecycleService,
+    NotificationsService,
+    PortfolioService,
+    AdminAccountsService,
+    OrdersService,
+  ],
 })
 export class TradingModule {}

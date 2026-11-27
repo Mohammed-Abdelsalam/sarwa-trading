@@ -4,14 +4,16 @@ import { filter, type Observable, Subject } from 'rxjs';
 import {
   type AdminTrading,
   type Alert,
+  type Halt,
   type NotificationPayload,
   type Order,
+  type SessionRevokedReason,
+  type Suspension,
   type TradingStatus,
 } from '@sarwa/contracts';
 
 export interface AccountRef {
   accountId: string;
-  deviceId: string;
   handle: string;
 }
 
@@ -25,7 +27,16 @@ export type DomainEvent =
     }
   | { type: 'alert.fired'; account: AccountRef; alert: Alert; lastTicks: number }
   | { type: 'account.reset'; account: AccountRef }
-  | { type: 'trading.changed'; status: TradingStatus; admin: AdminTrading };
+  | { type: 'trading.changed'; status: TradingStatus; admin: AdminTrading }
+  | { type: 'symbol.halted'; halt: Halt }
+  | { type: 'symbol.resumed'; symbol: string; at: number }
+  | {
+      type: 'session.revoked';
+      userId: string;
+      sessionIds: string[];
+      reason: SessionRevokedReason;
+      suspension?: Suspension;
+    };
 
 export type EventOf<T extends DomainEvent['type']> = Extract<DomainEvent, { type: T }>;
 

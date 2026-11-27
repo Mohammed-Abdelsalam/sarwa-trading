@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { ConsoleLogger, type LogLevel } from '@nestjs/common';
 import { type NextFunction, type Request, type Response } from 'express';
 
-const REQUEST_ID_HEADER = 'x-request-id';
+import { REQUEST_ID_HEADER } from '@sarwa/contracts';
+
 const SECRET_KEY = /cookie|authorization|password/i;
 
 const requestContext = new AsyncLocalStorage<{ requestId: string }>();

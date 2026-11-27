@@ -113,5 +113,11 @@ export function pushMessage(payload: NotificationPayload): PushMessage {
       return { title: `${payload.symbol} halted`, body: payload.message, data };
     case 'market_notice':
       return { title: 'Market notice', body: payload.message, data };
+    case 'welcome':
+      return {
+        title: 'Your $100,000 practice account is ready',
+        body: 'Place your first trade',
+        data,
+      };
   }
 }

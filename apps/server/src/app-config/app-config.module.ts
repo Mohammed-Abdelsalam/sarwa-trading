@@ -2,8 +2,10 @@ import { Controller, Get, Module } from '@nestjs/common';
 
 import { type AppConfig } from '@sarwa/contracts';
 
+import { Public } from '../auth/customer.guard';
 import { AppConfigService } from './app-config.service';
 
+@Public()
 @Controller('app-config')
 export class AppConfigController {
   constructor(private readonly appConfig: AppConfigService) {}

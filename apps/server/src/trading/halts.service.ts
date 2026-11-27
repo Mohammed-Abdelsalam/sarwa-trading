@@ -14,6 +14,7 @@ import { marketSession } from '@sarwa/domain';
 
 import { type Actor, AuditService } from '../admin/audit.service';
 import { Clock } from '../common/clock';
+import { EventBus } from '../common/events';
 import { MarketService } from '../market/market.service';
 import { PrismaService, type Tx } from '../prisma.service';
 import { TradingConfigService } from '../trading-config/trading-config.service';
@@ -21,7 +22,6 @@ import { CircuitBreaker } from './circuit-breaker';
 import { ExecutionQueue } from './execution-queue';
 import { toHalt, WORKING_STATUSES } from './mappers';
 import { NotificationsService } from './notifications.service';
-import { TradingGateway } from './trading.gateway';
 
 export interface NewHalt {
   symbol: string;
@@ -52,7 +52,7 @@ export class HaltsService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly clock: Clock,
     private readonly queue: ExecutionQueue,
-    private readonly gateway: TradingGateway,
+    private readonly events: EventBus,
     private readonly notifications: NotificationsService,
     private readonly breaker: CircuitBreaker,
     private readonly audit: AuditService,
@@ -97,7 +97,7 @@ export class HaltsService implements OnModuleInit, OnModuleDestroy {
     this.track(row);
     this.breaker.reset(row.symbol);
     const halt = toHalt(row);
-    this.gateway.symbolHalted(halt);
+    this.events.publish({ type: 'symbol.halted', halt });
     this.changes$.next();
     return halt;
   }
@@ -164,12 +164,13 @@ export class HaltsService implements OnModuleInit, OnModuleDestroy {
     clearTimeout(current.timer);
     this.active.delete(symbol);
     this.breaker.reset(symbol);
-    this.gateway.symbolResumed(symbol, now);
+    this.events.publish({ type: 'symbol.resumed', symbol, at: now });
     this.changes$.next();
     return true;
   }
 
-  // Everyone with a stake in the symbol: holders, accounts with working orders, and watchers.
+  // Everyone with a stake in the symbol: holders, accounts with working orders, and customers
+  // watching it.
   async affectedAccounts(symbol: string): Promise<{ accountIds: string[]; openOrders: number }> {
     const [positions, orders, watchers] = await Promise.all([
       this.prisma.position.findMany({ where: { symbol }, select: { accountId: true } }),
@@ -178,7 +179,7 @@ export class HaltsService implements OnModuleInit, OnModuleDestroy {
         select: { accountId: true },
       }),
       this.prisma.account.findMany({
-        where: { device: { watchlist: { some: { symbol } } } },
+        where: { userId: { not: null }, watchlist: { some: { symbol } } },
         select: { id: true },
       }),
     ]);

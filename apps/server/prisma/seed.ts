@@ -1,5 +1,5 @@
+import { hash } from '@node-rs/argon2';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 import {
   applyFill,
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     await prisma.adminUser.upsert({
       where: { email },
       update: {},
-      create: { email, name, role, passwordHash: await bcrypt.hash(password, 10) },
+      create: { email, name, role, passwordHash: await hash(password) },
     });
   }
 
@@ -104,17 +104,26 @@ async function main(): Promise<void> {
     },
   });
   const accounts = await seedDemoAccounts();
+  const customers = await seedDemoCustomers();
   console.log(
-    `[seed] ${STOCKS.length} stocks, ${admins.length} admins, ${accounts} demo accounts, configs ready`,
+    `[seed] ${STOCKS.length} stocks, ${admins.length} admins, ${accounts} demo accounts, ${customers} demo customers, configs ready`,
   );
 }
 
 type DemoTrade = [symbol: string, side: Side, shares: number];
 
-const DEMO_ACCOUNTS: { deviceId: string; handle: string; trades: DemoTrade[] }[] = [
+const DEMO_ACCOUNTS: {
+  deviceId: string;
+  handle: string;
+  email: string;
+  name: string;
+  trades: DemoTrade[];
+}[] = [
   {
     deviceId: '5eed0000-0000-4000-8000-000000000001',
     handle: 'ACC-5EED01',
+    email: 'demo1@sarwa.dev',
+    name: 'Sara Hamdy',
     trades: [
       ['AAPL', 'buy', 40],
       ['NVDA', 'buy', 120],
@@ -124,6 +133,8 @@ const DEMO_ACCOUNTS: { deviceId: string; handle: string; trades: DemoTrade[] }[]
   {
     deviceId: '5eed0000-0000-4000-8000-000000000002',
     handle: 'ACC-5EED02',
+    email: 'demo2@sarwa.dev',
+    name: 'Omar Fathy',
     trades: [
       ['MSFT', 'buy', 30],
       ['JPM', 'buy', 50],
@@ -133,6 +144,8 @@ const DEMO_ACCOUNTS: { deviceId: string; handle: string; trades: DemoTrade[] }[]
   {
     deviceId: '5eed0000-0000-4000-8000-000000000003',
     handle: 'ACC-5EED03',
+    email: 'demo3@sarwa.dev',
+    name: 'Lina Adel',
     trades: [
       ['TSLA', 'buy', 60],
       ['TSLA', 'sell', 60],
@@ -142,6 +155,8 @@ const DEMO_ACCOUNTS: { deviceId: string; handle: string; trades: DemoTrade[] }[]
   {
     deviceId: '5eed0000-0000-4000-8000-000000000004',
     handle: 'ACC-5EED04',
+    email: 'demo4@sarwa.dev',
+    name: 'Karim Nabil',
     trades: [
       ['META', 'buy', 25],
       ['NFLX', 'buy', 12],
@@ -151,13 +166,36 @@ const DEMO_ACCOUNTS: { deviceId: string; handle: string; trades: DemoTrade[] }[]
   },
 ];
 
+// Customers to sign in as, owning the demo books, so the admin's Customers page has data. The
+// password is public, so production never gets them.
+async function seedDemoCustomers(): Promise<number> {
+  if (process.env.NODE_ENV === 'production') return 0;
+  const passwordHash = await hash('practice-1234');
+  let created = 0;
+  for (const { handle, email, name } of DEMO_ACCOUNTS) {
+    const account = await prisma.account.findUnique({ where: { handle } });
+    if (!account || account.userId || (await prisma.user.findUnique({ where: { email } })))
+      continue;
+    const at = account.createdAt;
+    const user = await prisma.user.create({
+      data: { email, name, passwordHash, createdAt: at, lastActiveAt: at, emailVerifiedAt: at },
+    });
+    await prisma.account.update({
+      where: { id: account.id },
+      data: { userId: user.id, deviceId: null },
+    });
+    created++;
+  }
+  return created;
+}
+
 // Demo books built with the same domain functions the engine uses, so they always balance.
 async function seedDemoAccounts(): Promise<number> {
   const prices = new Map(STOCKS.map(([symbol, , , , basePrice]) => [symbol, basePrice]));
   const now = Date.now();
   let created = 0;
   for (const { deviceId, handle, trades } of DEMO_ACCOUNTS) {
-    if (await prisma.account.findUnique({ where: { deviceId } })) continue;
+    if (await prisma.account.findUnique({ where: { handle } })) continue;
     await prisma.device.upsert({ where: { id: deviceId }, update: {}, create: { id: deviceId } });
     const openedAt = new Date(now - 7 * 86_400_000);
     const account = await prisma.account.create({
