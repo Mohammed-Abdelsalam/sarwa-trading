@@ -26,6 +26,7 @@ export const SORTS = [
 ] as const;
 
 export type SortOption = (typeof SORTS)[number];
+export type SortKey = SortOption['key'];
 
 export const DEFAULT_SORT: SortOption = SORTS[4];
 
@@ -83,4 +84,27 @@ export function keyStats({ stock, stats }: StockDetailResponse, quote: Quote): K
     { label: 'Sector', value: SECTOR_LABELS[stock.sector] },
     { label: 'Exchange', value: stock.exchange },
   ];
+}
+
+export function similarStocks(
+  stocks: readonly StockWithQuote[],
+  symbol: string,
+  limit = 4,
+): StockWithQuote[] {
+  const sector = stocks.find((s) => s.symbol === symbol)?.sector;
+  if (!sector) return [];
+  return stocks.filter((s) => s.sector === sector && s.symbol !== symbol).slice(0, limit);
+}
+
+// Where a value sits between a low and a high, 0–1, for the 52-week and day-range bars.
+export function rangePosition(value: number, low: number, high: number): number {
+  if (high <= low) return 0.5;
+  return Math.min(Math.max((value - low) / (high - low), 0), 1);
+}
+
+// A sortable column header: first click sorts by that column, the next click flips the direction.
+export function sortByColumn(current: SortOption | null, key: SortKey): SortOption {
+  const options = SORTS.filter((s) => s.key === key);
+  const flipped = current?.key === key ? options.find((s) => s.dir !== current.dir) : undefined;
+  return flipped ?? options[0] ?? SORTS[0];
 }

@@ -88,6 +88,7 @@ describe('useStockDetail', () => {
 
     expect(result.current.quote?.price).toBe(205);
     expect(result.current.stock?.name).toBe('Apple');
+    expect(result.current.week52).toEqual({ low: 150, high: 250, position: 0.55 });
   });
 
   it('tells a missing stock apart from a failed request', async () => {

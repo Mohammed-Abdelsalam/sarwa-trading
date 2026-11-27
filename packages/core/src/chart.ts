@@ -13,6 +13,8 @@ export interface ChartGeometry {
   area: string;
   points: ChartPoint[];
   referenceY: number | null;
+  min: number;
+  max: number;
 }
 
 // `reference` (e.g. the previous close) is kept inside the vertical range so its line stays visible.
@@ -23,10 +25,12 @@ export function chartGeometry(
   padding = 2,
   reference?: number,
 ): ChartGeometry {
-  if (values.length < 2) return { line: '', area: '', points: [], referenceY: null };
+  if (values.length < 2)
+    return { line: '', area: '', points: [], referenceY: null, min: 0, max: 0 };
   const domain = reference === undefined ? values : [...values, reference];
   const min = Math.min(...domain);
-  const range = Math.max(...domain) - min || 1;
+  const max = Math.max(...domain);
+  const range = max - min || 1;
   const toY = (value: number) => padding + (1 - (value - min) / range) * (height - padding * 2);
   const points = values.map((value, i) => ({
     x: (i / (values.length - 1)) * width,
@@ -41,6 +45,8 @@ export function chartGeometry(
     area: `${line}L${width} ${height}L0 ${height}Z`,
     points,
     referenceY: reference === undefined ? null : toY(reference),
+    min,
+    max,
   };
 }
 
@@ -108,4 +114,50 @@ export function describeChart(
   const low = Math.min(...candles.map((c) => c.l));
   const high = Math.max(...candles.map((c) => c.h));
   return `${symbol} ${move} ${when}, low ${formatPrice(low)}, high ${formatPrice(high)}`;
+}
+
+export interface CandleShape {
+  x: number;
+  width: number;
+  bodyTop: number;
+  bodyHeight: number;
+  wickTop: number;
+  wickBottom: number;
+  up: boolean;
+  // Volume relative to the busiest candle, 0–1, for the volume bars under the chart.
+  volume: number;
+}
+
+export function candleGeometry(
+  candles: readonly Candle[],
+  width: number,
+  height: number,
+  padding = 2,
+): { shapes: CandleShape[]; min: number; max: number } {
+  if (candles.length === 0) return { shapes: [], min: 0, max: 0 };
+  const min = Math.min(...candles.map((c) => c.l));
+  const max = Math.max(...candles.map((c) => c.h));
+  const range = max - min || 1;
+  const toY = (value: number) => padding + (1 - (value - min) / range) * (height - padding * 2);
+  const slot = width / candles.length;
+  const maxVolume = Math.max(...candles.map((c) => c.v)) || 1;
+  const shapes = candles.map((c, i) => {
+    const top = toY(Math.max(c.o, c.c));
+    return {
+      x: slot * i + slot / 2,
+      width: Math.max(1, slot * 0.6),
+      bodyTop: top,
+      bodyHeight: Math.max(1, toY(Math.min(c.o, c.c)) - top),
+      wickTop: toY(c.h),
+      wickBottom: toY(c.l),
+      up: c.c >= c.o,
+      volume: c.v / maxVolume,
+    };
+  });
+  return { shapes, min, max };
+}
+
+export function axisTicks(min: number, max: number, count = 3): number[] {
+  if (count < 2) return [max];
+  return Array.from({ length: count }, (_, i) => max - ((max - min) * i) / (count - 1));
 }
