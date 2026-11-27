@@ -58,6 +58,7 @@ async function renderScreenHook() {
     },
     storage: { getItem: () => Promise.resolve(null), setItem: () => Promise.resolve() },
     removals: createRemovalQueue(),
+    analytics: { track: jest.fn() },
   };
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },

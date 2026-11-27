@@ -49,5 +49,6 @@ export function createTestClient(api: Partial<ApiClient>): SarwaClient {
       },
     },
     removals: createRemovalQueue(),
+    analytics: { track: jest.fn() },
   };
 }

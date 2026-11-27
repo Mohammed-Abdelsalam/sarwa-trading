@@ -8,6 +8,7 @@ import {
   createLiveStore,
   createMarketSocket,
   createRemovalQueue,
+  noopAnalytics,
   type SarwaClient,
 } from '@sarwa/core';
 
@@ -33,4 +34,5 @@ export const client: SarwaClient = {
   market: createMarketSocket({ url: API_URL, store }),
   storage: AsyncStorage,
   removals: createRemovalQueue(),
+  analytics: noopAnalytics,
 };

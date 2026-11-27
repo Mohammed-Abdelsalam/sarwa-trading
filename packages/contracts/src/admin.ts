@@ -110,6 +110,10 @@ export const AUDIT_ACTIONS = [
   'user.create',
   'user.role',
   'user.status',
+  'trading.update',
+  'halt.create',
+  'halt.resume',
+  'account.reset',
 ] as const;
 
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS);

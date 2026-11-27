@@ -4,6 +4,7 @@ import {
   createLiveStore,
   createMarketSocket,
   createRemovalQueue,
+  noopAnalytics,
   type KeyValueStorage,
   type SarwaClient,
 } from '@sarwa/core';
@@ -29,5 +30,6 @@ export function createBrowserClient(): SarwaClient {
     market: createMarketSocket({ url: API_URL, store }),
     storage: browserStorage,
     removals: createRemovalQueue(),
+    analytics: noopAnalytics,
   };
 }
