@@ -1,6 +1,7 @@
 import { Bell, Check, Clock, Info, type LucideIcon, X } from 'lucide-react-native';
 import { ScrollView, View } from 'react-native';
 
+import { type TicketResultTone as ResultTone } from '@sarwa/core';
 import { type ColorRole } from '@sarwa/tokens';
 
 import { Button } from '../../components/ui/button';
@@ -8,7 +9,6 @@ import { KeyValueRow } from '../../components/ui/key-value-row';
 import { Text } from '../../components/ui/text';
 import { useCopy } from '../../lib/i18n';
 import { cx, useColors } from '../../lib/theme';
-import { type ResultTone } from './ticket-review-model';
 import { type useOrderTicketScreen } from './use-order-ticket-screen';
 
 type Screen = ReturnType<typeof useOrderTicketScreen>;

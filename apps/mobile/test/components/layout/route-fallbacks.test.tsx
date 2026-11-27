@@ -2,9 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import { ErrorFallback, NotFoundScreen } from '../../../src/components/layout/route-fallbacks';
+import { savedLocale } from '../../../src/providers/app-providers';
 import { renderScreen } from '../../render';
 
 jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
+jest.mock('../../../src/providers/app-providers', () => ({ savedLocale: jest.fn(() => 'en') }));
 
 describe('ErrorFallback', () => {
   it('retries the crashed route when the user taps Try again', async () => {
@@ -14,6 +16,14 @@ describe('ErrorFallback', () => {
     expect(screen.getByText('Something went wrong')).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
     expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('speaks the language the user picked', async () => {
+    jest.mocked(savedLocale).mockReturnValue('ar');
+    await render(<ErrorFallback error={new Error('boom')} retry={jest.fn()} />);
+
+    expect(screen.getByText('حدث خطأ ما')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'حاول مجددًا' })).toBeOnTheScreen();
   });
 });
 

@@ -34,6 +34,8 @@ export function PeriodTabs({
             accessibilityRole="tab"
             accessibilityState={{ selected, disabled }}
             disabled={disabled}
+            // Tops up the segment to a 44 pt target inside the track's padding.
+            hitSlop={{ top: size === 'lg' ? 3 : 6, bottom: size === 'lg' ? 3 : 6 }}
             onPress={() => {
               void Haptics.selectionAsync();
               onChange(period);

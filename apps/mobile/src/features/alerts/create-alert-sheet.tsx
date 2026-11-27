@@ -1,5 +1,7 @@
 import { View } from 'react-native';
 
+import { useStockIndex } from '@sarwa/core';
+
 import { StockAvatar } from '../../components/trading/stock-avatar';
 import { Button } from '../../components/ui/button';
 import { Segmented } from '../../components/ui/segmented';
@@ -7,7 +9,6 @@ import { Sheet } from '../../components/ui/sheet';
 import { Text } from '../../components/ui/text';
 import { PriceField } from '../../components/ui/text-field';
 import { useCopy } from '../../lib/i18n';
-import { useStockIndex } from '../../lib/sectors';
 import { useCreateAlertForm } from './use-create-alert';
 
 function CreateAlertForm({ symbol, onClose }: { symbol: string; onClose: () => void }) {

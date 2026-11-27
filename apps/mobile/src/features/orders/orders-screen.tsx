@@ -1,5 +1,6 @@
+import { FlashList } from '@shopify/flash-list';
 import { ListChecks } from 'lucide-react-native';
-import { ActivityIndicator, FlatList, RefreshControl } from 'react-native';
+import { ActivityIndicator, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Empty, Loading, LoadError } from '../../components/layout/load-state';
@@ -25,20 +26,21 @@ export function OrdersScreen() {
       ) : isError ? (
         <LoadError onRetry={actions.refresh} />
       ) : (
-        <FlatList
+        <FlashList
           testID="orders-list"
           data={rows}
           keyExtractor={(row) => row.line.id}
           renderItem={({ item }) => <OrderRow order={item.line} sector={item.sector} />}
           ListEmptyComponent={<Empty icon={ListChecks} title={t.orders.empty} />}
           ListFooterComponent={
-            isLoadingMore ? (
-              <ActivityIndicator className="py-4" color={colors['brand-fg']} />
-            ) : undefined
+            <View className="pb-10">
+              {isLoadingMore ? (
+                <ActivityIndicator className="py-4" color={colors['brand-fg']} />
+              ) : null}
+            </View>
           }
           onEndReached={actions.loadMore}
           onEndReachedThreshold={0.5}
-          contentContainerClassName="pb-10"
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}

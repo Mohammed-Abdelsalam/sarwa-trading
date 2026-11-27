@@ -1,4 +1,3 @@
-import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { Platform, Share } from 'react-native';
 
@@ -22,6 +21,7 @@ import {
 } from '@sarwa/core';
 
 import { useCopy } from '../../lib/i18n';
+import { stockWebUrl } from '../../lib/navigation';
 
 // Mobile remembers the last period and chart type; the web keeps them in the shareable URL instead.
 export function useStockDetailScreen(symbol: string) {
@@ -36,8 +36,7 @@ export function useStockDetailScreen(symbol: string) {
   const similar = similarStocks(useStocks().data ?? [], symbol);
   useLiveSymbols(similar.map((s) => s.symbol));
   const copy = useCopy();
-  const { t, f } = copy;
-  const held = usePortfolio().position(symbol);
+  const { t } = copy;
 
   return {
     stock,
@@ -51,9 +50,6 @@ export function useStockDetailScreen(symbol: string) {
     isRefreshing,
     sectorLabel: stock ? t.sectors[stock.sector] : undefined,
     similar,
-    sellLabel: held
-      ? t.ticket.sellHeld({ shares: f.shares(micros(held.qtyMicros)) })
-      : t.common.sell,
     chart: {
       period: resolvePeriod(enabledPeriods, period.value),
       type: type.value,
@@ -71,7 +67,7 @@ export function useStockDetailScreen(symbol: string) {
       share: () => {
         if (!stock || !quote) return;
         const message = shareStockMessage(copy, { symbol, name: stock.name, quote });
-        const url = Linking.createURL(`/stock/${symbol}`);
+        const url = stockWebUrl(symbol);
         // Android shares only the message, so the link rides inside it there.
         void Share.share(
           Platform.OS === 'ios' ? { message, url } : { message: `${message}\n${url}` },
@@ -79,4 +75,11 @@ export function useStockDetailScreen(symbol: string) {
       },
     },
   };
+}
+
+// Its own hook so a tick on another held stock re-renders only the trade bar, not the whole screen.
+export function useSellLabel(symbol: string): string {
+  const { t, f } = useCopy();
+  const held = usePortfolio().position(symbol);
+  return held ? t.ticket.sellHeld({ shares: f.shares(micros(held.qtyMicros)) }) : t.common.sell;
 }

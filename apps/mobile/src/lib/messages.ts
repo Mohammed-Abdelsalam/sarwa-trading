@@ -10,20 +10,15 @@ const en = {
   pause: 'Pause',
   resume: 'Resume',
   delete: 'Delete',
-  account: {
-    paperAccount: 'Paper account',
-    virtualStart: 'Virtual start',
-  },
   alerts: {
     inAppOnly: 'Alerts arrive in-app only',
   },
-  orders: {
-    workingAmount: ({ amount }: { amount: string }) => `Working · ${amount} remaining`,
-    reservedCash: ({ amount }: { amount: string }) => `reserved ${amount}`,
-  },
-  notFound: {
-    title: 'Page not found',
-    body: "This link doesn't lead anywhere in Mini Trading.",
+  maintenance: {
+    title: "We'll be right back",
+    body: "Mini Trading is getting a scheduled upgrade. Your watchlist is saved and live prices return as soon as we're done.",
+    checkAgain: 'Check again',
+    autoRetry: ({ seconds }: { seconds: string }) =>
+      `We'll also retry automatically every ${seconds} s.`,
   },
 };
 
@@ -37,20 +32,14 @@ const ar: AppMessages = {
   pause: 'إيقاف مؤقت',
   resume: 'استئناف',
   delete: 'حذف',
-  account: {
-    paperAccount: 'حساب تجريبي',
-    virtualStart: 'الرصيد الافتراضي الأولي',
-  },
   alerts: {
     inAppOnly: 'تصلك التنبيهات داخل التطبيق فقط',
   },
-  orders: {
-    workingAmount: ({ amount }) => `قيد التنفيذ · متبقٍ ${amount}`,
-    reservedCash: ({ amount }) => `حُجز ${amount}`,
-  },
-  notFound: {
-    title: 'الصفحة غير موجودة',
-    body: 'هذا الرابط لا يؤدي إلى أي مكان في Mini Trading.',
+  maintenance: {
+    title: 'سنعود قريبًا',
+    body: 'يخضع Mini Trading لتحديث مجدول. قائمة المتابعة محفوظة، وستعود الأسعار المباشرة فور انتهائنا.',
+    checkAgain: 'تحقّق مجددًا',
+    autoRetry: ({ seconds }) => `سنعيد المحاولة تلقائيًا كل ${seconds} ث.`,
   },
 };
 

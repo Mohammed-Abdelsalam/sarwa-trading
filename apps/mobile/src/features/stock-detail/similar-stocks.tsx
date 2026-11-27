@@ -16,7 +16,7 @@ function SimilarCard({ stock }: { stock: StockWithQuote }) {
   const quote = useQuote(stock.symbol) ?? stock.quote;
   const pct = changePct(quote);
   return (
-    <Link href={`/stock/${stock.symbol}`} asChild>
+    <Link href={`/stocks/${stock.symbol}`} asChild>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={formatStockLabel(copy, {

@@ -27,6 +27,8 @@ export interface StockRowProps {
   stock: StockWithQuote;
   watched?: boolean;
   onToggleWatch?: (symbol: string, watched: boolean) => void;
+  // The screen-reader stand-in for swipe-to-remove on the Watchlist.
+  onRemove?: (symbol: string) => void;
   stale?: boolean;
 }
 
@@ -35,6 +37,7 @@ export const StockRow = memo(function StockRow({
   stock,
   watched = false,
   onToggleWatch,
+  onRemove,
   stale = false,
 }: StockRowProps) {
   const copy = useCopy();
@@ -67,7 +70,7 @@ export const StockRow = memo(function StockRow({
   );
 
   return (
-    <Link href={`/stock/${stock.symbol}`} asChild>
+    <Link href={`/stocks/${stock.symbol}`} asChild>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={formatStockLabel(copy, {
@@ -76,17 +79,21 @@ export const StockRow = memo(function StockRow({
           quote,
           watched,
         })}
-        accessibilityActions={
-          withStar
+        accessibilityActions={[
+          ...(withStar
             ? [
                 {
                   name: 'toggleWatch',
                   label: watched ? t.watchlist.removeAction : t.watchlist.addAction,
                 },
               ]
-            : undefined
-        }
-        onAccessibilityAction={toggle}
+            : []),
+          ...(onRemove ? [{ name: 'remove', label: t.watchlist.removeAction }] : []),
+        ]}
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === 'remove') onRemove?.(stock.symbol);
+          else toggle();
+        }}
         className={cx(
           'min-h-16 flex-row items-center ps-4 active:bg-surface-3',
           withStar ? 'gap-2.5 py-2 pe-1.5' : 'gap-3 py-2.5 pe-4',

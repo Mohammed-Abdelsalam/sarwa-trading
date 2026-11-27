@@ -1,59 +1,35 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-import { type Alert } from '@sarwa/contracts';
-import {
-  changeBps,
-  negate,
-  parseMoveBps,
-  parseTicks,
-  POLICY,
-  toTradeQuote,
-  useAlerts,
-  useCreateAlert,
-  useLiveSymbols,
-  useQuote,
-} from '@sarwa/core';
+import { alertTargetHint, changeBps, POLICY, toTradeQuote, useAlertForm } from '@sarwa/core';
 
 import { useCopy } from '../../lib/i18n';
 
-type Condition = Alert['condition'];
-type Repeat = Alert['repeat'];
-
 const MINUTE_MS = 60_000;
 
-const positive = (value: number | null) => (value !== null && value > 0 ? value : null);
-
-// The create sheet's form: thresholds are parsed here, every rule is checked by core before sending.
+// The create sheet's form: thresholds are parsed and every rule is checked by core before sending.
 export function useCreateAlertForm(symbol: string, onCreated: () => void) {
-  const { t, f, alertIssue } = useCopy();
-  useLiveSymbols([symbol]);
-  const quote = useQuote(symbol);
-  const create = useCreateAlert();
-  const limit = useAlerts().data?.limit;
-  const [condition, setCondition] = useState<Condition>('price_above');
-  const [text, setText] = useState('');
-  const [repeat, setRepeat] = useState<Repeat>('once');
+  const copy = useCopy();
+  const { t, f, alertIssue } = copy;
+  const form = useAlertForm(symbol);
+  const { condition, repeat } = form;
   const isMove = condition === 'move_today';
-  const live = quote ? toTradeQuote(quote) : null;
-  const ticks = isMove ? null : positive(parseTicks(text));
-  // A move can be negative (a down move), like the domain rule.
-  const bps = isMove ? parseMoveBps(text) : null;
+  const live = form.quote ? toTradeQuote(form.quote) : null;
 
-  const created = create.status === 'success';
+  const created = form.status === 'success';
+  const { reset } = form;
   useEffect(() => {
     if (!created) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    create.reset();
+    reset();
     onCreated();
-  }, [created, create, onCreated]);
+  }, [created, reset, onCreated]);
 
-  const distance = live && ticks !== null ? changeBps(live.lastTicks, ticks) : null;
-  const issue = create.issue ? alertIssue(create.issue, symbol).explanation : null;
+  const issue = form.issue ? alertIssue(form.issue, symbol).explanation : null;
   const serverError =
-    create.errorCode === 'ALERT_LIMIT' && limit !== undefined
-      ? t.alerts.limitReached({ max: f.number(limit) })
-      : create.error
+    form.limitReached !== null
+      ? t.alerts.limitReached({ max: f.number(form.limitReached) })
+      : form.failed
         ? t.common.loadErrorBody
         : null;
 
@@ -71,15 +47,10 @@ export function useCreateAlertForm(symbol: string, onCreated: () => void) {
       label: t.alerts.conditions[value],
     })),
     fieldLabel: isMove ? t.alerts.targetMove : t.alerts.targetPrice,
-    prefix: isMove ? undefined : '$',
+    prefix: isMove ? undefined : f.currencyAffix(),
     signed: isMove,
-    text,
-    hint:
-      distance === null || distance === 0
-        ? undefined
-        : distance > 0
-          ? t.alerts.aboveCurrent({ pct: f.percent(distance) })
-          : t.alerts.belowCurrent({ pct: f.percent(negate(distance)) }),
+    text: form.target,
+    hint: alertTargetHint(form.request, live?.lastTicks ?? null, copy),
     error: issue ?? serverError ?? undefined,
     repeat,
     repeats: [
@@ -92,25 +63,14 @@ export function useCreateAlertForm(symbol: string, onCreated: () => void) {
         }),
       },
     ],
-    canSubmit: (isMove ? bps : ticks) !== null && create.status !== 'pending',
-    submitting: create.status === 'pending',
+    canSubmit: form.request !== null && form.status !== 'pending',
+    submitting: form.status === 'pending',
     actions: {
-      setCondition: (next: Condition) => {
-        create.reset();
-        setCondition(next);
-      },
-      setText: (next: string) => {
-        create.reset();
-        setText(next);
-      },
-      setRepeat,
+      setCondition: form.setCondition,
+      setText: form.setTarget,
+      setRepeat: form.setRepeat,
       submit: () => {
-        create.create({
-          symbol,
-          condition,
-          repeat,
-          ...(isMove ? { thresholdBps: bps ?? 0 } : { thresholdTicks: ticks ?? 0 }),
-        });
+        form.submit();
       },
     },
   };

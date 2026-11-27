@@ -140,7 +140,7 @@ export function OrderDetailScreen({ id }: { id: string }) {
             </Text>
             <PriceField
               label={screen.modify.label}
-              prefix="$"
+              prefix={screen.modify.prefix}
               value={screen.modify.text}
               onChangeText={actions.setPriceText}
               error={screen.modify.failed ? t.common.loadErrorBody : undefined}

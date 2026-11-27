@@ -67,7 +67,7 @@ function SettingsList({ screen }: { screen: ReturnType<typeof useAccountScreen> 
 }
 
 export function AccountScreen() {
-  const { t, m } = useCopy();
+  const { t } = useCopy();
   const screen = useAccountScreen();
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
@@ -80,7 +80,7 @@ export function AccountScreen() {
         <View className="gap-2 rounded-lg border border-border bg-surface p-4">
           <View className="flex-row items-center justify-between">
             <Text variant="sm" weight={600} className="text-fg-2">
-              {m.account.paperAccount}
+              {t.paper.account}
             </Text>
             <Badge label={t.paper.badge} tone="outline" />
           </View>
@@ -88,7 +88,7 @@ export function AccountScreen() {
             <>
               <Text variant="display">{screen.account.equity}</Text>
               <Text variant="caption" className="text-fg-3">
-                {`${m.account.virtualStart} ${screen.account.start} · ${screen.account.handle}`}
+                {`${t.paper.virtualStart} ${screen.account.start} · ${screen.account.handle}`}
               </Text>
             </>
           ) : null}

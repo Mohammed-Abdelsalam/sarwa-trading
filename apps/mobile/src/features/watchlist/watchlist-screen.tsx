@@ -33,35 +33,44 @@ function SwipeToRemoveRow({
   onRemove: (symbol: string) => void;
 }) {
   const colors = useColors();
-  const { t } = useCopy();
-  return (
-    <ReanimatedSwipeable
-      friction={2}
-      rightThreshold={48}
-      overshootRight={false}
-      onSwipeableOpen={(direction) => {
-        if (direction === SwipeDirection.LEFT) onRemove(stock.symbol);
+  const { t, dir } = useCopy();
+  const rtl = dir === 'rtl';
+  const action = () => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t.watchlist.removeSymbol({ symbol: stock.symbol })}
+      onPress={() => {
+        onRemove(stock.symbol);
       }}
-      renderRightActions={() => (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t.watchlist.removeSymbol({ symbol: stock.symbol })}
-          onPress={() => {
-            onRemove(stock.symbol);
-          }}
-          className="w-24 items-center justify-center gap-1 bg-danger"
-        >
-          <Trash2 size={20} color={colors['on-brand']} />
-          <Text variant="caption" weight={600} className="text-on-brand">
-            {t.watchlist.remove}
-          </Text>
-        </Pressable>
-      )}
+      style={{ direction: dir }}
+      className="w-24 items-center justify-center gap-1 bg-danger"
     >
-      <View className="border-b border-border bg-bg">
-        <StockRow stock={stock} stale={stale} />
-      </View>
-    </ReanimatedSwipeable>
+      <Trash2 size={20} color={colors['on-brand']} />
+      <Text variant="caption" weight={600} className="text-on-brand">
+        {t.watchlist.remove}
+      </Text>
+    </Pressable>
+  );
+  // The swipeable lays out in physical LTR, so the action goes on whichever side is trailing.
+  const trailing = rtl
+    ? { renderLeftActions: action, leftThreshold: 48, overshootLeft: false }
+    : { renderRightActions: action, rightThreshold: 48, overshootRight: false };
+  return (
+    <View style={{ direction: 'ltr' }}>
+      <ReanimatedSwipeable
+        friction={2}
+        {...trailing}
+        onSwipeableOpen={(direction) => {
+          if (direction === (rtl ? SwipeDirection.RIGHT : SwipeDirection.LEFT)) {
+            onRemove(stock.symbol);
+          }
+        }}
+      >
+        <View style={{ direction: dir }} className="border-b border-border bg-bg">
+          <StockRow stock={stock} stale={stale} onRemove={onRemove} />
+        </View>
+      </ReanimatedSwipeable>
+    </View>
   );
 }
 

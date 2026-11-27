@@ -85,7 +85,14 @@ function detailVm(overrides: Partial<DetailVm> = {}): DetailVm {
     cancelLabel: 'Cancel remaining',
     isCanceling: false,
     cancelFailed: false,
-    modify: { open: false, label: 'Limit price', text: '', saving: false, failed: false },
+    modify: {
+      open: false,
+      label: 'Limit price',
+      prefix: '$',
+      text: '',
+      saving: false,
+      failed: false,
+    },
     actions: {
       retry: jest.fn(),
       cancel: jest.fn(),
@@ -181,7 +188,14 @@ describe('OrderDetailScreen', () => {
 
   it('saves a new limit price from the modify sheet', async () => {
     const model = detailVm({
-      modify: { open: true, label: 'Limit price', text: '117.00', saving: false, failed: false },
+      modify: {
+        open: true,
+        label: 'Limit price',
+        prefix: '$',
+        text: '117.00',
+        saving: false,
+        failed: false,
+      },
     });
     mockedDetail.mockReturnValue(model);
     await renderScreen(<OrderDetailScreen id="o_8ef3" />);

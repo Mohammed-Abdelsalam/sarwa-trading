@@ -1,7 +1,6 @@
-import { bps, cents, ticks } from '@sarwa/core';
+import { bps, cents, ticketResultView, ticks } from '@sarwa/core';
 
 import { blockLabel } from '../../../src/features/order-ticket/ticket-entry-model';
-import { resultRows } from '../../../src/features/order-ticket/ticket-review-model';
 import { order } from '../../fixtures';
 import { englishCopy } from '../../render';
 
@@ -14,9 +13,10 @@ describe('order ticket model', () => {
 
   it('shows the fill slippage in dollars per share, as in the design', async () => {
     const copy = await englishCopy();
-    const rows = resultRows(
+    const { rows } = ticketResultView(
       order({ id: 'ord-1' }),
       { avgFillTicks: ticks(2_315_200), slippageBps: bps(1), slippageCents: cents(2) },
+      { symbol: 'AAPL', opensAt: null },
       copy,
     );
 

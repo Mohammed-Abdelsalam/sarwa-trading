@@ -6,7 +6,10 @@ import { type RefreshControlProps } from 'react-native';
 import { type StockWithQuote } from '@sarwa/contracts';
 
 import { StockDetailScreen } from '../../../src/features/stock-detail/stock-detail-screen';
-import { useStockDetailScreen } from '../../../src/features/stock-detail/use-stock-detail-screen';
+import {
+  useSellLabel,
+  useStockDetailScreen,
+} from '../../../src/features/stock-detail/use-stock-detail-screen';
 import { renderScreen } from '../../render';
 
 jest.mock('../../../src/features/stock-detail/use-stock-detail-screen');
@@ -26,6 +29,10 @@ jest.mock('@sarwa/core', () => ({
 }));
 
 const mockedHook = jest.mocked(useStockDetailScreen);
+
+beforeEach(() => {
+  jest.mocked(useSellLabel).mockReturnValue('Sell');
+});
 
 const quote = {
   symbol: 'AAPL',
@@ -58,7 +65,6 @@ function viewModel(
     isRefreshing: false,
     sectorLabel: 'Tech',
     similar: [],
-    sellLabel: 'Sell',
     chart: {
       period: '1D',
       type: 'area',

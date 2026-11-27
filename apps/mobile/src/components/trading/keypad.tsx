@@ -4,7 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { type KeypadKey } from '@sarwa/core';
 
-import { localDigits, useCopy } from '../../lib/i18n';
+import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
 import { Text } from '../ui/text';
 
@@ -17,13 +17,13 @@ const ROWS: KeypadKey[][] = [
 
 export function Keypad({ onKey }: { onKey: (key: KeypadKey) => void }) {
   const colors = useColors();
-  const { t, digits, dir } = useCopy();
+  const { t, f, dir } = useCopy();
   const labelOf = (key: KeypadKey) =>
     key === 'backspace'
       ? t.ticket.keypad.delete
       : key === '.'
         ? t.ticket.keypad.decimalPoint
-        : localDigits(key, digits);
+        : f.localDigits(key);
 
   return (
     <View className="gap-1">
@@ -47,7 +47,7 @@ export function Keypad({ onKey }: { onKey: (key: KeypadKey) => void }) {
                   style={dir === 'rtl' ? { transform: [{ scaleX: -1 }] } : undefined}
                 />
               ) : (
-                <Text variant="keypad">{localDigits(key, digits)}</Text>
+                <Text variant="keypad">{f.localDigits(key)}</Text>
               )}
             </Pressable>
           ))}

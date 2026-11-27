@@ -1,9 +1,9 @@
-import { router } from 'expo-router';
 import { ChevronLeft, X } from 'lucide-react-native';
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { useCopy } from '../../lib/i18n';
+import { goBack } from '../../lib/navigation';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 
@@ -12,9 +12,7 @@ export function TopBar({
   title,
   right,
   close = false,
-  onLeave = () => {
-    router.back();
-  },
+  onLeave = goBack,
 }: {
   title?: string;
   right?: ReactNode;

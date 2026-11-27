@@ -1,15 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { focusManager, onlineManager, QueryClient } from '@tanstack/react-query';
+import {
+  defaultShouldDehydrateQuery,
+  focusManager,
+  hashKey,
+  onlineManager,
+  type Query,
+  QueryClient,
+} from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import Constants from 'expo-constants';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState, useSyncExternalStore } from 'react';
 import { AppState, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { type AppConfig } from '@sarwa/contracts';
 import {
+  type Locale,
+  queryKeys,
   SarwaProvider,
   shouldRetry,
   useI18n,
@@ -28,35 +38,78 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { gcTime: CACHE_TTL_MS, retry: shouldRetry } },
 });
 
-// A new app version never restores cache shaped by an older contract.
-export const persistOptions = {
-  persister: createAsyncStoragePersister({ storage: AsyncStorage, key: 'sarwa.query-cache' }),
-  buster: Constants.expoConfig?.version ?? '',
-  maxAge: CACHE_TTL_MS,
-};
+// For screens rendered outside the providers (the root error boundary): the language already read.
+export function savedLocale(): Locale {
+  return queryClient.getQueryData(queryKeys.preference('sarwa.locale')) === 'ar' ? 'ar' : 'en';
+}
 
+// Only what paints the first screens offline; candles, order pages and notifications refetch.
+const PERSISTED = new Set(
+  [
+    queryKeys.stocks,
+    queryKeys.appConfig,
+    queryKeys.tradingStatus,
+    queryKeys.watchlist,
+    queryKeys.portfolio,
+  ].map((key) => hashKey(key)),
+);
+
+export function shouldPersistQuery(query: Query): boolean {
+  if (!defaultShouldDehydrateQuery(query) || !PERSISTED.has(query.queryHash)) return false;
+  // A saved maintenance flag would lock the next launch before the app could ask again.
+  return (
+    query.queryHash !== hashKey(queryKeys.appConfig) ||
+    !(query.state.data as AppConfig).maintenanceMode
+  );
+}
+
+// The scope keeps one identity's cache from being restored for another.
+// A new app version never restores cache shaped by an older contract.
+export function createPersistOptions(scope: string) {
+  return {
+    persister: createAsyncStoragePersister({
+      storage: AsyncStorage,
+      key: `sarwa.query-cache.${scope}`,
+    }),
+    buster: Constants.expoConfig?.version ?? '',
+    maxAge: CACHE_TTL_MS,
+    dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+  };
+}
+
+export const persistOptions = createPersistOptions('device');
+
+// Wi-Fi without internet (captive portal, dead hotspot) counts as offline; unknown reachability does not.
+export function isOnline(state: {
+  isConnected: boolean | null;
+  isInternetReachable?: boolean | null;
+}) {
+  return state.isConnected !== false && state.isInternetReachable !== false;
+}
+
+// iOS reports 'inactive' for the app switcher, a call or Control Center; only 'background' pauses the socket.
+export const isForeground = (status: string | null | undefined) => status !== 'background';
+
+// The one NetInfo subscription: queries and the socket both follow the query client's online state.
 onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => {
-    setOnline(state.isConnected !== false);
+    setOnline(isOnline(state));
   }),
 );
 
 function useAppLifecycle(): { foreground: boolean; online: boolean } {
-  const [foreground, setForeground] = useState(AppState.currentState === 'active');
-  const [online, setOnline] = useState(true);
+  const [foreground, setForeground] = useState(isForeground(AppState.currentState));
+  const online = useSyncExternalStore(onlineManager.subscribe.bind(onlineManager), () =>
+    onlineManager.isOnline(),
+  );
 
   useEffect(() => {
     const appState = AppState.addEventListener('change', (status) => {
-      const active = status === 'active';
-      focusManager.setFocused(active);
-      setForeground(active);
-    });
-    const netInfo = NetInfo.addEventListener((state) => {
-      setOnline(state.isConnected !== false);
+      focusManager.setFocused(status === 'active');
+      setForeground(isForeground(status));
     });
     return () => {
       appState.remove();
-      netInfo();
     };
   }, []);
 

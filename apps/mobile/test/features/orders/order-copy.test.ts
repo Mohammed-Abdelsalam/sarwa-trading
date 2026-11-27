@@ -1,5 +1,4 @@
 import { describeOrder } from '../../../src/features/orders/order-copy';
-import { orderTimeline } from '../../../src/features/orders/order-timeline';
 import { order } from '../../fixtures';
 import { englishCopy } from '../../render';
 
@@ -48,61 +47,15 @@ describe('describeOrder', () => {
   });
 });
 
-describe('orderTimeline', () => {
-  it('lists placed, accepted, each partial fill and the working remainder', async () => {
+describe('canceled orders', () => {
+  it.each([
+    ['user', 'Canceled by you'],
+    ['admin_reset', 'Canceled · account reset'],
+    ['symbol_disabled', 'Canceled · stock no longer trades'],
+  ] as const)('says who canceled it (%s)', async (cancelReason, text) => {
     const copy = await englishCopy();
-    const partial = order({
-      side: 'sell',
-      type: 'limit',
-      status: 'partially_filled',
-      limitTicks: 1_165_000,
-      amountCents: null,
-      qtyMicros: 15_000_000,
-      filledMicros: 8_000_000,
-      heldMicros: 7_000_000,
-      fills: [
-        {
-          id: 'f1',
-          qtyMicros: 5_000_000,
-          priceTicks: 1_165_000,
-          notionalCents: 58_250,
-          realizedCents: -1_200,
-          at: NOW,
-        },
-        {
-          id: 'f2',
-          qtyMicros: 3_000_000,
-          priceTicks: 1_165_500,
-          notionalCents: 34_965,
-          realizedCents: -705,
-          at: NOW,
-        },
-      ],
-    });
+    const canceled = order({ status: 'canceled', cancelReason, closedAt: NOW });
 
-    expect(orderTimeline(partial, copy).map((step) => [step.title, step.state])).toEqual([
-      ['Order placed', 'done'],
-      ['Accepted by exchange sim', 'done'],
-      ['Partially filled · 5 @ $116.50', 'done'],
-      ['Partially filled · 3 @ $116.55', 'done'],
-      ['Working · 7 remaining', 'now'],
-    ]);
-  });
-
-  it('shows the remaining amount and reserved cash for a dollar-amount buy', async () => {
-    const copy = await englishCopy();
-    const working = order({
-      type: 'limit',
-      status: 'partially_filled',
-      limitTicks: 2_300_000,
-      filledMicros: 869_565,
-      filledNotionalCents: 20_000,
-      heldCents: 30_000,
-    });
-
-    const [, accepted, last] = orderTimeline(working, copy);
-
-    expect(accepted?.detail).toContain('reserved $300.00');
-    expect(last?.title).toBe('Working · $300.00 remaining');
+    expect(describeOrder(canceled, copy, NOW).note).toBe(text);
   });
 });
