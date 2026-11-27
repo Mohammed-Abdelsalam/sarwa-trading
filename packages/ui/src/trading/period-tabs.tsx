@@ -9,23 +9,26 @@ export function PeriodTabs({
   onChange,
   enabled = PERIODS,
   size = 'md',
-  label = 'Chart period',
+  label,
   className,
 }: {
   value: Period;
   onChange: (period: Period) => void;
   enabled?: readonly Period[];
   size?: 'md' | 'lg';
-  label?: string;
+  label: string;
   className?: string;
 }) {
   const choices = PERIODS.filter((period) => enabled.includes(period));
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const index = choices.indexOf(value);
+    const rtl = event.currentTarget.closest('[dir]')?.getAttribute('dir') === 'rtl';
+    const after = choices[(index + 1) % choices.length];
+    const before = choices[(index - 1 + choices.length) % choices.length];
     const next = {
-      ArrowRight: choices[(index + 1) % choices.length],
-      ArrowLeft: choices[(index - 1 + choices.length) % choices.length],
+      ArrowRight: rtl ? before : after,
+      ArrowLeft: rtl ? after : before,
       Home: choices[0],
       End: choices.at(-1),
     }[event.key];

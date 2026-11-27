@@ -49,7 +49,13 @@ export function SegmentedControl<T extends string>({
 }) {
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (disabled) return;
-    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    const forward = event.currentTarget.closest('[dir]')?.getAttribute('dir') === 'rtl' ? -1 : 1;
+    const step = {
+      ArrowRight: forward,
+      ArrowLeft: -forward,
+      ArrowDown: 1,
+      ArrowUp: -1,
+    }[event.key];
     if (!step) return;
     event.preventDefault();
     const index = options.findIndex((o) => o.value === value);

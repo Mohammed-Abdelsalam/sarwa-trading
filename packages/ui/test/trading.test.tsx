@@ -87,4 +87,17 @@ describe('PeriodTabs', () => {
     await userEvent.keyboard('{ArrowRight}');
     expect(onChange).toHaveBeenLastCalledWith('1D');
   });
+
+  it('moves with the reading direction in RTL', async () => {
+    const onChange = jest.fn();
+    render(
+      <div dir="rtl">
+        <PeriodTabs value="1W" onChange={onChange} label="فترة الرسم" />
+      </div>,
+    );
+
+    screen.getByRole('tab', { name: '1W' }).focus();
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(onChange).toHaveBeenLastCalledWith('1M');
+  });
 });

@@ -22,6 +22,15 @@ describe('Button', () => {
     expect(button).toHaveAttribute('aria-busy', 'true');
   });
 
+  it('stays disabled while loading even when disabled is passed as false', () => {
+    render(
+      <Button loading disabled={false}>
+        Create alert
+      </Button>,
+    );
+    expect(screen.getByRole('button', { name: 'Create alert' })).toBeDisabled();
+  });
+
   it('renders its child element when asChild is set', () => {
     render(
       <Button asChild>
@@ -116,6 +125,24 @@ describe('SegmentedControl', () => {
 
     screen.getByRole('radio', { name: 'Area' }).focus();
     await userEvent.keyboard('{ArrowRight}');
+    expect(onChange).toHaveBeenLastCalledWith('candle');
+  });
+
+  it('follows the reading direction with the left and right arrows in RTL', async () => {
+    const onChange = jest.fn();
+    render(
+      <div dir="rtl">
+        <SegmentedControl
+          label="Chart type"
+          options={[...options, { value: 'line', label: 'Line' }]}
+          value="area"
+          onChange={onChange}
+        />
+      </div>,
+    );
+
+    screen.getByRole('radio', { name: 'Area' }).focus();
+    await userEvent.keyboard('{ArrowLeft}');
     expect(onChange).toHaveBeenLastCalledWith('candle');
   });
 

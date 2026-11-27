@@ -58,7 +58,7 @@ export function Button({
   return (
     <Component
       className={cn(buttonVariants({ variant, size }), loading && 'pointer-events-none', className)}
-      disabled={disabled ?? loading}
+      disabled={loading || disabled}
       aria-busy={loading || undefined}
       {...props}
     >
