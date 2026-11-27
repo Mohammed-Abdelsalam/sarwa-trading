@@ -1,9 +1,10 @@
 import { View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
-import { formatPrice } from '@sarwa/core';
+import { formatPrice, percentToBps } from '@sarwa/core';
 
 import { Text } from '../../components/ui/text';
+import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
 
 export function RangeCard({
@@ -17,20 +18,26 @@ export function RangeCard({
 }) {
   const colors = useColors();
   const percent = Math.round(position * 100);
+  const { t, f } = useCopy();
+  const weeks = f.count(52);
   return (
     <View className="mx-5 mt-4 gap-2.5 rounded-lg border border-border bg-surface px-4 py-4">
       <Text variant="overline" className="text-fg-3">
-        52-week range
+        {t.stock.range(weeks)}
       </Text>
       <View
         accessible
         accessibilityRole="progressbar"
-        accessibilityLabel="Price within the 52-week range"
+        accessibilityLabel={t.stock.rangeLabel(weeks)}
         accessibilityValue={{
           min: 0,
           max: 100,
           now: percent,
-          text: `${String(percent)}% of the way from ${formatPrice(low)} to ${formatPrice(high)}`,
+          text: t.stock.rangeValue({
+            pct: f.percent(percentToBps(percent)),
+            low: formatPrice(f, low),
+            high: formatPrice(f, high),
+          }),
         }}
         className="h-1.5 justify-center rounded-full bg-surface-3"
       >
@@ -51,10 +58,10 @@ export function RangeCard({
       </View>
       <View className="flex-row justify-between">
         <Text variant="num-sm" className="text-fg-2">
-          {formatPrice(low)}
+          {formatPrice(f, low)}
         </Text>
         <Text variant="num-sm" className="text-fg-2">
-          {formatPrice(high)}
+          {formatPrice(f, high)}
         </Text>
       </View>
     </View>

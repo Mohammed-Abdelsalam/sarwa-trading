@@ -10,6 +10,7 @@ import { ScreenHeader } from '../../components/layout/screen-header';
 import { StockListSkeleton, StockRow } from '../../components/trading/stock-row';
 import { Button } from '../../components/ui/button';
 import { StateView } from '../../components/ui/state-view';
+import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
 import { ListMeta, SearchField, SectorChips } from './markets-toolbar';
 import { useMarketsScreen } from './use-markets-screen';
@@ -18,6 +19,7 @@ const VIEWABILITY = { itemVisiblePercentThreshold: 10 };
 
 export function MarketsScreen() {
   const colors = useColors();
+  const { t } = useCopy();
   const { rows, watched, stale, isLoading, isError, isRefreshing, filters, actions } =
     useMarketsScreen();
 
@@ -31,7 +33,7 @@ export function MarketsScreen() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
-      <ScreenHeader title="Markets" />
+      <ScreenHeader title={t.markets.title} />
       <AppBanners />
       <SearchField
         value={filters.query}
@@ -47,15 +49,15 @@ export function MarketsScreen() {
         <StateView
           icon={WifiOff}
           tone="neg"
-          title="Couldn't load markets"
-          description="We couldn't reach the price server. Check your connection — we'll keep trying in the background."
+          title={t.markets.loadError}
+          description={t.markets.loadErrorBody}
           action={
             <Button
               size="lg"
               icon={<RefreshCw size={16} color={colors['on-brand']} />}
               onPress={actions.refresh}
             >
-              Retry
+              {t.common.retry}
             </Button>
           }
         />
@@ -80,18 +82,18 @@ export function MarketsScreen() {
               refreshing={isRefreshing}
               onRefresh={actions.refresh}
               tintColor={colors['brand-fg']}
-              title="Updating prices…"
+              title={t.markets.updating}
               titleColor={colors['fg-3']}
             />
           }
           ListEmptyComponent={
             <StateView
               icon={Search}
-              title={`No matches for “${filters.searchedQuery}”`}
-              description={`Try a ticker like AAPL or a company name like “Netflix”. Sector filter: ${filters.sectorLabel}.`}
+              title={t.search.noMatches({ query: filters.searchedQuery })}
+              description={t.markets.noMatchesBody({ sector: filters.sectorLabel })}
               action={
                 <Button variant="secondary" onPress={actions.clearFilters}>
-                  Clear search
+                  {t.markets.clearSearch}
                 </Button>
               }
             />

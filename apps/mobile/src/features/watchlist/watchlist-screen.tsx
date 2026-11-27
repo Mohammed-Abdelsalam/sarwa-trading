@@ -18,6 +18,7 @@ import { Button } from '../../components/ui/button';
 import { Snackbar } from '../../components/ui/snackbar';
 import { StateView } from '../../components/ui/state-view';
 import { Text } from '../../components/ui/text';
+import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
 import { EmptyWatchlist } from './empty-watchlist';
 import { useWatchlistScreen } from './use-watchlist-screen';
@@ -32,6 +33,7 @@ function SwipeToRemoveRow({
   onRemove: (symbol: string) => void;
 }) {
   const colors = useColors();
+  const { t } = useCopy();
   return (
     <ReanimatedSwipeable
       friction={2}
@@ -43,7 +45,7 @@ function SwipeToRemoveRow({
       renderRightActions={() => (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Remove ${stock.symbol} from watchlist`}
+          accessibilityLabel={t.watchlist.removeSymbol({ symbol: stock.symbol })}
           onPress={() => {
             onRemove(stock.symbol);
           }}
@@ -51,7 +53,7 @@ function SwipeToRemoveRow({
         >
           <Trash2 size={20} color={colors['on-brand']} />
           <Text variant="caption" weight={600} className="text-on-brand">
-            Remove
+            {t.watchlist.remove}
           </Text>
         </Pressable>
       )}
@@ -74,20 +76,21 @@ function WatchlistSummary({
   sort: SortOption | null;
   onCycleSort: () => void;
 }) {
+  const { t, f } = useCopy();
   return (
-    <View className="flex-row items-center justify-between pb-2 pl-5 pr-3">
+    <View className="flex-row items-center justify-between pb-2 pe-3 ps-5">
       <View className="flex-row items-center gap-1">
         <Text variant="sm" className="text-fg-2">
-          {count} {count === 1 ? 'stock' : 'stocks'}
+          {t.watchlist.count(f.count(count))}
         </Text>
         {average === null ? null : (
           <>
             <Text variant="sm" className="text-fg-2">
               ·
             </Text>
-            <ChangePill value={average} label={formatPct(average)} variant="inline" />
+            <ChangePill value={average} label={formatPct(f, average)} variant="inline" />
             <Text variant="sm" className="text-fg-2">
-              avg today
+              {t.watchlist.avgToday}
             </Text>
           </>
         )}
@@ -99,11 +102,12 @@ function WatchlistSummary({
 
 export function WatchlistScreen() {
   const colors = useColors();
+  const { t } = useCopy();
   const { rows, average, stale, isLoading, isError, sort, removed, actions } = useWatchlistScreen();
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
-      <ScreenHeader title="Watchlist" />
+      <ScreenHeader title={t.watchlist.title} />
       <AppBanners />
 
       {isLoading ? (
@@ -112,18 +116,18 @@ export function WatchlistScreen() {
         <StateView
           icon={AlertTriangle}
           tone="neg"
-          title="Couldn't load your watchlist"
-          description="We couldn't reach the price server. Check your connection and try again."
+          title={t.watchlist.loadError}
+          description={t.watchlist.loadErrorBody}
           action={
             <Button variant="secondary" onPress={actions.retry}>
-              Retry
+              {t.common.retry}
             </Button>
           }
         />
       ) : rows.length === 0 ? (
         <EmptyWatchlist
           onBrowse={() => {
-            router.navigate('/');
+            router.navigate('/markets');
           }}
         />
       ) : (
@@ -148,7 +152,7 @@ export function WatchlistScreen() {
           <View className="flex-row items-center gap-2 px-5 py-4">
             <Hand size={16} color={colors['fg-3']} />
             <Text variant="caption" className="text-fg-3">
-              Swipe left on a row to remove
+              {t.watchlist.swipeHint}
             </Text>
           </View>
         </ScrollView>
@@ -156,8 +160,8 @@ export function WatchlistScreen() {
 
       {removed ? (
         <Snackbar
-          message={`${removed} removed from Watchlist`}
-          actionLabel="Undo"
+          message={t.watchlist.removed({ symbol: removed })}
+          actionLabel={t.common.undo}
           onAction={actions.undo}
           onDismiss={actions.dismissUndo}
         />

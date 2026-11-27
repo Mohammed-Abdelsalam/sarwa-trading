@@ -6,6 +6,7 @@ import { shadows } from '@sarwa/tokens';
 
 import { Button } from '../../components/ui/button';
 import { Text } from '../../components/ui/text';
+import { useCopy } from '../../lib/i18n';
 import { useColors, useThemeName } from '../../lib/theme';
 
 // Illustration geometry copied from the canvas (M-Watchlist); the one place fixed pixel offsets are allowed.
@@ -52,17 +53,16 @@ function EmptyWatchlistArt() {
 }
 
 export function EmptyWatchlist({ onBrowse }: { onBrowse: () => void }) {
+  const { t } = useCopy();
   return (
     <View className="flex-1 items-center justify-center gap-4 px-10 pb-16">
       <EmptyWatchlistArt />
       <Text variant="h2" className="text-center">
-        Your watchlist is empty
+        {t.watchlist.emptyTitle}
       </Text>
-      <Text className="text-center text-fg-2">
-        Tap the star on any stock to follow its live price here.
-      </Text>
+      <Text className="text-center text-fg-2">{t.watchlist.emptyBody}</Text>
       <Button size="lg" className="mt-2 min-w-state-action" onPress={onBrowse}>
-        Browse markets
+        {t.watchlist.browse}
       </Button>
     </View>
   );

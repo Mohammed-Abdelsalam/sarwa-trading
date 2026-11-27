@@ -2,9 +2,10 @@ import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { Platform, Share } from 'react-native';
 
-import { PERIODS, SECTOR_LABELS } from '@sarwa/contracts';
+import { PERIODS } from '@sarwa/contracts';
 import {
   CHART_TYPES,
+  micros,
   resolvePeriod,
   type ScrubPoint,
   shareStockMessage,
@@ -12,6 +13,7 @@ import {
   useEnabledPeriods,
   useLiveStatus,
   useLiveSymbols,
+  usePortfolio,
   usePreference,
   useRefreshStock,
   useStockDetail,
@@ -19,7 +21,7 @@ import {
   useWatchToggle,
 } from '@sarwa/core';
 
-const CHART_TYPE_VALUES = CHART_TYPES.map((option) => option.value);
+import { useCopy } from '../../lib/i18n';
 
 // Mobile remembers the last period and chart type; the web keeps them in the shareable URL instead.
 export function useStockDetailScreen(symbol: string) {
@@ -28,11 +30,14 @@ export function useStockDetailScreen(symbol: string) {
   const status = useLiveStatus();
   const enabledPeriods = useEnabledPeriods();
   const period = usePreference('sarwa.chart.period', PERIODS, '1D');
-  const type = usePreference('sarwa.chart.type', CHART_TYPE_VALUES, 'area');
+  const type = usePreference('sarwa.chart.type', CHART_TYPES, 'area');
   const { refresh, isRefreshing } = useRefreshStock(symbol);
   const [scrubbed, setScrubbed] = useState<ScrubPoint | null>(null);
   const similar = similarStocks(useStocks().data ?? [], symbol);
   useLiveSymbols(similar.map((s) => s.symbol));
+  const copy = useCopy();
+  const { t, f } = copy;
+  const held = usePortfolio().position(symbol);
 
   return {
     stock,
@@ -44,8 +49,11 @@ export function useStockDetailScreen(symbol: string) {
     notFound,
     isError,
     isRefreshing,
-    sectorLabel: stock ? SECTOR_LABELS[stock.sector] : undefined,
+    sectorLabel: stock ? t.sectors[stock.sector] : undefined,
     similar,
+    sellLabel: held
+      ? t.ticket.sellHeld({ shares: f.shares(micros(held.qtyMicros)) })
+      : t.common.sell,
     chart: {
       period: resolvePeriod(enabledPeriods, period.value),
       type: type.value,
@@ -62,7 +70,7 @@ export function useStockDetailScreen(symbol: string) {
       scrub: setScrubbed,
       share: () => {
         if (!stock || !quote) return;
-        const message = shareStockMessage({ symbol, name: stock.name, quote });
+        const message = shareStockMessage(copy, { symbol, name: stock.name, quote });
         const url = Linking.createURL(`/stock/${symbol}`);
         // Android shares only the message, so the link rides inside it there.
         void Share.share(

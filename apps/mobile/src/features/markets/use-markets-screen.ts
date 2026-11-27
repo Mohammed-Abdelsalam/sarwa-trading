@@ -12,7 +12,10 @@ import {
   useWatchedSymbols,
 } from '@sarwa/core';
 
+import { useCopy } from '../../lib/i18n';
+
 export function useMarketsScreen() {
+  const { t } = useCopy();
   const [query, setQuery] = useState('');
   const [sector, setSector] = useState<SectorFilter>('all');
   const [sort, setSort] = useState(DEFAULT_SORT);
@@ -40,7 +43,7 @@ export function useMarketsScreen() {
     filters: {
       query,
       sector,
-      sectorLabel: sectorFilterLabel(sector),
+      sectorLabel: sectorFilterLabel(t, sector),
       sort,
       searchedQuery,
       searchDisabled: isLoading || isError,

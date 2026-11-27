@@ -9,15 +9,21 @@ import { PriceFlash } from '../../components/trading/price-flash';
 import { Sparkline } from '../../components/trading/sparkline';
 import { StockAvatar } from '../../components/trading/stock-avatar';
 import { Text } from '../../components/ui/text';
+import { useCopy } from '../../lib/i18n';
 
 function SimilarCard({ stock }: { stock: StockWithQuote }) {
+  const copy = useCopy();
   const quote = useQuote(stock.symbol) ?? stock.quote;
   const pct = changePct(quote);
   return (
     <Link href={`/stock/${stock.symbol}`} asChild>
       <Pressable
         accessibilityRole="link"
-        accessibilityLabel={formatStockLabel({ symbol: stock.symbol, name: stock.name, quote })}
+        accessibilityLabel={formatStockLabel(copy, {
+          symbol: stock.symbol,
+          name: stock.name,
+          quote,
+        })}
         className="w-40 gap-2.5 rounded-lg border border-border bg-surface px-4 py-3.5 active:bg-surface-3"
       >
         <View className="flex-row items-center gap-2.5">
@@ -32,7 +38,7 @@ function SimilarCard({ stock }: { stock: StockWithQuote }) {
         <Sparkline values={stock.sparkline} direction={direction(pct)} width={126} height={32} />
         <View className="gap-1">
           <PriceFlash price={quote.price} />
-          <ChangePill value={pct} label={formatPct(pct)} />
+          <ChangePill value={pct} label={formatPct(copy.f, pct)} />
         </View>
       </Pressable>
     </Link>
