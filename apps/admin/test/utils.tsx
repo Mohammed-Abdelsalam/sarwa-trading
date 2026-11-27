@@ -59,6 +59,15 @@ export function query(data: unknown, overrides: object = {}) {
   } as never;
 }
 
+// Settles every call successfully, so confirm dialogs close like they do after a real save.
+export function succeedingMutation() {
+  return mutation({
+    mutate: jest.fn((_variables: unknown, options?: { onSuccess?: () => void }) => {
+      options?.onSuccess?.();
+    }),
+  });
+}
+
 export function mutation(overrides: object = {}) {
   return {
     mutate: jest.fn(),

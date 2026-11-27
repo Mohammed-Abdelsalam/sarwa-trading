@@ -116,6 +116,11 @@ describe('message functions', () => {
     );
   });
 
+  it('keeps the typed confirmation word inside one sentence per language', () => {
+    expect(en.admin.market.dropConfirmLabel({ word: 'DROP' })).toBe('Type DROP to confirm');
+    expect(ar.admin.market.dropConfirmLabel({ word: 'DROP' })).toBe('اكتب DROP للتأكيد');
+  });
+
   it('uses the Arabic dual and few forms', () => {
     expect(ar.admin.tripsToday(arF.count(2))).toBe('تفعيلان اليوم');
     expect(ar.common.minutes(arF.count(5))).toBe('٥ دقائق');

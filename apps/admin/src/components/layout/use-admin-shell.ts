@@ -3,7 +3,7 @@ import { usePathname } from 'next/navigation';
 import { useLiveStatus } from '@sarwa/core';
 import { useAdminLive, useAdminSession, useLogout, useServerVersion } from '@sarwa/core/admin';
 
-import { useLocalPreference } from '../../lib/browser';
+import { useLocalPreference, usePageLifecycle } from '../../lib/browser';
 import { useTheme } from '../../lib/theme';
 import { navKeyFor } from './nav';
 
@@ -17,7 +17,8 @@ export function useAdminShell() {
   const { theme, toggle } = useTheme();
   const [sidebar, setSidebar] = useLocalPreference('sarwa.admin.sidebar', SIDEBAR, 'expanded');
   const version = useServerVersion();
-  useAdminLive(session.user !== null);
+  const { foreground } = usePageLifecycle();
+  useAdminLive({ enabled: session.user !== null, foreground });
 
   return {
     active: navKeyFor(pathname),

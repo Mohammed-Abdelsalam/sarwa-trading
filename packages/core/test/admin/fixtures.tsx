@@ -95,11 +95,13 @@ export function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 export interface FakeAdminSocket extends AdminSocket {
   order(order: AdminOrder): void;
   trading(trading: AdminTrading): void;
+  connected(): void;
 }
 
 export function fakeAdminSocket(): FakeAdminSocket {
   const orders = new Set<(order: AdminOrder) => void>();
   const tradings = new Set<(trading: AdminTrading) => void>();
+  const connects = new Set<() => void>();
   return {
     connect: jest.fn(),
     disconnect: jest.fn(),
@@ -110,6 +112,15 @@ export function fakeAdminSocket(): FakeAdminSocket {
     onTrading: (listener) => {
       tradings.add(listener);
       return () => tradings.delete(listener);
+    },
+    onConnect: (listener) => {
+      connects.add(listener);
+      return () => connects.delete(listener);
+    },
+    connected: () => {
+      connects.forEach((listener) => {
+        listener();
+      });
     },
     order: (order) => {
       orders.forEach((listener) => {

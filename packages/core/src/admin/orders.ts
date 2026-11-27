@@ -23,7 +23,7 @@ import { useAdmin } from './provider';
 
 export const ORDER_STREAM_LIMIT = 50;
 
-// Newest first: an update replaces its row in place, a new order goes on top.
+// Newest first: an update replaces its row in place, a new order goes on top, a late older event is dropped.
 export function mergeOrder(
   items: readonly AdminOrder[],
   order: AdminOrder,
@@ -31,6 +31,8 @@ export function mergeOrder(
   limit = ORDER_STREAM_LIMIT,
 ): AdminOrder[] {
   const index = items.findIndex((item) => item.id === order.id);
+  const cached = items[index];
+  if (cached && cached.updatedAt > order.updatedAt) return [...items];
   const next =
     index === -1 ? [order, ...items] : items.map((item, i) => (i === index ? order : item));
   return next.filter((item) => !status || item.status === status).slice(0, limit);

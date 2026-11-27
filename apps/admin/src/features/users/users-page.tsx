@@ -24,6 +24,7 @@ import {
 } from '@sarwa/ui';
 
 import { Forbidden } from '../../components/common/access';
+import { ConfirmDialog } from '../../components/common/confirm-dialog';
 import { RoleBadge, UserAvatar } from '../../components/common/identity';
 import { LoadError, PageHeader, TableSkeleton } from '../../components/common/states';
 import { AddUserDialog } from './add-user-dialog';
@@ -139,6 +140,25 @@ function UsersTable({ page }: { page: UsersPageModel }) {
   );
 }
 
+function UserConfirmDialog({ page }: { page: UsersPageModel }) {
+  const { t } = useI18n();
+  const request = page.confirm.request;
+  const copy =
+    request?.kind === 'demote' ? t.admin.users.confirmDemote : t.admin.users.confirmDisable;
+  return (
+    <ConfirmDialog
+      open={request !== null}
+      title={copy.title({ email: request?.user.email ?? '' })}
+      body={copy.body}
+      submit={copy.submit}
+      isSaving={page.confirm.isSaving}
+      failed={page.confirm.failed}
+      onConfirm={page.actions.confirm}
+      onCancel={page.actions.cancelConfirm}
+    />
+  );
+}
+
 export function UsersPage() {
   const page = useUsersPage();
   const { t, f } = useI18n();
@@ -199,6 +219,7 @@ export function UsersPage() {
         {copy.note} <span className="type-mono">user.role</span>.
       </Callout>
       <AddUserDialog add={page.add} />
+      <UserConfirmDialog page={page} />
     </>
   );
 }

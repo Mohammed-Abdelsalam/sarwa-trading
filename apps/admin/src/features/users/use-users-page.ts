@@ -1,6 +1,12 @@
 import { useState } from 'react';
 
-import { CreateUserSchema, type Role, type UserStatus } from '@sarwa/contracts';
+import {
+  type AdminUser,
+  CreateUserSchema,
+  type Role,
+  type UpdateUser,
+  type UserStatus,
+} from '@sarwa/contracts';
 import {
   isConflict,
   useAdminSession,
@@ -11,6 +17,10 @@ import {
 
 export type UserFilter = 'all' | UserStatus;
 export type UserFieldError = 'emailInvalid' | 'required' | 'passwordShort' | 'exists';
+export interface UserConfirm {
+  kind: 'disable' | 'demote';
+  user: AdminUser;
+}
 
 const EMPTY = { email: '', name: '', password: '', role: 'VIEWER' as Role };
 
@@ -71,7 +81,14 @@ export function useUsersPage() {
   const add = useAddUser();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<UserFilter>('all');
+  const [confirm, setConfirm] = useState<UserConfirm | null>(null);
   const all = users.data ?? [];
+  const ask = (kind: UserConfirm['kind'], id: string) => {
+    const user = all.find((row) => row.id === id);
+    if (!user) return;
+    update.reset();
+    setConfirm({ kind, user });
+  };
   const q = search.trim().toLowerCase();
 
   return {
@@ -95,15 +112,38 @@ export function useUsersPage() {
     failed: update.isError,
     now: users.dataUpdatedAt,
     add,
+    confirm: {
+      request: confirm,
+      isSaving: update.isPending,
+      failed: confirm !== null && update.isError,
+    },
     actions: {
       retry: () => void users.refetch(),
       search: setSearch,
       setFilter,
       setRole: (id: string, role: Role) => {
-        update.mutate({ id, patch: { role } });
+        if (role === 'VIEWER') ask('demote', id);
+        else update.mutate({ id, patch: { role } });
       },
       setStatus: (id: string, status: UserStatus) => {
-        update.mutate({ id, patch: { status } });
+        if (status === 'disabled') ask('disable', id);
+        else update.mutate({ id, patch: { status } });
+      },
+      confirm: () => {
+        if (!confirm) return;
+        const patch: UpdateUser =
+          confirm.kind === 'disable' ? { status: 'disabled' } : { role: 'VIEWER' };
+        update.mutate(
+          { id: confirm.user.id, patch },
+          {
+            onSuccess: () => {
+              setConfirm(null);
+            },
+          },
+        );
+      },
+      cancelConfirm: () => {
+        setConfirm(null);
       },
     },
   };

@@ -268,8 +268,7 @@ export const adminEn = {
     dropTitle: ({ n }: N) => `Drop all ${n} connections?`,
     dropDialogBody:
       "Every client disconnects immediately and shows “Reconnecting…”. This can't be undone, and it's recorded in the audit log.",
-    dropType: 'Type',
-    dropToConfirm: 'to confirm',
+    dropConfirmLabel: ({ word }: { word: string }) => `Type ${word} to confirm`,
     dropSubmit: 'Drop connections',
     dropped: ({ n }: N) => `Dropped ${n} connections.`,
     ticker: 'Live ticker preview',
@@ -282,6 +281,26 @@ export const adminEn = {
       calendar: 'Calendar',
       'always-open': 'Always open',
     } satisfies Record<SessionMode, string>,
+    confirmTradingOff: {
+      title: 'Turn off trading?',
+      body: 'Buy and Sell stop for every client until trading is turned back on. Prices stay live and open orders keep working.',
+      submit: 'Turn off trading',
+    },
+    confirmBreakerOff: {
+      title: 'Turn off the circuit breaker?',
+      body: 'Symbols will no longer halt automatically on sharp moves. Halts already in place stay until they resume.',
+      submit: 'Turn off breaker',
+    },
+    confirmSessionMode: {
+      title: ({ mode }: { mode: string }) => `Switch session mode to ${mode}?`,
+      body: {
+        calendar:
+          "The market follows the exchange calendar again. If it's outside regular hours, trading stops for clients right away.",
+        'always-open':
+          'The market stays open around the clock and ignores the calendar, so clients can trade outside regular hours.',
+      } satisfies Record<SessionMode, string>,
+      submit: 'Switch mode',
+    },
     closesAt: ({ time }: { time: string }) => `closes ${time}`,
     opensAt: ({ time }: { time: string }) => `opens ${time}`,
     earlyClose: '(early close)',
@@ -515,6 +534,16 @@ export const adminEn = {
     statuses: { active: 'Active', disabled: 'Disabled' },
     disable: 'Disable',
     enable: 'Re-enable',
+    confirmDisable: {
+      title: ({ email }: { email: string }) => `Disable ${email}?`,
+      body: "They're signed out on their next request and can't sign in until re-enabled.",
+      submit: 'Disable user',
+    },
+    confirmDemote: {
+      title: ({ email }: { email: string }) => `Make ${email} a VIEWER?`,
+      body: 'They lose edit access on their next request and can only view the dashboard.',
+      submit: 'Change role',
+    },
     note: "You can't change your own role or disable yourself. At least one ADMIN must remain active. Role changes take effect on the user's next request and are audited as",
     addTitle: 'Add admin user',
     addBody: 'They sign in with this email and password.',

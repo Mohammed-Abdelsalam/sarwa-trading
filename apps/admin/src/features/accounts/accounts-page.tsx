@@ -56,9 +56,7 @@ function AccountsTable({ page }: { page: AccountsPageModel }) {
       <StateView
         icon={<Search />}
         title={
-          page.search.trim()
-            ? t.admin.accountList.noMatch({ q: page.search.trim() })
-            : t.admin.accountList.empty
+          page.query ? t.admin.accountList.noMatch({ q: page.query }) : t.admin.accountList.empty
         }
       />
     );

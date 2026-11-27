@@ -101,11 +101,20 @@ describe('StocksPage', () => {
     expect(screen.getByRole('button', { name: 'Add your first stock' })).toBeEnabled();
   });
 
-  it('disables every change for viewers without hiding it', () => {
+  it('locks every change for viewers without hiding it', async () => {
     setup({ role: 'VIEWER' });
 
-    expect(screen.getByRole('button', { name: 'Add stock' })).toBeDisabled();
-    expect(screen.getByRole('switch', { name: 'Disable AAPL' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Actions for AAPL' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add stock' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(screen.getByRole('switch', { name: 'Disable AAPL' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    const actions = screen.getByRole('button', { name: 'Actions for AAPL' });
+    expect(actions).toHaveAccessibleDescription("Viewers can't make changes");
+    await userEvent.click(actions);
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
 });

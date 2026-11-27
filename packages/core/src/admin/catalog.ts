@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 
 import {
   type AdminStock,
@@ -95,6 +96,22 @@ export function useUpdateUser() {
     mutationFn: ({ id, patch }: { id: string; patch: UpdateUser }) => api.updateUser(id, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: adminKeys.users }),
   });
+}
+
+export const SEARCH_DEBOUNCE_MS = 300;
+
+// Search boxes query the server once typing pauses, not on every keystroke.
+export function useDebouncedValue<T>(value: T, delayMs = SEARCH_DEBOUNCE_MS): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSettled(value);
+    }, delayMs);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delayMs]);
+  return settled;
 }
 
 export const AUDIT_PAGE_SIZE = 25;

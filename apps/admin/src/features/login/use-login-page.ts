@@ -33,7 +33,7 @@ export function useLoginPage() {
   const ticker = useLiveTicker(TICKER);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(true);
+  const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const errors = submitted ? validate(email, password) : {};

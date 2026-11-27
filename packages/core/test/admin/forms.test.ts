@@ -98,6 +98,9 @@ describe('execution rules form', () => {
       staleQuoteMs: 'required',
     });
     expect(parseRulesDraft({ ...draft, collarBps: '90' }).errors).toEqual({ collarBps: 'range' });
+    expect(parseRulesDraft({ ...draft, spreadBps: '-0.02' }).errors).toEqual({
+      spreadBps: 'invalid',
+    });
     expect(parseRulesDraft({ ...draft, minNotionalCents: '300000' }).errors).toEqual({
       minNotionalCents: 'range',
     });
@@ -105,7 +108,13 @@ describe('execution rules form', () => {
 
   it('patches only what changed', () => {
     const next = { ...DEFAULT_EXECUTION_RULES, spreadBps: 4 };
-    expect(rulesPatch(DEFAULT_EXECUTION_RULES, next)).toEqual({ spreadBps: 4 });
+    expect(rulesPatch(DEFAULT_EXECUTION_RULES, next, ['spreadBps'])).toEqual({ spreadBps: 4 });
+    expect(
+      rulesPatch({ ...DEFAULT_EXECUTION_RULES, collarBps: 900 }, next, [
+        'spreadBps',
+        'staleQuoteMs',
+      ]),
+    ).toEqual({ spreadBps: 4 });
   });
 });
 
@@ -125,6 +134,19 @@ describe('config draft', () => {
       patch: { maintenanceMode: true, banner: null, enabledPeriods: ['1W', '1M', '1Y'] },
     });
     expect(configChanges(saved, configToDraft(saved))).toEqual({ count: 0, patch: {} });
+  });
+
+  it('only diffs the fields that were edited', () => {
+    const newer = makeConfig({ banner: { message: 'Close at 1pm', tone: 'warning' } });
+
+    expect(configChanges(newer, { maintenanceMode: true })).toEqual({
+      count: 1,
+      patch: { maintenanceMode: true },
+    });
+    expect(configChanges(newer, { bannerTone: 'info' })).toEqual({
+      count: 1,
+      patch: { banner: { message: 'Close at 1pm', tone: 'info' } },
+    });
   });
 
   it('keeps at least one period and restores the canonical order', () => {

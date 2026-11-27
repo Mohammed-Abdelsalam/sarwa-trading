@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { type AdminTrading, type CreateHalt, type UpdateTrading } from '@sarwa/contracts';
 
@@ -52,20 +52,36 @@ export function useResumeHalt() {
   });
 }
 
-// One admin socket per signed-in dashboard; trading changes made elsewhere land in the cache.
-export function useAdminLive(enabled: boolean): void {
+// One admin socket per signed-in, visible dashboard; after a reconnect the order lists refetch what was missed.
+export function useAdminLive({
+  enabled,
+  foreground,
+}: {
+  enabled: boolean;
+  foreground: boolean;
+}): void {
   const { socket } = useAdmin();
   const queryClient = useQueryClient();
+  const connectedBefore = useRef(false);
 
   useEffect(() => {
-    if (!enabled) return;
-    const stop = socket.onTrading((trading: AdminTrading) => {
+    if (!enabled || !foreground) return;
+    const stopTrading = socket.onTrading((trading: AdminTrading) => {
       queryClient.setQueryData(adminKeys.trading, trading);
+    });
+    const stopConnect = socket.onConnect(() => {
+      if (connectedBefore.current) {
+        void queryClient.invalidateQueries({ queryKey: adminKeys.orderLists });
+        void queryClient.invalidateQueries({ queryKey: adminKeys.orderStats });
+        void queryClient.invalidateQueries({ queryKey: adminKeys.trading });
+      }
+      connectedBefore.current = true;
     });
     socket.connect();
     return () => {
-      stop();
+      stopTrading();
+      stopConnect();
       socket.disconnect();
     };
-  }, [enabled, socket, queryClient]);
+  }, [enabled, foreground, socket, queryClient]);
 }

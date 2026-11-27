@@ -1,7 +1,13 @@
 import { useState } from 'react';
 
 import { type AuditAction } from '@sarwa/contracts';
-import { AUDIT_PAGE_SIZE, auditChanges, auditPreview, useAuditLog } from '@sarwa/core/admin';
+import {
+  AUDIT_PAGE_SIZE,
+  auditChanges,
+  auditPreview,
+  useAuditLog,
+  useDebouncedValue,
+} from '@sarwa/core/admin';
 
 export type ActionFilter = AuditAction | 'all';
 
@@ -10,10 +16,11 @@ export function useAuditPage() {
   const [actor, setActor] = useState('');
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const actorQuery = useDebouncedValue(actor.trim());
   const audit = useAuditLog({
     page,
     action: action === 'all' ? undefined : action,
-    actor: actor.trim() || undefined,
+    actor: actorQuery || undefined,
   });
   const data = audit.data;
 

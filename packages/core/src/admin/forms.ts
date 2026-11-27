@@ -16,7 +16,7 @@ import {
   type UpdateAppConfig,
   type UpdateStock,
 } from '@sarwa/contracts';
-import { parseCents } from '@sarwa/domain';
+import { parseCents, parsePercentBps } from '@sarwa/domain';
 
 import { type I18n } from '../hooks/i18n';
 
@@ -152,7 +152,11 @@ export function rulesToDraft(rules: ExecutionRulesWire): RulesDraft {
 
 function parseRule(unit: RuleUnit, text: string): number | null {
   const cleaned = text.replace(/[,\s]/g, '');
-  if (unit !== 'seconds') return parseCents(cleaned);
+  if (unit === 'dollars') return parseCents(cleaned);
+  if (unit === 'percent') {
+    const value = parsePercentBps(cleaned);
+    return value !== null && value >= 0 ? value : null;
+  }
   if (!/^\d+(\.\d{0,3})?$/.test(cleaned)) return null;
   return Math.round(Number(cleaned) * MS_PER_SECOND);
 }
@@ -184,12 +188,14 @@ export function parseRulesDraft(draft: RulesDraft): {
   return { rules: result.data, errors };
 }
 
+// Only the fields this admin touched: saved values update live, so diffing the rest would revert others' edits.
 export function rulesPatch(
   saved: ExecutionRulesWire,
   next: ExecutionRulesWire,
+  touched: readonly (keyof ExecutionRulesWire)[],
 ): Partial<ExecutionRulesWire> {
   return Object.fromEntries(
-    Object.entries(next).filter(([key, value]) => saved[key as keyof ExecutionRulesWire] !== value),
+    touched.filter((key) => saved[key] !== next[key]).map((key) => [key, next[key]]),
   );
 }
 
@@ -217,27 +223,32 @@ export function togglePeriod(periods: readonly Period[], period: Period): Period
   return PERIODS.filter((p) => p === period || periods.includes(p));
 }
 
+// Like rulesPatch, only the edited fields are compared against the live saved config.
 export function configChanges(
   saved: AppConfig,
-  draft: ConfigDraft,
+  edits: Partial<ConfigDraft>,
 ): { patch: UpdateAppConfig; count: number } {
   const patch: UpdateAppConfig = {};
   let count = 0;
-  if (draft.maintenanceMode !== saved.maintenanceMode) {
-    patch.maintenanceMode = draft.maintenanceMode;
+  if (edits.maintenanceMode !== undefined && edits.maintenanceMode !== saved.maintenanceMode) {
+    patch.maintenanceMode = edits.maintenanceMode;
     count += 1;
   }
-  const message = draft.bannerMessage.trim();
-  const banner = message ? { message, tone: draft.bannerTone } : null;
-  if (banner?.message !== saved.banner?.message || banner?.tone !== saved.banner?.tone) {
-    patch.banner = banner;
-    count += 1;
+  if (edits.bannerMessage !== undefined || edits.bannerTone !== undefined) {
+    const current = configToDraft(saved);
+    const message = (edits.bannerMessage ?? current.bannerMessage).trim();
+    const banner = message ? { message, tone: edits.bannerTone ?? current.bannerTone } : null;
+    if (banner?.message !== saved.banner?.message || banner?.tone !== saved.banner?.tone) {
+      patch.banner = banner;
+      count += 1;
+    }
   }
-  const toggled = PERIODS.filter(
-    (p) => draft.enabledPeriods.includes(p) !== saved.enabledPeriods.includes(p),
-  ).length;
-  if (toggled > 0) {
-    patch.enabledPeriods = PERIODS.filter((p) => draft.enabledPeriods.includes(p));
+  const periods = edits.enabledPeriods;
+  const toggled = periods
+    ? PERIODS.filter((p) => periods.includes(p) !== saved.enabledPeriods.includes(p)).length
+    : 0;
+  if (periods && toggled > 0) {
+    patch.enabledPeriods = PERIODS.filter((p) => periods.includes(p));
     count += toggled;
   }
   return { patch, count };

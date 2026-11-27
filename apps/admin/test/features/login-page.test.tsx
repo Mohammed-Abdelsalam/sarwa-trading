@@ -41,24 +41,24 @@ describe('LoginPage', () => {
     expect(model.submit).not.toHaveBeenCalled();
   });
 
-  it('signs in with remember-me on by default and lets the operator turn it off', async () => {
+  it('signs in with remember-me off by default and lets the operator turn it on', async () => {
     const model = login();
     renderWithProviders(<LoginPage />);
 
     await userEvent.type(screen.getByLabelText('Email'), ' maya@minitrading.dev ');
     await userEvent.type(screen.getByLabelText('Password'), 'hunter2-but-longer');
     const remember = screen.getByRole('checkbox', { name: 'Keep me signed in for 7 days' });
-    expect(remember).toBeChecked();
+    expect(remember).not.toBeChecked();
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(model.submit).toHaveBeenLastCalledWith({
       email: 'maya@minitrading.dev',
       password: 'hunter2-but-longer',
-      remember: true,
+      remember: false,
     });
 
     await userEvent.click(remember);
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(model.submit).toHaveBeenLastCalledWith(expect.objectContaining({ remember: false }));
+    expect(model.submit).toHaveBeenLastCalledWith(expect.objectContaining({ remember: true }));
   });
 
   it('explains a wrong password without saying which field was wrong', () => {

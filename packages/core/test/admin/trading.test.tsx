@@ -26,7 +26,7 @@ describe('trading hooks', () => {
     });
     const { result, unmount } = renderHook(
       () => {
-        useAdminLive(true);
+        useAdminLive({ enabled: true, foreground: true });
         return { trading: useAdminTrading(), update: useUpdateTrading() };
       },
       { wrapper: Wrapper },
@@ -50,6 +50,32 @@ describe('trading hooks', () => {
 
     unmount();
     expect(socket.disconnect).toHaveBeenCalled();
+  });
+
+  it('drops the socket in background tabs and refetches orders after reconnecting', () => {
+    const { Wrapper, socket, queryClient } = createAdminWrapper({});
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const { rerender } = renderHook(
+      ({ foreground }: { foreground: boolean }) => {
+        useAdminLive({ enabled: true, foreground });
+      },
+      { wrapper: Wrapper, initialProps: { foreground: true } },
+    );
+    expect(socket.connect).toHaveBeenCalledTimes(1);
+    act(() => {
+      socket.connected();
+    });
+    expect(invalidate).not.toHaveBeenCalled();
+
+    rerender({ foreground: false });
+    expect(socket.disconnect).toHaveBeenCalled();
+    rerender({ foreground: true });
+    expect(socket.connect).toHaveBeenCalledTimes(2);
+    act(() => {
+      socket.connected();
+    });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['admin', 'orders', 'list'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['admin', 'orders', 'stats'] });
   });
 
   it('loads halt impact only for a chosen symbol and halts/resumes', async () => {
@@ -108,6 +134,14 @@ describe('orders', () => {
       'b',
     ]);
     expect(mergeOrder([a], b, undefined, 1)).toEqual([b]);
+  });
+
+  it('ignores a late order event older than the cached row', () => {
+    const newer = makeAdminOrder({ id: 'a', status: 'filled', updatedAt: 3_000 });
+    const late = makeAdminOrder({ id: 'a', status: 'open', updatedAt: 2_000 });
+
+    expect(mergeOrder([newer], late)).toEqual([newer]);
+    expect(mergeOrder([late], newer)).toEqual([newer]);
   });
 
   it('streams orders live and holds them back while paused', async () => {

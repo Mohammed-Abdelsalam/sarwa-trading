@@ -27,6 +27,7 @@ import {
   ReadOnlyBadge,
   ViewerNotice,
 } from '../../components/common/access';
+import { ConfirmDialog } from '../../components/common/confirm-dialog';
 import { LoadError, PageHeader, TableSkeleton } from '../../components/common/states';
 import { HaltDialog } from './halt-dialog';
 import { RulesForm } from './rules-form';
@@ -134,6 +135,32 @@ function ControlCards({ page }: { page: TradingPageModel }) {
         <span className="type-caption text-fg-3">{t.admin.sessionNote}</span>
       </Card>
     </div>
+  );
+}
+
+function TradingConfirmDialog({ page }: { page: TradingPageModel }) {
+  const { t } = useI18n();
+  const copy = t.admin.trading;
+  const request = page.confirm.request;
+  const text =
+    request?.kind === 'sessionMode'
+      ? {
+          title: copy.confirmSessionMode.title({ mode: copy.sessionModes[request.mode] }),
+          body: copy.confirmSessionMode.body[request.mode],
+          submit: copy.confirmSessionMode.submit,
+        }
+      : request?.kind === 'breakerOff'
+        ? copy.confirmBreakerOff
+        : copy.confirmTradingOff;
+  return (
+    <ConfirmDialog
+      open={request !== null}
+      {...text}
+      isSaving={page.confirm.isSaving}
+      failed={page.confirm.failed}
+      onConfirm={page.actions.confirm}
+      onCancel={page.actions.cancelConfirm}
+    />
   );
 }
 
@@ -335,6 +362,7 @@ export function TradingPage() {
           </div>
           <CalendarStrip page={page} />
           <HaltDialog halt={page.halt} />
+          <TradingConfirmDialog page={page} />
         </>
       )}
     </>

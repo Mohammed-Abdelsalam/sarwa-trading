@@ -116,35 +116,35 @@ function StocksTable({ page }: { page: StocksPageModel }) {
               />
             </TCell>
             <TCell align="end">
-              <Locked locked={!page.canEdit}>
-                <Menu>
-                  <MenuTrigger asChild disabled={!page.canEdit}>
+              <Menu>
+                <Locked locked={!page.canEdit}>
+                  <MenuTrigger asChild>
                     <IconButton size={32} label={copy.actionsFor({ symbol: stock.symbol })}>
                       <Ellipsis aria-hidden className="size-4" />
                     </IconButton>
                   </MenuTrigger>
-                  <MenuContent>
-                    <MenuItem
-                      icon={<Pencil />}
-                      onSelect={() => {
-                        page.dialog.actions.openEdit(stock);
-                      }}
-                    >
-                      {copy.edit}
-                    </MenuItem>
-                    <MenuSeparator />
-                    <MenuItem
-                      danger
-                      icon={<Trash2 />}
-                      onSelect={() => {
-                        page.actions.askDelete(stock.symbol);
-                      }}
-                    >
-                      {copy.delete}
-                    </MenuItem>
-                  </MenuContent>
-                </Menu>
-              </Locked>
+                </Locked>
+                <MenuContent>
+                  <MenuItem
+                    icon={<Pencil />}
+                    onSelect={() => {
+                      page.dialog.actions.openEdit(stock);
+                    }}
+                  >
+                    {copy.edit}
+                  </MenuItem>
+                  <MenuSeparator />
+                  <MenuItem
+                    danger
+                    icon={<Trash2 />}
+                    onSelect={() => {
+                      page.actions.askDelete(stock.symbol);
+                    }}
+                  >
+                    {copy.delete}
+                  </MenuItem>
+                </MenuContent>
+              </Menu>
             </TCell>
           </TRow>
         ))}

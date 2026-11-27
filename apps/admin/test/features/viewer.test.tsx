@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { useMarketStatus } from '@sarwa/core';
@@ -14,7 +14,14 @@ import {
 
 import { MarketPage } from '../../src/features/market/market-page';
 import { UsersPage } from '../../src/features/users/users-page';
-import { makeUser, mutation, query, renderWithProviders, session } from '../utils';
+import {
+  makeUser,
+  mutation,
+  query,
+  renderWithProviders,
+  session,
+  succeedingMutation,
+} from '../utils';
 
 jest.mock('@sarwa/core', () => ({
   ...jest.requireActual<object>('@sarwa/core'),
@@ -67,16 +74,26 @@ describe('Market control room', () => {
     );
   });
 
-  it('shows viewers the same controls, disabled with a lock and tooltip', () => {
-    mockMarket('VIEWER');
+  it('shows viewers the same controls, focusable but locked with an explanation', async () => {
+    const command = mockMarket('VIEWER');
     renderWithProviders(<MarketPage />);
 
     expect(screen.getByText('View-only access.')).toBeInTheDocument();
     expect(screen.getByText('Read-only')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Pause market' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Drop all connections' })).toBeDisabled();
-    expect(screen.getByRole('slider')).toHaveAttribute('data-disabled');
-    expect(screen.getAllByLabelText("Viewers can't make changes").length).toBeGreaterThanOrEqual(3);
+    for (const name of ['Pause market', 'Drop all connections']) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      expect(button).toHaveAccessibleDescription("Viewers can't make changes");
+      await userEvent.click(button);
+    }
+    const slider = screen.getByRole('slider');
+    act(() => {
+      slider.focus();
+    });
+    expect(slider).toHaveFocus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(command.mutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 
@@ -100,7 +117,7 @@ describe('Users', () => {
   });
 
   it('locks your own row and changes another user', async () => {
-    const update = mutation();
+    const update = succeedingMutation();
     jest.mocked(useAdminSession).mockReturnValue(session('ADMIN'));
     jest
       .mocked(useAdminUsers)
@@ -116,6 +133,49 @@ describe('Users', () => {
 
     expect(screen.getByRole('button', { name: 'Role for maya@minitrading.dev' })).toBeDisabled();
     await userEvent.click(screen.getAllByRole('button', { name: 'Disable' })[1]!);
-    expect(update.mutate).toHaveBeenCalledWith({ id: 'u2', patch: { status: 'disabled' } });
+    expect(update.mutate).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog', { name: 'Disable sam@minitrading.dev?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disable user' }));
+    expect(update.mutate).toHaveBeenCalledWith(
+      { id: 'u2', patch: { status: 'disabled' } },
+      expect.anything(),
+    );
+  });
+
+  it('asks before demoting an ADMIN but promotes and re-enables right away', async () => {
+    const update = succeedingMutation();
+    jest.mocked(useAdminSession).mockReturnValue(session('ADMIN'));
+    jest.mocked(useAdminUsers).mockReturnValue(
+      query([
+        makeUser(),
+        makeUser({ id: 'u2', email: 'sam@minitrading.dev', name: 'Sam Okafor' }),
+        makeUser({
+          id: 'u3',
+          email: 'lee@minitrading.dev',
+          name: 'Lee Chen',
+          role: 'VIEWER',
+          status: 'disabled',
+        }),
+      ]),
+    );
+    jest.mocked(useUpdateUser).mockReturnValue(update as never);
+    jest.mocked(useCreateUser).mockReturnValue(mutation() as never);
+    renderWithProviders(<UsersPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Role for sam@minitrading.dev' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /VIEWER/ }));
+    expect(update.mutate).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog', { name: 'Make sam@minitrading.dev a VIEWER?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Change role' }));
+    expect(update.mutate).toHaveBeenLastCalledWith(
+      { id: 'u2', patch: { role: 'VIEWER' } },
+      expect.anything(),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Role for lee@minitrading.dev' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /ADMIN/ }));
+    expect(update.mutate).toHaveBeenLastCalledWith({ id: 'u3', patch: { role: 'ADMIN' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Re-enable' }));
+    expect(update.mutate).toHaveBeenLastCalledWith({ id: 'u3', patch: { status: 'active' } });
   });
 });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { CreateHaltSchema, type HaltDuration } from '@sarwa/contracts';
+import { CreateHaltSchema, type HaltDuration, type UpdateTrading } from '@sarwa/contracts';
 import { useStocks, type SessionMode } from '@sarwa/core';
 import {
   parseRulesDraft,
@@ -19,6 +19,15 @@ import {
 } from '@sarwa/core/admin';
 
 import { shortActor } from '../overview/use-overview-page';
+
+export type TradingConfirm =
+  { kind: 'tradingOff' } | { kind: 'breakerOff' } | { kind: 'sessionMode'; mode: SessionMode };
+
+function confirmPatch(request: TradingConfirm): UpdateTrading {
+  if (request.kind === 'tradingOff') return { tradingEnabled: false };
+  if (request.kind === 'breakerOff') return { circuitBreaker: { enabled: false } };
+  return { sessionMode: request.mode };
+}
 
 function useHaltDialog() {
   const stocks = useStocks();
@@ -78,42 +87,36 @@ function useHaltDialog() {
 
 function useRulesForm(saved: Parameters<typeof rulesToDraft>[0] | undefined) {
   const update = useUpdateTrading();
-  const [draft, setDraft] = useState<RulesDraft | null>(null);
+  const [edits, setEdits] = useState<Partial<RulesDraft>>({});
   const [submitted, setSubmitted] = useState(false);
-  const current = draft ?? (saved ? rulesToDraft(saved) : null);
+  const touched = Object.keys(edits) as (keyof RulesDraft)[];
+  const current = saved ? { ...rulesToDraft(saved), ...edits } : null;
   const parsed = current ? parseRulesDraft(current) : null;
-  const patch = saved && parsed?.rules ? rulesPatch(saved, parsed.rules) : {};
+  const patch = saved && parsed?.rules ? rulesPatch(saved, parsed.rules, touched) : {};
+  const clear = () => {
+    setEdits({});
+    setSubmitted(false);
+  };
 
   return {
     draft: current,
     errors: submitted ? (parsed?.errors ?? {}) : {},
-    dirty: draft !== null && (!parsed?.rules || Object.keys(patch).length > 0),
+    dirty: touched.length > 0 && (!parsed?.rules || Object.keys(patch).length > 0),
     isSaving: update.isPending,
     failed: update.isError && update.variables.rules !== undefined,
     actions: {
       set: <K extends keyof RulesDraft>(key: K, value: RulesDraft[K]) => {
-        if (current) setDraft({ ...current, [key]: value });
+        setEdits((current) => ({ ...current, [key]: value }));
       },
-      discard: () => {
-        setDraft(null);
-        setSubmitted(false);
-      },
+      discard: clear,
       save: () => {
         setSubmitted(true);
         if (!parsed?.rules) return;
         if (Object.keys(patch).length === 0) {
-          setDraft(null);
+          clear();
           return;
         }
-        update.mutate(
-          { rules: patch },
-          {
-            onSuccess: () => {
-              setDraft(null);
-              setSubmitted(false);
-            },
-          },
-        );
+        update.mutate({ rules: patch }, { onSuccess: clear });
       },
     },
   };
@@ -128,6 +131,11 @@ export function useTradingPage() {
   const enableStock = useUpdateStock();
   const halt = useHaltDialog();
   const rules = useRulesForm(trading.data?.rules);
+  const [confirm, setConfirm] = useState<TradingConfirm | null>(null);
+  const ask = (request: TradingConfirm) => {
+    update.reset();
+    setConfirm(request);
+  };
   const data = trading.data;
   const today = data ? marketClock(data.updatedAt).date : '';
   const lastTrip = data?.tripsToday.at(-1);
@@ -148,16 +156,34 @@ export function useTradingPage() {
     calendar: (data?.upcoming ?? []).map((day) => ({ ...day, isToday: day.date === today })),
     halt,
     rules,
+    confirm: {
+      request: confirm,
+      isSaving: update.isPending,
+      failed: confirm !== null && update.isError,
+    },
     actions: {
       retry: () => void trading.refetch(),
       setTradingEnabled: (tradingEnabled: boolean) => {
-        update.mutate({ tradingEnabled });
+        if (tradingEnabled) update.mutate({ tradingEnabled });
+        else ask({ kind: 'tradingOff' });
       },
       setCircuitBreaker: (enabled: boolean) => {
-        update.mutate({ circuitBreaker: { enabled } });
+        if (enabled) update.mutate({ circuitBreaker: { enabled } });
+        else ask({ kind: 'breakerOff' });
       },
-      setSessionMode: (sessionMode: SessionMode) => {
-        update.mutate({ sessionMode });
+      setSessionMode: (mode: SessionMode) => {
+        if (mode !== data?.sessionMode) ask({ kind: 'sessionMode', mode });
+      },
+      confirm: () => {
+        if (!confirm) return;
+        update.mutate(confirmPatch(confirm), {
+          onSuccess: () => {
+            setConfirm(null);
+          },
+        });
+      },
+      cancelConfirm: () => {
+        setConfirm(null);
       },
       resume: (symbol: string) => {
         resume.mutate(symbol);

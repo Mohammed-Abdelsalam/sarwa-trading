@@ -6,6 +6,7 @@ import {
   isResetConfirmed,
   useAdminAccounts,
   useAdminSession,
+  useDebouncedValue,
   useResetAccount,
 } from '@sarwa/core/admin';
 
@@ -21,7 +22,7 @@ export function useAccountsPage() {
   const [resetting, setResetting] = useState<AdminAccount | null>(null);
   const [confirmText, setConfirmText] = useState('');
   const [resetDone, setResetDone] = useState<string | null>(null);
-  const q = search.trim();
+  const q = useDebouncedValue(search.trim());
   const accounts = useAdminAccounts({
     q: q || undefined,
     sort,
@@ -33,6 +34,7 @@ export function useAccountsPage() {
   return {
     canEdit,
     search,
+    query: q,
     sort,
     page,
     rows: accounts.data?.items ?? [],

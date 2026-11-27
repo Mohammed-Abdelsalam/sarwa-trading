@@ -20,6 +20,7 @@ export interface AdminSocket {
   disconnect(): void;
   onOrder(listener: (order: AdminOrder) => void): () => void;
   onTrading(listener: (trading: AdminTrading) => void): () => void;
+  onConnect(listener: () => void): () => void;
 }
 
 const defaultCreateSocket = (url: string): AdminIo =>
@@ -60,6 +61,7 @@ export function createAdminSocket({
   const socket = createSocket(`${url.replace(/\/$/, '')}${ADMIN_NAMESPACE}`);
   const orders = listenerSet<AdminOrder>();
   const trading = listenerSet<AdminTrading>();
+  const connects = listenerSet<undefined>();
 
   // Events are checked against their v1 schema; a shape this dashboard doesn't know is dropped.
   socket.on(AdminSocketEvent.Order, (payload: unknown) => {
@@ -69,6 +71,9 @@ export function createAdminSocket({
   socket.on(AdminSocketEvent.TradingStatus, (payload: unknown) => {
     const parsed = TradingEventSchema.safeParse(payload);
     if (parsed.success) trading.emit(parsed.data.trading);
+  });
+  socket.on('connect', () => {
+    connects.emit(undefined);
   });
   socket.on('connect_error', (error) => {
     if (error.message === 'Unauthorized') onUnauthorized?.();
@@ -83,5 +88,6 @@ export function createAdminSocket({
     },
     onOrder: orders.add,
     onTrading: trading.add,
+    onConnect: connects.add,
   };
 }

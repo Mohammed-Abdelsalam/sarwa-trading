@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { useAdminAccounts, useAdminSession, useResetAccount } from '@sarwa/core/admin';
@@ -61,6 +61,27 @@ describe('AccountsPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'View ACC-00AA11' }));
 
-    expect(screen.getByRole('button', { name: 'Reset account' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reset account' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
+  it('queries the server once typing pauses, not on every keystroke', async () => {
+    jest.useFakeTimers();
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    setup();
+
+    await user.type(screen.getByLabelText('Search accounts'), 'acc');
+    const queried = () => jest.mocked(useAdminAccounts).mock.calls.map(([query]) => query.q);
+    expect(queried()).not.toContain('a');
+    expect(queried()).not.toContain('ac');
+
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
+    expect(queried()).toContain('acc');
+    expect(queried()).not.toContain('ac');
+    jest.useRealTimers();
   });
 });

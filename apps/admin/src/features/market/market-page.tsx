@@ -111,7 +111,6 @@ function VolatilityCard({ page }: { page: MarketPageModel }) {
           max={MARKET_VOLATILITY.max}
           step={0.1}
           value={[page.volatility]}
-          disabled={!page.canEdit}
           onValueChange={([value]) => {
             if (value !== undefined) page.actions.dragVolatility(value);
           }}
@@ -279,7 +278,7 @@ export function MarketPage() {
           </>
         }
       >
-        <Field label={`${copy.dropType} ${DROP_WORD} ${copy.dropToConfirm}`}>
+        <Field label={copy.dropConfirmLabel({ word: DROP_WORD })}>
           {(field) => (
             <Input
               {...field}

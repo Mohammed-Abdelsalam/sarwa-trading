@@ -1,6 +1,12 @@
 import { ArrowLeft, Eye, Lock } from 'lucide-react';
 import Link from 'next/link';
-import { type ComponentProps, type ReactNode } from 'react';
+import {
+  cloneElement,
+  type ComponentProps,
+  type ReactElement,
+  type SyntheticEvent,
+  useId,
+} from 'react';
 
 import { type AdminUser } from '@sarwa/contracts';
 import { useI18n } from '@sarwa/core';
@@ -27,19 +33,36 @@ export function ReadOnlyBadge() {
   );
 }
 
-// Viewers keep every control in place, disabled with a lock and a tooltip, so layouts match between roles.
-export function Locked({ locked, children }: { locked: boolean; children: ReactNode }) {
+const block = (event: SyntheticEvent) => {
+  event.preventDefault();
+  event.stopPropagation();
+};
+
+// Viewers keep every control in place and focusable, but inert and described as view-only, so layouts match between roles.
+export function Locked({
+  locked,
+  children,
+}: {
+  locked: boolean;
+  children: ReactElement<Record<string, unknown>>;
+}) {
   const { t } = useI18n();
+  const id = useId();
   if (!locked) return children;
   return (
     <Tooltip content={t.admin.viewer.locked}>
       <span
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- disabled controls can't take focus, so the wrapper carries the tooltip.
-        tabIndex={0}
-        aria-label={t.admin.viewer.locked}
-        className="focus-visible:outline-focus inline-flex cursor-not-allowed rounded-md focus-visible:outline-2"
+        className="inline-flex cursor-not-allowed"
+        onClickCapture={block}
+        onPointerDownCapture={block}
+        onKeyDownCapture={(event) => {
+          if (event.key !== 'Tab') block(event);
+        }}
       >
-        {children}
+        {cloneElement(children, { 'aria-disabled': true, 'aria-describedby': id })}
+        <span id={id} className="sr-only">
+          {t.admin.viewer.locked}
+        </span>
       </span>
     </Tooltip>
   );
@@ -55,7 +78,7 @@ export function GuardedButton({
     <Locked locked={locked}>
       <Button
         {...props}
-        disabled={locked || disabled}
+        disabled={!locked && disabled}
         icon={locked ? <Lock aria-hidden className="size-4" /> : icon}
       />
     </Locked>
@@ -69,7 +92,7 @@ export function GuardedSwitch({
 }: ComponentProps<typeof Switch> & { locked: boolean }) {
   return (
     <Locked locked={locked}>
-      <Switch {...props} disabled={locked || disabled} />
+      <Switch {...props} disabled={!locked && disabled} />
     </Locked>
   );
 }

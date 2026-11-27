@@ -17,12 +17,11 @@ export function useConfigPage() {
   const config = useAdminConfig();
   const stats = useAdminStats();
   const save = useUpdateConfig();
-  const [draft, setDraft] = useState<ConfigDraft | null>(null);
-  const current = draft ?? (config.data ? configToDraft(config.data) : null);
-  const changes =
-    config.data && current ? configChanges(config.data, current) : { patch: {}, count: 0 };
+  const [edits, setEdits] = useState<Partial<ConfigDraft>>({});
+  const current = config.data ? { ...configToDraft(config.data), ...edits } : null;
+  const changes = config.data ? configChanges(config.data, edits) : { patch: {}, count: 0 };
   const edit = (patch: Partial<ConfigDraft>) => {
-    if (current) setDraft({ ...current, ...patch });
+    setEdits((previous) => ({ ...previous, ...patch }));
   };
 
   return {
@@ -50,13 +49,13 @@ export function useConfigPage() {
         if (current) edit({ enabledPeriods: togglePeriod(current.enabledPeriods, period) });
       },
       discard: () => {
-        setDraft(null);
+        setEdits({});
       },
       save: () => {
         if (changes.count === 0) return;
         save.mutate(changes.patch, {
           onSuccess: () => {
-            setDraft(null);
+            setEdits({});
           },
         });
       },

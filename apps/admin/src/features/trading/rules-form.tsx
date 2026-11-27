@@ -78,7 +78,6 @@ export function RulesForm({ form, canEdit }: { form: RulesFormModel; canEdit: bo
             <Switch
               aria-labelledby="rule-queue"
               checked={draft.queueWhenClosed}
-              disabled={!canEdit}
               onCheckedChange={(checked) => {
                 form.actions.set('queueWhenClosed', checked);
               }}
@@ -105,7 +104,7 @@ export function RulesForm({ form, canEdit }: { form: RulesFormModel; canEdit: bo
               type="submit"
               size="sm"
               loading={form.isSaving}
-              disabled={!canEdit || !form.dirty}
+              disabled={canEdit && !form.dirty}
             >
               {t.admin.saveRules}
             </Button>
