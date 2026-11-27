@@ -115,7 +115,12 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
         ({ row }) =>
           !q || row.symbol.toLowerCase().includes(q) || row.name.toLowerCase().includes(q),
       )
-      .map(({ row, quote }) => ({ ...toStock(row), quote, sparkline: this.sparkline(row.symbol) }));
+      .map(({ row, quote }) => ({
+        ...toStock(row),
+        quote,
+        sparkline: this.sparkline(row.symbol),
+        marketCap: row.marketCap,
+      }));
   }
 
   // Every 12th 5-minute close of the 1D chart: one point per hour for the list rows.
