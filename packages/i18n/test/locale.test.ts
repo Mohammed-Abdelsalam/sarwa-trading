@@ -47,6 +47,42 @@ describe('plural', () => {
     expect(plural('ar', 11, forms)).toBe('دقيقة+');
   });
 
+  it('picks the same category as Intl.PluralRules, which Hermes lacks', () => {
+    const forms = {
+      zero: 'zero',
+      one: 'one',
+      two: 'two',
+      few: 'few',
+      many: 'many',
+      other: 'other',
+    };
+    const counts = [...Array.from({ length: 251 }, (_, n) => n), 1001, 1.5, 2.25, 0.5];
+
+    for (const locale of LOCALES) {
+      const rules = new Intl.PluralRules(locale);
+      for (const count of counts) {
+        expect(plural(locale, count, forms)).toBe(rules.select(count));
+      }
+    }
+  });
+
+  it('works when the runtime has no Intl.PluralRules', () => {
+    const original = Intl.PluralRules;
+    Reflect.deleteProperty(Intl, 'PluralRules');
+    try {
+      jest.isolateModules(() => {
+        const { plural: isolated } = jest.requireActual<{ plural: typeof plural }>('../src');
+        expect(isolated('en', 2, { one: 'order', other: 'orders' })).toBe('orders');
+      });
+    } finally {
+      Reflect.defineProperty(Intl, 'PluralRules', {
+        value: original,
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
+
   it('falls back to the other form when a category is missing', () => {
     expect(plural('en', 1, { other: 'orders' })).toBe('orders');
   });
