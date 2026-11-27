@@ -1,6 +1,6 @@
 import { type LucideIcon, Megaphone, Pause, WifiOff } from 'lucide-react';
 
-import { type NoticeKind, useAppNotices } from '@sarwa/core';
+import { type NoticeKind, useAppNotices, useI18n } from '@sarwa/core';
 import { Banner, Spinner } from '@sarwa/ui';
 
 const ICONS: Record<Exclude<NoticeKind, 'reconnecting'>, LucideIcon> = {
@@ -12,6 +12,7 @@ const ICONS: Record<Exclude<NoticeKind, 'reconnecting'>, LucideIcon> = {
 // Full-width bars under the nav (W-Global): connection notices outrank remote messages, max two.
 export function AppBanners() {
   const { notices, dismiss } = useAppNotices();
+  const { t } = useI18n();
   if (notices.length === 0) return null;
 
   return (
@@ -29,13 +30,14 @@ export function AppBanners() {
                 <span className="type-caption text-fg-3">{notice.meta}</span>
               ) : undefined
             }
-            onDismiss={
-              notice.dismissible
-                ? () => {
+            {...(notice.dismissible
+              ? {
+                  onDismiss: () => {
                     dismiss(notice);
-                  }
-                : undefined
-            }
+                  },
+                  dismissLabel: t.common.dismiss,
+                }
+              : { onDismiss: undefined })}
           >
             {notice.title ? <b className="font-semibold">{notice.title}</b> : null} {notice.message}
           </Banner>

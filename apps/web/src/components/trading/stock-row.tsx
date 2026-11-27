@@ -9,7 +9,9 @@ import {
   formatListPrice,
   formatPct,
   formatStockLabel,
+  useI18n,
   useQuote,
+  watchLabel,
 } from '@sarwa/core';
 import {
   ChangePill,
@@ -43,6 +45,8 @@ export const StockRow = memo(function StockRow({
   onSelect,
   onKeyDown,
 }: StockRowProps) {
+  const i18n = useI18n();
+  const { t, f } = i18n;
   const quote = useQuote(stock.symbol) ?? stock.quote;
   const pct = changePct(quote);
 
@@ -61,7 +65,12 @@ export const StockRow = memo(function StockRow({
         data-row={stock.symbol}
         aria-current={selected ? 'true' : undefined}
         onKeyDown={onKeyDown}
-        aria-label={formatStockLabel({ symbol: stock.symbol, name: stock.name, quote, watched })}
+        aria-label={formatStockLabel(i18n, {
+          symbol: stock.symbol,
+          name: stock.name,
+          quote,
+          watched,
+        })}
         onClick={(event) => {
           const newTab = event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0;
           if (!onSelect || newTab) return;
@@ -81,10 +90,14 @@ export const StockRow = memo(function StockRow({
           className="shrink-0 max-md:hidden"
         />
         <span className="w-price-col-wide flex shrink-0 flex-col items-end gap-1">
-          <PriceFlash price={quote.price} format={formatListPrice} muted={stale} />
+          <PriceFlash
+            price={quote.price}
+            format={(price) => formatListPrice(f, price)}
+            muted={stale}
+          />
           <ChangePill
             value={pct}
-            label={formatPct(pct)}
+            label={formatPct(f, pct)}
             size="sm"
             className={stale ? 'opacity-70' : undefined}
           />
@@ -92,7 +105,7 @@ export const StockRow = memo(function StockRow({
       </Link>
       {onToggleWatch ? (
         <StarButton
-          symbol={stock.symbol}
+          label={watchLabel(t, stock.symbol, watched)}
           watched={watched}
           size={36}
           className="mr-2"
@@ -106,8 +119,9 @@ export const StockRow = memo(function StockRow({
 });
 
 export function StockListSkeleton({ rows }: { rows: number }) {
+  const { t } = useI18n();
   return (
-    <div role="progressbar" aria-label="Loading stocks" aria-busy>
+    <div role="progressbar" aria-label={t.markets.loading} aria-busy>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex min-h-16 items-center gap-3 py-2.5 pr-4 pl-4">
           <Skeleton className="rounded-control-lg size-10" />

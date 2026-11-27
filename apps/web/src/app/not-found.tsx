@@ -14,7 +14,7 @@ export default function NotFound() {
       title="Page not found"
       description="This link doesn't lead anywhere in Mini Trading."
       action={
-        <Link href="/" className={buttonVariants({ variant: 'secondary' })}>
+        <Link href="/markets" className={buttonVariants({ variant: 'secondary' })}>
           Back to Markets
         </Link>
       }

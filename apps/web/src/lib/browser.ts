@@ -1,5 +1,5 @@
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useEffectEvent, useSyncExternalStore } from 'react';
 
 function subscribeVisibility(onChange: () => void) {
   document.addEventListener('visibilitychange', onChange);
@@ -129,4 +129,71 @@ export function useLocalPreference<T extends string>(
     });
   };
   return [value, setValue];
+}
+
+export function isTyping(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+  );
+}
+
+// A window keydown listener that always sees the latest render's handler.
+export function useWindowKeyDown(handler: (event: KeyboardEvent) => void): void {
+  const onKeyDown = useEffectEvent(handler);
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => {
+      onKeyDown(event);
+    };
+    window.addEventListener('keydown', listener);
+    return () => {
+      window.removeEventListener('keydown', listener);
+    };
+  }, []);
+}
+
+const noSubscribe = () => () => undefined;
+
+// "⌘" on Apple keyboards, "Ctrl" elsewhere; the server renders the Ctrl form.
+export function useModKey(): string {
+  return useSyncExternalStore(
+    noSubscribe,
+    () => (/Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl'),
+    () => 'Ctrl',
+  );
+}
+
+export type NotificationPermissionState = NotificationPermission | 'unsupported';
+
+const permissionListeners = new Set<() => void>();
+
+function readPermission(): NotificationPermissionState {
+  return typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
+}
+
+export function useNotificationPermission(): {
+  permission: NotificationPermissionState;
+  request: () => void;
+} {
+  const permission = useSyncExternalStore(
+    (onChange) => {
+      permissionListeners.add(onChange);
+      return () => {
+        permissionListeners.delete(onChange);
+      };
+    },
+    readPermission,
+    (): NotificationPermissionState => 'default',
+  );
+  return {
+    permission,
+    request: () => {
+      if (typeof Notification === 'undefined') return;
+      void Notification.requestPermission().then(() => {
+        permissionListeners.forEach((listener) => {
+          listener();
+        });
+      });
+    },
+  };
 }

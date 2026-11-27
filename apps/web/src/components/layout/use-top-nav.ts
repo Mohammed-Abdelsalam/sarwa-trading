@@ -1,64 +1,89 @@
 import { type Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
-import { useLiveStatus } from '@sarwa/core';
+import { marketPill, useLiveStatus, useTradingStatus } from '@sarwa/core';
 
-import { replaceSearchParam, useSearchParam } from '../../lib/browser';
+import { isTyping, useModKey, useWindowKeyDown } from '../../lib/browser';
+import { useCopy } from '../../lib/i18n';
 import { useTheme } from '../../lib/theme';
 
-function isTyping(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-  );
+const SEQUENCE_MS = 1_000;
+
+// "G then O" jumps to Orders, as listed in the command palette.
+export const GO_TO: Partial<Record<string, Route>> = {
+  h: '/',
+  m: '/markets',
+  p: '/portfolio',
+  w: '/watchlist',
+  o: '/orders',
+  a: '/alerts',
+};
+
+export function isSectionActive(pathname: string, href: string): boolean {
+  if (href === '/') return pathname === '/';
+  if (href === '/markets') return pathname.startsWith('/markets') || pathname.startsWith('/stocks');
+  return pathname.startsWith(href);
 }
 
 export function useTopNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const urlQuery = useSearchParam('q') ?? '';
-  const status = useLiveStatus();
-  const { theme, toggle } = useTheme();
-  const searchRef = useRef<HTMLInputElement>(null);
-  const [draft, setDraft] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const onMarkets = pathname === '/';
+  const copy = useCopy();
+  const { t, m } = copy;
+  const live = useLiveStatus();
+  const session = useTradingStatus().data?.session;
+  const { toggle: toggleTheme } = useTheme();
+  const mod = useModKey();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const pendingGo = useRef(0);
 
-  // "/" focuses search from anywhere, as on the canvas (W-Markets).
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== '/' || isTyping(event.target)) return;
+  useWindowKeyDown((event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault();
-      setSearchOpen(true);
-      searchRef.current?.focus();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, []);
+      setPaletteOpen((open) => !open);
+      return;
+    }
+    if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
+    const go = Date.now() - pendingGo.current < SEQUENCE_MS ? GO_TO[event.key] : undefined;
+    pendingGo.current = 0;
+    if (go) {
+      router.push(go);
+    } else if (event.key === '/') {
+      event.preventDefault();
+      const search = document.getElementById('markets-search');
+      if (search) search.focus();
+      else setPaletteOpen(true);
+    } else if (event.shiftKey && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      toggleTheme();
+    } else if (event.key === 'g') {
+      pendingGo.current = Date.now();
+    }
+  });
+
+  const links = [
+    { href: '/', label: t.nav.home },
+    { href: '/markets', label: t.nav.markets },
+    { href: '/portfolio', label: t.nav.portfolio },
+    { href: '/watchlist', label: t.nav.watchlist },
+    { href: '/orders', label: t.nav.orders },
+  ].map((link) => ({
+    href: link.href as Route,
+    label: link.label,
+    active: isSectionActive(pathname, link.href),
+  }));
 
   return {
-    pathname,
-    status,
-    theme,
-    toggleTheme: toggle,
-    searchRef,
-    searchOpen,
-    toggleSearch: () => {
-      setSearchOpen((open) => !open);
-    },
-    // On Markets the search box drives the list through ?q=; elsewhere Enter takes you there.
-    query: onMarkets ? urlQuery : draft,
-    setQuery: (value: string) => {
-      if (onMarkets) replaceSearchParam('q', value || null);
-      else setDraft(value);
-    },
-    submit: () => {
-      if (onMarkets || !draft) return;
-      router.push(`/?q=${encodeURIComponent(draft)}` as Route);
-      setDraft('');
+    links,
+    live,
+    pill: marketPill(live, session, copy),
+    palette: { open: paletteOpen, setOpen: setPaletteOpen, shortcut: `${mod} K` },
+    labels: {
+      main: t.nav.main,
+      sections: m.nav.sections,
+      search: t.common.search,
+      searchA11y: m.nav.commandA11y,
     },
   };
 }
