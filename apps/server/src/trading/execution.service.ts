@@ -1,0 +1,256 @@
+import { Injectable } from '@nestjs/common';
+import { type Order as OrderRow } from '@prisma/client';
+
+import {
+  type CancelReason,
+  type NotificationPayload,
+  type Order,
+  type RejectionWire,
+} from '@sarwa/contracts';
+import {
+  applyFill,
+  bps,
+  cents,
+  closeOrder,
+  type FillResult,
+  fillNotionalCents,
+  fillQuantity,
+  limitFillPrice,
+  marketFillPrice,
+  micros,
+  type Micros,
+  remainingMicros,
+  shouldTriggerStop,
+  type Side,
+  ticks,
+  type Ticks,
+  type TradeQuote,
+  type WorkingOrder,
+} from '@sarwa/domain';
+
+import { AdminGateway } from '../admin/admin.gateway';
+import { Clock } from '../common/clock';
+import { type Random } from '../market/simulator';
+import { PrismaService, type Tx } from '../prisma.service';
+import { TradingConfigService } from '../trading-config/trading-config.service';
+import { AccountsService } from './accounts.service';
+import {
+  isWorking,
+  type OrderWithFills,
+  positionData,
+  toOrder,
+  toPosition,
+  toWorkingOrder,
+  WORKING_STATUSES,
+  workingOrderData,
+} from './mappers';
+import { NotificationsService } from './notifications.service';
+import { OrderBook } from './order-book';
+import { TradingGateway } from './trading.gateway';
+
+type ClosedStatus = 'canceled' | 'expired' | 'rejected';
+
+// Runs inside the execution queue only. Every fill is one transaction over the account, the
+// position, the order and the fill row, computed by the domain's applyFill.
+@Injectable()
+export class ExecutionService {
+  random: Random = Math.random;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly clock: Clock,
+    private readonly config: TradingConfigService,
+    private readonly book: OrderBook,
+    private readonly accounts: AccountsService,
+    private readonly notifications: NotificationsService,
+    private readonly gateway: TradingGateway,
+    private readonly adminGateway: AdminGateway,
+  ) {}
+
+  // The caller has checked that the session is open, the market running and the symbol not halted.
+  async work(row: OrderRow, quote: TradeQuote): Promise<void> {
+    const side = row.side as Side;
+    let order = row;
+    if (order.type === 'stop' && order.triggeredAt === null) {
+      if (!shouldTriggerStop(side, ticks(Number(order.stopTicks)), quote.lastTicks)) return;
+      const now = new Date(this.clock.now());
+      order = await this.prisma.order.update({
+        where: { id: order.id },
+        data: { triggeredAt: now, updatedAt: now },
+      });
+    }
+
+    const slippageBps = bps(
+      Math.floor(this.random() * (this.config.get().rules.maxSlippageBps + 1)),
+    );
+    const price =
+      order.type === 'limit'
+        ? limitFillPrice(side, ticks(Number(order.limitTicks)), quote, slippageBps)
+        : marketFillPrice(side, quote, slippageBps);
+    if (price === null) return;
+
+    const displayed = side === 'buy' ? quote.askSizeMicros : quote.bidSizeMicros;
+    const qty = fillQuantity(activate(toWorkingOrder(order)), price, displayed);
+    if (qty > 0) await this.fill(order.id, qty, price);
+  }
+
+  async close(
+    row: OrderRow,
+    status: ClosedStatus,
+    extra: { cancelReason?: CancelReason; rejection?: RejectionWire } = {},
+    tx: Tx = this.prisma,
+  ): Promise<OrderWithFills> {
+    const now = new Date(this.clock.now());
+    return tx.order.update({
+      where: { id: row.id },
+      data: {
+        ...workingOrderData(closeOrder(toWorkingOrder(row), status)),
+        cancelReason: extra.cancelReason ?? null,
+        rejection: extra.rejection ? JSON.stringify(extra.rejection) : row.rejection,
+        updatedAt: now,
+        closedAt: now,
+      },
+      include: { fills: true },
+    });
+  }
+
+  async publish(row: OrderWithFills, notice?: NotificationPayload['kind']): Promise<Order> {
+    this.book.sync(row);
+    const order = toOrder(row);
+    const { deviceId, handle } = await this.accounts.ref(row.accountId);
+    this.gateway.orderUpdated(deviceId, order);
+    this.adminGateway.order({ ...order, accountHandle: handle, latencyMs: row.latencyMs });
+    if (notice) await this.notifications.notify([row.accountId], orderNotice(notice, order));
+    return order;
+  }
+
+  async reservedCents(accountId: string, tx: Tx = this.prisma): Promise<number> {
+    const { _sum } = await tx.order.aggregate({
+      _sum: { heldCents: true },
+      where: { accountId, side: 'buy', status: { in: [...WORKING_STATUSES] } },
+    });
+    return Number(_sum.heldCents ?? 0n);
+  }
+
+  private async fill(orderId: string, wantedMicros: Micros, priceTicks: Ticks): Promise<void> {
+    const now = new Date(this.clock.now());
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+      if (!isWorking(row.status)) return null;
+      const account = await tx.account.findUniqueOrThrow({ where: { id: row.accountId } });
+      const positionRow = await tx.position.findUnique({
+        where: { accountId_symbol: { accountId: row.accountId, symbol: row.symbol } },
+      });
+      const position = positionRow ? toPosition(positionRow) : null;
+      const cashCents = cents(Number(account.cashCents));
+      const working = activate(toWorkingOrder(row));
+      // The quantity was sized outside the transaction; never fill past what is still open.
+      const qtyMicros =
+        working.qtyMicros === null
+          ? wantedMicros
+          : micros(Math.min(wantedMicros, remainingMicros(working)));
+      if (qtyMicros <= 0) return null;
+
+      // Holds keep a sell within the position; this only trips if shares left by another path.
+      if (row.side === 'sell' && qtyMicros > (position?.qtyMicros ?? 0)) {
+        const rejection: RejectionWire = {
+          code: 'INSUFFICIENT_SHARES',
+          field: 'size',
+          sellableMicros: position?.qtyMicros ?? 0,
+        };
+        return { order: await this.close(row, 'rejected', { rejection }, tx), filled: false };
+      }
+      // A stop or a queued order can gap past its hold: it may only spend cash no other order holds.
+      if (row.side === 'buy') {
+        const otherHolds = (await this.reservedCents(row.accountId, tx)) - working.heldCents;
+        const availableCents = cashCents - otherHolds;
+        const requiredCents = fillNotionalCents(working, { qtyMicros, priceTicks });
+        if (requiredCents > availableCents) {
+          const rejection: RejectionWire = {
+            code: 'INSUFFICIENT_FUNDS',
+            field: 'size',
+            requiredCents,
+            availableCents: Math.max(0, availableCents),
+          };
+          return { order: await this.close(row, 'rejected', { rejection }, tx), filled: false };
+        }
+      }
+      const result: FillResult = applyFill(cashCents, position, working, row.symbol, {
+        qtyMicros,
+        priceTicks,
+      });
+
+      await tx.account.update({
+        where: { id: row.accountId },
+        data: { cashCents: BigInt(result.cashCents) },
+      });
+      const key = { accountId_symbol: { accountId: row.accountId, symbol: row.symbol } };
+      if (result.position) {
+        await tx.position.upsert({
+          where: key,
+          update: positionData(result.position),
+          create: {
+            accountId: row.accountId,
+            symbol: row.symbol,
+            ...positionData(result.position),
+          },
+        });
+      } else {
+        await tx.position.deleteMany({ where: { accountId: row.accountId, symbol: row.symbol } });
+      }
+      await tx.fill.create({
+        data: {
+          orderId: row.id,
+          accountId: row.accountId,
+          epoch: row.epoch,
+          symbol: row.symbol,
+          side: row.side,
+          qtyMicros: BigInt(qtyMicros),
+          priceTicks: BigInt(priceTicks),
+          notionalCents: BigInt(result.notionalCents),
+          realizedCents: BigInt(result.realizedCents),
+          at: now,
+        },
+      });
+      const order = await tx.order.update({
+        where: { id: row.id },
+        data: {
+          ...workingOrderData(result.order),
+          updatedAt: now,
+          closedAt: result.order.status === 'filled' ? now : null,
+        },
+        include: { fills: true },
+      });
+      return { order, filled: true };
+    });
+    if (!outcome) return;
+
+    const notice = !outcome.filled
+      ? 'order_rejected'
+      : outcome.order.status === 'filled'
+        ? 'order_filled'
+        : 'order_partially_filled';
+    await this.publish(outcome.order, notice);
+  }
+}
+
+// A queued order becomes open the moment it can execute.
+function activate(order: WorkingOrder): WorkingOrder {
+  return order.status === 'queued' ? { ...order, status: 'open' } : order;
+}
+
+function orderNotice(kind: NotificationPayload['kind'], order: Order): NotificationPayload {
+  const base = { orderId: order.id, symbol: order.symbol, side: order.side };
+  if (kind === 'order_rejected' && order.rejection) {
+    return { kind, ...base, rejection: order.rejection };
+  }
+  const last = order.fills.at(-1);
+  const partial = kind === 'order_partially_filled' && last;
+  return {
+    kind: kind as 'order_filled' | 'order_partially_filled' | 'order_expired' | 'order_canceled',
+    ...base,
+    qtyMicros: partial ? last.qtyMicros : order.filledMicros,
+    priceTicks: partial ? last.priceTicks : order.avgFillTicks,
+    notionalCents: partial ? last.notionalCents : order.filledNotionalCents,
+  };
+}

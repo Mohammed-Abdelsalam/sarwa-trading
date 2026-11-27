@@ -1,0 +1,183 @@
+import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { type Subscription } from 'rxjs';
+
+import { type Quote } from '@sarwa/contracts';
+import { MARKET_TIME_ZONE, marketClock, marketSession } from '@sarwa/domain';
+
+import { Clock } from '../common/clock';
+import { MarketService } from '../market/market.service';
+import { PrismaService } from '../prisma.service';
+import { TradingConfigService } from '../trading-config/trading-config.service';
+import { AlertsService } from './alerts.service';
+import { CircuitBreaker } from './circuit-breaker';
+import { ExecutionQueue } from './execution-queue';
+import { ExecutionService } from './execution.service';
+import { HaltsService } from './halts.service';
+import { toTradeQuote, WORKING_STATUSES } from './mappers';
+import { NotificationsService } from './notifications.service';
+import { OrderBook } from './order-book';
+import { StatusService } from './status.service';
+
+const HOUSEKEEPING_MS = 1_000;
+
+const closeTime = new Intl.DateTimeFormat('en-US', {
+  timeZone: MARKET_TIME_ZONE,
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+// Drives the book from the market: quotes, session open/close and expiry all run through the
+// execution queue like every other change to orders and accounts.
+@Injectable()
+export class TradingEngine implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(TradingEngine.name);
+  // Only the latest quote per symbol matters: a burst of ticks becomes one processing task.
+  private readonly pending = new Map<string, Quote>();
+  private quotesQueued = false;
+  private housekeepingQueued = false;
+  private subscription?: Subscription;
+  private timer?: NodeJS.Timeout;
+  private wasOpen = false;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly clock: Clock,
+    private readonly queue: ExecutionQueue,
+    private readonly market: MarketService,
+    private readonly config: TradingConfigService,
+    private readonly book: OrderBook,
+    private readonly execution: ExecutionService,
+    private readonly halts: HaltsService,
+    private readonly breaker: CircuitBreaker,
+    private readonly alerts: AlertsService,
+    private readonly notifications: NotificationsService,
+    private readonly status: StatusService,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    const working = await this.prisma.order.findMany({
+      where: { status: { in: [...WORKING_STATUSES] } },
+      select: { id: true, symbol: true, status: true },
+    });
+    for (const row of working) this.book.sync(row);
+    this.wasOpen = this.session().isOpen;
+    this.subscription = this.market.quotes$.subscribe((quotes) => {
+      this.enqueue(quotes);
+    });
+    this.timer = setInterval(() => {
+      this.scheduleHousekeeping();
+    }, HOUSEKEEPING_MS);
+    this.logger.log(`Loaded ${this.book.size()} working orders`);
+  }
+
+  onModuleDestroy(): void {
+    this.subscription?.unsubscribe();
+    clearInterval(this.timer);
+  }
+
+  // Resolves after everything queued so far (including pending quotes) has been processed.
+  idle(): Promise<void> {
+    return this.queue.idle();
+  }
+
+  scheduleHousekeeping(): void {
+    if (this.housekeepingQueued) return;
+    this.housekeepingQueued = true;
+    this.queue
+      .run(() => {
+        this.housekeepingQueued = false;
+        return this.housekeeping();
+      })
+      .catch((error: unknown) => {
+        this.logger.error(`Housekeeping failed: ${String(error)}`);
+      });
+  }
+
+  private enqueue(quotes: Quote[]): void {
+    for (const quote of quotes) this.pending.set(quote.symbol, quote);
+    if (this.quotesQueued) return;
+    this.quotesQueued = true;
+    this.queue
+      .run(() => {
+        this.quotesQueued = false;
+        const batch = [...this.pending.values()];
+        this.pending.clear();
+        return this.processQuotes(batch);
+      })
+      .catch((error: unknown) => {
+        this.logger.error(`Quote processing failed: ${String(error)}`);
+      });
+  }
+
+  private async processQuotes(quotes: Quote[]): Promise<void> {
+    const now = this.clock.now();
+    const settings = this.config.get();
+    const tradable = !this.market.isPaused() && this.session().isOpen;
+    for (const quote of quotes) {
+      const tradeQuote = toTradeQuote(quote);
+      await this.alerts.evaluate(quote.symbol, tradeQuote, now);
+      if (this.halts.isHalted(quote.symbol)) continue;
+
+      const tripped = this.breaker.check(
+        quote.symbol,
+        tradeQuote.lastTicks,
+        now,
+        settings.circuitBreaker,
+      );
+      if (tripped) {
+        const halt = await this.halts.halt({
+          symbol: quote.symbol,
+          source: 'circuit_breaker',
+          message: tripped,
+          resumesAt: now + settings.circuitBreaker.haltMs,
+          createdBy: null,
+        });
+        await this.halts.notifyAffected(halt);
+        continue;
+      }
+      if (!tradable) continue;
+
+      const ids = this.book.ids(quote.symbol);
+      if (ids.length === 0) continue;
+      // Time priority: the oldest order gets the displayed size first.
+      const orders = await this.prisma.order.findMany({
+        where: { id: { in: ids }, status: { in: [...WORKING_STATUSES] } },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      });
+      for (const order of orders) await this.execution.work(order, tradeQuote);
+    }
+  }
+
+  private async housekeeping(): Promise<void> {
+    const now = this.clock.now();
+    const session = this.session();
+    if (session.isOpen !== this.wasOpen) {
+      this.wasOpen = session.isOpen;
+      this.status.publish();
+      if (session.isOpen && session.earlyClose) await this.announceEarlyClose(session.closesAt);
+    }
+
+    const expired = await this.prisma.order.findMany({
+      where: { status: { in: [...WORKING_STATUSES] }, expiresAt: { lte: new Date(now) } },
+    });
+    for (const row of expired) {
+      const closed = await this.execution.close(row, 'expired');
+      await this.execution.publish(closed, 'order_expired');
+    }
+  }
+
+  private async announceEarlyClose(closesAt: number): Promise<void> {
+    const accounts = await this.prisma.account.findMany({ select: { id: true } });
+    await this.notifications.notify(
+      accounts.map((account) => account.id),
+      {
+        kind: 'market_notice',
+        message: `Markets close early today (${marketClock(closesAt).date}) at ${closeTime.format(closesAt)} ET`,
+      },
+    );
+  }
+
+  private session() {
+    return marketSession(this.clock.now(), this.config.get().sessionMode);
+  }
+}
