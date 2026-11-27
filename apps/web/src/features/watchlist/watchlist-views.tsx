@@ -15,7 +15,9 @@ import {
   rangePosition,
   type SortKey,
   type SortOption,
+  useI18n,
   useQuote,
+  watchLabel,
 } from '@sarwa/core';
 import {
   buttonVariants,
@@ -77,6 +79,7 @@ function TableRow({
   onRemove: (symbol: string) => void;
 }) {
   const router = useRouter();
+  const { t, f } = useI18n();
   const quote = useQuote(stock.symbol) ?? stock.quote;
   const pct = changePct(quote);
   const delta = change(quote);
@@ -93,7 +96,7 @@ function TableRow({
         if (event.key === 'Enter') router.push(href);
       }}
     >
-      <td className="pl-5!">
+      <td className="ps-5!">
         <Link href={href} tabIndex={-1} className="flex items-center gap-3">
           <StockAvatar symbol={stock.symbol} sector={stock.sector} />
           <span>
@@ -103,20 +106,20 @@ function TableRow({
         </Link>
       </td>
       <td className="text-right">
-        <PriceFlash price={quote.price} muted={stale} />
+        <PriceFlash price={quote.price} format={(price) => formatPrice(f, price)} muted={stale} />
       </td>
       <td className={cn('text-right font-semibold tabular-nums', COLOR[direction(delta)])}>
-        {formatChange(delta)}
+        {formatChange(f, delta)}
       </td>
       <td className="text-right">
-        <ChangePill value={pct} label={formatPct(pct)} size="sm" />
+        <ChangePill value={pct} label={formatPct(f, pct)} size="sm" />
       </td>
       <td>
         <Sparkline values={stock.sparkline} direction={direction(pct)} width={96} height={28} />
       </td>
       <td>
         <div className="type-caption text-fg-3 flex items-center gap-2 tabular-nums">
-          <span>{formatPrice(quote.dayLow)}</span>
+          <span>{formatPrice(f, quote.dayLow)}</span>
           <span className="bg-surface-3 relative h-1 w-20 rounded-full">
             <span
               className="bg-fg-2 absolute -top-0.75 h-2.5 w-0.75 rounded-full"
@@ -125,13 +128,13 @@ function TableRow({
               }}
             />
           </span>
-          <span>{formatPrice(quote.dayHigh)}</span>
+          <span>{formatPrice(f, quote.dayHigh)}</span>
         </div>
       </td>
-      <td className="text-fg-2 text-right tabular-nums">{formatMarketCap(stock.marketCap)}</td>
+      <td className="text-fg-2 text-right tabular-nums">{formatMarketCap(f, stock.marketCap)}</td>
       <td className="text-right">
         <StarButton
-          symbol={stock.symbol}
+          label={watchLabel(t, stock.symbol, true)}
           watched
           size={36}
           onToggle={() => {
@@ -156,34 +159,41 @@ export function WatchlistTable({
   onSort: (key: SortKey) => void;
   onRemove: (symbol: string) => void;
 }) {
+  const columns = useI18n().t.watchlist.columns;
   return (
     <div className="border-border bg-surface overflow-x-auto rounded-lg border">
       <table className="type-sm [&_td]:border-border w-full border-separate border-spacing-0 [&_td]:border-b [&_tr:last-child_td]:border-b-0">
         <thead className="type-caption text-fg-3 [&_th]:border-border [&_th]:h-10 [&_th]:border-b [&_th]:font-semibold">
           <tr>
-            <SortHeader label="Stock" column="name" sort={sort} onSort={onSort} />
-            <SortHeader label="Price" column="price" sort={sort} onSort={onSort} align="right" />
+            <SortHeader label={columns.stock} column="name" sort={sort} onSort={onSort} />
+            <SortHeader
+              label={columns.price}
+              column="price"
+              sort={sort}
+              onSort={onSort}
+              align="right"
+            />
             <th scope="col" className="px-3 text-right">
-              Change
+              {columns.change}
             </th>
             <SortHeader
-              label="% Change"
+              label={columns.changePct}
               column="change"
               sort={sort}
               onSort={onSort}
               align="right"
             />
             <th scope="col" className="px-3 text-left">
-              Today
+              {columns.today}
             </th>
             <th scope="col" className="px-3 text-left">
-              Day range
+              {columns.dayRange}
             </th>
             <th scope="col" className="px-3 text-right">
-              Market cap
+              {columns.marketCap}
             </th>
             <th scope="col">
-              <span className="sr-only">Actions</span>
+              <span className="sr-only">{columns.actions}</span>
             </th>
           </tr>
         </thead>
@@ -198,6 +208,7 @@ export function WatchlistTable({
 }
 
 function GridCard({ stock, onRemove }: { stock: StockWithQuote; onRemove: (s: string) => void }) {
+  const { t, f } = useI18n();
   const quote = useQuote(stock.symbol) ?? stock.quote;
   const pct = changePct(quote);
   return (
@@ -212,7 +223,7 @@ function GridCard({ stock, onRemove }: { stock: StockWithQuote; onRemove: (s: st
           <span className="type-caption text-fg-3 block truncate">{stock.name}</span>
         </Link>
         <StarButton
-          symbol={stock.symbol}
+          label={watchLabel(t, stock.symbol, true)}
           watched
           size={36}
           className="relative z-10"
@@ -223,8 +234,8 @@ function GridCard({ stock, onRemove }: { stock: StockWithQuote; onRemove: (s: st
       </div>
       <Sparkline values={stock.sparkline} direction={direction(pct)} className="h-14 w-full" />
       <div className="flex items-center justify-between">
-        <PriceFlash price={quote.price} size="lg" />
-        <ChangePill value={pct} label={formatPct(pct)} />
+        <PriceFlash price={quote.price} format={(price) => formatPrice(f, price)} size="lg" />
+        <ChangePill value={pct} label={formatPct(f, pct)} />
       </div>
     </div>
   );
@@ -248,6 +259,7 @@ export function WatchlistGrid({
 
 // Illustration geometry copied from the canvas (W-Watchlist empty state).
 export function EmptyWatchlist() {
+  const { t } = useI18n();
   return (
     <div className="border-border bg-surface flex flex-col items-center gap-3.5 rounded-lg border px-6 py-18 text-center">
       <div aria-hidden className="relative mb-2 h-32 w-42">
@@ -271,14 +283,14 @@ export function EmptyWatchlist() {
           <Star className="size-6 fill-current" />
         </div>
       </div>
-      <h2 className="type-h2">Your watchlist is empty</h2>
+      <h2 className="type-h2">{t.watchlist.emptyTitle}</h2>
       <p className="type-body text-fg-2 max-w-105">
-        Star any stock in Markets — or press <kbd className="type-kbd">S</kbd> on a focused row —
-        and it shows up here with live prices.
+        {t.watchlist.emptyKeyHint.before} <kbd className="type-kbd">S</kbd>{' '}
+        {t.watchlist.emptyKeyHint.after}
       </p>
-      <Link href="/" className={cn(buttonVariants({ size: 'lg' }), 'mt-1.5')}>
-        Browse markets
-        <ChevronRight aria-hidden className="size-4" />
+      <Link href="/markets" className={cn(buttonVariants({ size: 'lg' }), 'mt-1.5')}>
+        {t.watchlist.browse}
+        <ChevronRight aria-hidden className="size-4 rtl:-scale-x-100" />
       </Link>
     </div>
   );

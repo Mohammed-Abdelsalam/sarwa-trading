@@ -2,14 +2,13 @@ import { ChartArea, ChartCandlestick } from 'lucide-react';
 import { type ReactNode } from 'react';
 
 import { type Period } from '@sarwa/contracts';
-import { CHART_TYPES, type ChartType, formatChange, formatPct } from '@sarwa/core';
+import { CHART_TYPES, type ChartType, formatChange, formatPct, useI18n } from '@sarwa/core';
 import { ChangePill, PeriodTabs, SegmentedControl } from '@sarwa/ui';
 
 const ICONS: Record<ChartType, ReactNode> = {
   area: <ChartArea aria-hidden />,
   candle: <ChartCandlestick aria-hidden />,
 };
-const TYPE_OPTIONS = CHART_TYPES.map((option) => ({ ...option, icon: ICONS[option.value] }));
 
 export function ChartToolbar({
   period,
@@ -26,13 +25,25 @@ export function ChartToolbar({
   type?: ChartType;
   onTypeChange?: (type: ChartType) => void;
 }) {
+  const { t, f } = useI18n();
+  const typeOptions = CHART_TYPES.map((value) => ({
+    value,
+    label: t.chart.types[value],
+    icon: ICONS[value],
+  }));
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-2.5">
-      <PeriodTabs value={period} onChange={onPeriodChange} enabled={enabledPeriods} />
+      <PeriodTabs
+        value={period}
+        onChange={onPeriodChange}
+        enabled={enabledPeriods}
+        label={t.chart.period}
+      />
       {type && onTypeChange ? (
         <SegmentedControl
-          label="Chart type"
-          options={TYPE_OPTIONS}
+          label={t.chart.type}
+          options={typeOptions}
           value={type}
           onChange={onTypeChange}
         />
@@ -40,10 +51,10 @@ export function ChartToolbar({
         <span className="type-sm">
           <ChangePill
             value={change.value}
-            label={`${formatChange(change.value)} (${formatPct(change.pct)})`}
+            label={`${formatChange(f, change.value)} (${formatPct(f, change.pct)})`}
             variant="inline"
           />{' '}
-          <span className="text-fg-3">this period</span>
+          <span className="text-fg-3">{t.chart.thisPeriod}</span>
         </span>
       ) : null}
     </div>

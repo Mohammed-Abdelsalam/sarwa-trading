@@ -7,11 +7,11 @@ import {
   candleIndexAt,
   chartGeometry,
   type ChartType,
-  formatCandleDate,
   formatPrice,
   nearestPointIndex,
   scrubPoint,
   useChartSeries,
+  useI18n,
 } from '@sarwa/core';
 
 // The SVG draws in a fixed 800-wide viewBox and stretches; positions are reported as percentages.
@@ -29,6 +29,7 @@ export function usePriceChart({
   type: ChartType;
   height: number;
 }) {
+  const { f } = useI18n();
   const series = useChartSeries(symbol, period);
   const [active, setActive] = useState<number | null>(null);
   const count = series.candles.length;
@@ -84,7 +85,7 @@ export function usePriceChart({
       max: Math.max(0, count - 1),
       now: active ?? Math.max(0, count - 1),
       text: activeCandle
-        ? `${formatCandleDate(activeCandle.t, period)}, ${formatPrice(activeCandle.c)}`
+        ? `${f.chartDate(activeCandle.t, period)}, ${formatPrice(f, activeCandle.c)}`
         : series.summary,
     },
     // Hover on web; ← → step through points and Esc leaves, as the canvas specifies (Dev-Notes 04).

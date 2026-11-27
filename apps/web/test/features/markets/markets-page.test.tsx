@@ -1,13 +1,18 @@
-import { render, screen } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Route } from 'next';
+import { type ReactElement } from 'react';
 
 import { DEFAULT_SORT, SECTOR_FILTERS } from '@sarwa/core';
 
 import { type StockRowProps } from '../../../src/components/trading/stock-row';
 import { MarketsPage } from '../../../src/features/markets/markets-page';
 import { useMarketsPage } from '../../../src/features/markets/use-markets-page';
+import { providers } from '../../copy';
 import { makeStock } from '../../fixtures';
+
+const render = (ui: ReactElement, options?: Parameters<typeof providers>[0]) =>
+  rtlRender(ui, { wrapper: providers(options).wrapper });
 
 jest.mock('../../../src/features/markets/use-markets-page');
 jest.mock('../../../src/features/markets/stock-preview', () => ({ StockPreview: () => null }));
@@ -35,9 +40,11 @@ function viewModel(
     stale: false,
     isLoading: false,
     isError: false,
+    search: '',
     filters: { query: '', sector: 'all', sectorLabel: 'All', sort: DEFAULT_SORT },
     rowHref: (symbol) => `/stocks/${symbol}` as Route,
     actions: {
+      setQuery: jest.fn(),
       setSector: jest.fn(),
       cycleSort: jest.fn(),
       clearFilters: jest.fn(),
@@ -76,13 +83,24 @@ describe('MarketsPage', () => {
 
   it('filters by sector when a chip is picked', async () => {
     const model = viewModel({ rows: [makeStock('AAPL')] });
-    const sector = SECTOR_FILTERS[1];
     mockedHook.mockReturnValue(model);
     render(<MarketsPage />);
 
-    if (sector) await userEvent.click(screen.getByRole('tab', { name: sector.label }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Technology' }));
 
-    expect(model.actions.setSector).toHaveBeenCalledWith(sector?.id);
+    expect(model.actions.setSector).toHaveBeenCalledWith(SECTOR_FILTERS[1]);
+  });
+
+  it('speaks Arabic, with Arabic-Indic digits in the stock count', () => {
+    mockedHook.mockReturnValue(viewModel({ rows: [makeStock('AAPL'), makeStock('NVDA')] }));
+    render(<MarketsPage />, { locale: 'ar', digits: 'arab' });
+
+    expect(screen.getByRole('heading', { name: 'الأسواق' })).toBeInTheDocument();
+    expect(screen.getByText('٢ سهم · أسهم أمريكية · دولار أمريكي')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'الكل' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^الترتيب حسب ٪ التغيّر، تنازلي/ }),
+    ).toBeInTheDocument();
   });
 
   it('moves between rows with the arrow keys and stars the focused row with S', async () => {

@@ -2,6 +2,7 @@ import { ArrowUpRight } from 'lucide-react';
 import { type Route } from 'next';
 import Link from 'next/link';
 
+import { useI18n, watchLabel } from '@sarwa/core';
 import { Badge, buttonVariants, StarButton, StockAvatar } from '@sarwa/ui';
 
 import { ChartToolbar } from '../stock-detail/chart-toolbar';
@@ -10,12 +11,13 @@ import { PriceChart } from '../stock-detail/price-chart';
 import { useStockPreview } from './use-stock-preview';
 
 export function StockPreview({ symbol }: { symbol: string }) {
+  const { t } = useI18n();
   const preview = useStockPreview(symbol);
   const { stock, quote, stats } = preview;
 
   return (
     <section
-      aria-label={`${symbol} detail`}
+      aria-label={t.markets.detail({ symbol })}
       className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-8 py-7"
     >
       <div className="flex items-start justify-between gap-4">
@@ -31,12 +33,16 @@ export function StockPreview({ symbol }: { symbol: string }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StarButton symbol={symbol} watched={preview.watched} onToggle={preview.toggleWatch} />
+          <StarButton
+            label={watchLabel(t, symbol, preview.watched)}
+            watched={preview.watched}
+            onToggle={preview.toggleWatch}
+          />
           <Link
             href={`/stocks/${symbol}` as Route}
             className={buttonVariants({ variant: 'secondary' })}
           >
-            Open full page
+            {t.markets.openFullPage}
             <ArrowUpRight aria-hidden className="size-4" />
           </Link>
         </div>
