@@ -1,5 +1,5 @@
 import { type Order } from '@sarwa/contracts';
-import { micros, ticks } from '@sarwa/core';
+import { cents, micros, ticks } from '@sarwa/core';
 
 import { type Copy } from '../../lib/i18n';
 
@@ -10,10 +10,23 @@ export interface TimelineStep {
   state: 'done' | 'now' | 'failed';
 }
 
-function remainingMicros(order: Order): number {
-  return order.qtyMicros === null
-    ? order.heldMicros
-    : Math.max(0, order.qtyMicros - order.filledMicros);
+function remaining(order: Order, { t, f, m }: Copy): string {
+  if (order.qtyMicros !== null) {
+    const shares = Math.max(0, order.qtyMicros - order.filledMicros);
+    return t.orders.working({ shares: f.shares(micros(shares)) });
+  }
+  const amount = Math.max(0, (order.amountCents ?? 0) - order.filledNotionalCents);
+  return m.orders.workingAmount({ amount: f.money(cents(amount)) });
+}
+
+function reserved(order: Order, { t, f, m }: Copy): string | null {
+  if (order.side === 'buy')
+    return order.heldCents > 0
+      ? m.orders.reservedCash({ amount: f.money(cents(order.heldCents)) })
+      : null;
+  return order.heldMicros > 0
+    ? t.orders.reserved({ shares: f.shares(micros(order.heldMicros)) })
+    : null;
 }
 
 function finalStep(order: Order, copy: Copy): TimelineStep | null {
@@ -25,7 +38,7 @@ function finalStep(order: Order, copy: Copy): TimelineStep | null {
       const expires = order.expiresAt;
       return {
         key: 'working',
-        title: t.orders.working({ shares: f.shares(micros(remainingMicros(order))) }),
+        title: remaining(order, copy),
         detail:
           expires === null
             ? ''
@@ -80,14 +93,11 @@ export function orderTimeline(order: Order, copy: Copy): TimelineStep[] {
     },
   ];
   if (order.status !== 'rejected') {
-    const reserved =
-      order.heldMicros > 0
-        ? ` · ${t.orders.reserved({ shares: f.shares(micros(order.heldMicros)) })}`
-        : '';
+    const held = reserved(order, copy);
     steps.push({
       key: 'accepted',
       title: t.orders.accepted,
-      detail: `${time(order.createdAt)}${reserved}`,
+      detail: held ? `${time(order.createdAt)} · ${held}` : time(order.createdAt),
       state: 'done',
     });
   }

@@ -228,6 +228,21 @@ describe('OrderTicketScreen · review', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
     expect(vm.actions.retry).toHaveBeenCalledTimes(1);
   });
+
+  it('retries with the same order instead of placing a new one after a send error', async () => {
+    const vm = ticketVm({
+      step: 'review',
+      review: { error: { title: "Couldn't send the order", body: 'Nothing was placed.' } },
+    });
+    await mountTicket(vm);
+
+    await fireEvent(screen.getByRole('button', { name: 'Buy AAPL' }), 'accessibilityAction', {
+      nativeEvent: { actionName: 'activate' },
+    });
+
+    expect(vm.actions.retry).toHaveBeenCalledTimes(1);
+    expect(vm.actions.submit).not.toHaveBeenCalled();
+  });
 });
 
 describe('OrderTicketScreen · result', () => {

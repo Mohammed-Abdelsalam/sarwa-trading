@@ -88,4 +88,21 @@ describe('orderTimeline', () => {
       ['Working · 7 remaining', 'now'],
     ]);
   });
+
+  it('shows the remaining amount and reserved cash for a dollar-amount buy', async () => {
+    const copy = await englishCopy();
+    const working = order({
+      type: 'limit',
+      status: 'partially_filled',
+      limitTicks: 2_300_000,
+      filledMicros: 869_565,
+      filledNotionalCents: 20_000,
+      heldCents: 30_000,
+    });
+
+    const [, accepted, last] = orderTimeline(working, copy);
+
+    expect(accepted?.detail).toContain('reserved $300.00');
+    expect(last?.title).toBe('Working · $300.00 remaining');
+  });
 });

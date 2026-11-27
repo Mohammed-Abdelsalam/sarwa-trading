@@ -4,6 +4,7 @@ import { ActivityIndicator, View } from 'react-native';
 
 import { type BannerTone, type ColorRole } from '@sarwa/tokens';
 
+import { useCopy } from '../../lib/i18n';
 import { cx, useColors } from '../../lib/theme';
 import { IconButton } from './icon-button';
 
@@ -30,13 +31,14 @@ export function Banner({
   onDismiss?: () => void;
 }) {
   const colors = useColors();
+  const { t } = useCopy();
   const [container, iconColor] = TONE[tone];
   return (
     <View
       accessibilityRole="alert"
       className={cx(
-        'flex-row items-center gap-2.5 rounded-control-lg border py-2.5 pl-3.5',
-        onDismiss ? 'pr-1' : 'pr-3.5',
+        'flex-row items-center gap-2.5 rounded-control-lg border py-2.5 ps-3.5',
+        onDismiss ? 'pe-1' : 'pe-3.5',
         container,
       )}
     >
@@ -49,7 +51,7 @@ export function Banner({
       {action}
       {onDismiss ? (
         <IconButton
-          label="Dismiss message"
+          label={t.common.dismiss}
           icon={X}
           iconSize={16}
           size={44}

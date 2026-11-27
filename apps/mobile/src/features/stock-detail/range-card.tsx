@@ -52,8 +52,8 @@ export function RangeCard({
           <Rect width="100%" height="100%" rx={3} fill="url(#range)" />
         </Svg>
         <View
-          className="absolute -ml-0.5 h-4 w-1 rounded-xs bg-fg"
-          style={{ left: `${String(percent)}%` }}
+          className="absolute -ms-0.5 h-4 w-1 rounded-xs bg-fg"
+          style={{ start: `${String(percent)}%` }}
         />
       </View>
       <View className="flex-row justify-between">

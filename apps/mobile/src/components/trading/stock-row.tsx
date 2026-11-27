@@ -54,7 +54,12 @@ export const StockRow = memo(function StockRow({
         !largeText && (withStar ? 'w-price-col' : 'w-price-col-wide'),
       )}
     >
-      <PriceFlash price={quote.price} format={(value) => formatListPrice(f, value)} muted={stale} />
+      <PriceFlash
+        key={stock.symbol}
+        price={quote.price}
+        format={(value) => formatListPrice(f, value)}
+        muted={stale}
+      />
       <View className={stale ? 'opacity-70' : undefined}>
         <ChangePill value={pct} label={formatPct(f, pct)} />
       </View>
@@ -83,8 +88,8 @@ export const StockRow = memo(function StockRow({
         }
         onAccessibilityAction={toggle}
         className={cx(
-          'min-h-16 flex-row items-center pl-4 active:bg-surface-3',
-          withStar ? 'gap-2.5 py-2 pr-1.5' : 'gap-3 py-2.5 pr-4',
+          'min-h-16 flex-row items-center ps-4 active:bg-surface-3',
+          withStar ? 'gap-2.5 py-2 pe-1.5' : 'gap-3 py-2.5 pe-4',
         )}
       >
         <StockAvatar symbol={stock.symbol} sector={stock.sector} />
@@ -118,10 +123,7 @@ export const StockRow = memo(function StockRow({
 
 export function StockRowSkeleton() {
   return (
-    <View
-      testID="stock-row-skeleton"
-      className="min-h-16 flex-row items-center gap-2.5 py-2 pl-4 pr-4"
-    >
+    <View testID="stock-row-skeleton" className="min-h-16 flex-row items-center gap-2.5 px-4 py-2">
       <Skeleton className="h-10 w-10 rounded-control-lg" />
       <View className="flex-1 gap-1.5">
         <Skeleton className="h-3.5 w-14" />

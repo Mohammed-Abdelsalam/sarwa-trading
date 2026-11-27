@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import { ErrorFallback, NotFoundScreen } from '../../../src/components/layout/route-fallbacks';
+import { renderScreen } from '../../render';
 
 jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
 
@@ -18,9 +19,16 @@ describe('ErrorFallback', () => {
 
 describe('NotFoundScreen', () => {
   it('sends an unknown link back to markets', async () => {
-    await render(<NotFoundScreen />);
+    await renderScreen(<NotFoundScreen />);
 
     await fireEvent.press(screen.getByRole('button', { name: 'Back to Markets' }));
     expect(router.replace).toHaveBeenCalledWith('/markets');
+  });
+
+  it('follows the Arabic locale', async () => {
+    await renderScreen(<NotFoundScreen />, { locale: 'ar' });
+
+    expect(screen.getByRole('button', { name: 'العودة إلى الأسواق' })).toBeOnTheScreen();
+    expect(screen.queryByText('Page not found')).not.toBeOnTheScreen();
   });
 });

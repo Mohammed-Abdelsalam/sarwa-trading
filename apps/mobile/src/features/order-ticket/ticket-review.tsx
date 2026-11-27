@@ -123,7 +123,7 @@ export function TicketReview({
         <SlideToConfirm
           confirm={review.confirm}
           sendingLabel={review.sendingLabel}
-          onConfirm={actions.submit}
+          onConfirm={review.error ? actions.retry : actions.submit}
         />
       </View>
     </>

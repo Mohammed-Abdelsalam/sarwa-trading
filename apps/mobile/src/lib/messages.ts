@@ -17,6 +17,14 @@ const en = {
   alerts: {
     inAppOnly: 'Alerts arrive in-app only',
   },
+  orders: {
+    workingAmount: ({ amount }: { amount: string }) => `Working · ${amount} remaining`,
+    reservedCash: ({ amount }: { amount: string }) => `reserved ${amount}`,
+  },
+  notFound: {
+    title: 'Page not found',
+    body: "This link doesn't lead anywhere in Mini Trading.",
+  },
 };
 
 export type AppMessages = typeof en;
@@ -35,6 +43,14 @@ const ar: AppMessages = {
   },
   alerts: {
     inAppOnly: 'تصلك التنبيهات داخل التطبيق فقط',
+  },
+  orders: {
+    workingAmount: ({ amount }) => `قيد التنفيذ · متبقٍ ${amount}`,
+    reservedCash: ({ amount }) => `حُجز ${amount}`,
+  },
+  notFound: {
+    title: 'الصفحة غير موجودة',
+    body: 'هذا الرابط لا يؤدي إلى أي مكان في Mini Trading.',
   },
 };
 

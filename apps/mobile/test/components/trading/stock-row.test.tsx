@@ -1,4 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react-native';
+import * as reanimated from 'react-native-reanimated';
 
 import { type StockWithQuote } from '@sarwa/contracts';
 
@@ -79,5 +80,17 @@ describe('StockRow', () => {
       'accessibilityActions',
       [{ name: 'toggleWatch', label: 'أزل من المفضلة' }],
     );
+  });
+
+  it('does not flash a recycled row that now shows another stock', async () => {
+    const flash = jest.spyOn(reanimated, 'withSequence');
+    await renderScreen(<StockRow stock={apple} />);
+    await screen.rerender(
+      <StockRow
+        stock={{ ...apple, symbol: 'MSFT', quote: { ...apple.quote, symbol: 'MSFT', price: 410 } }}
+      />,
+    );
+
+    expect(flash).not.toHaveBeenCalled();
   });
 });

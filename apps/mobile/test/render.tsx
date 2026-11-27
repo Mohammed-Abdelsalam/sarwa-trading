@@ -53,7 +53,10 @@ export function Providers({
 }: ProviderOptions & { children: ReactNode }) {
   const [queryClient] = useState(() => {
     const created = new QueryClient({
-      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+      defaultOptions: {
+        queries: { retry: false, gcTime: Infinity },
+        mutations: { gcTime: Infinity },
+      },
     });
     // Saved preferences are seeded so copy renders without an async storage read (English by default).
     created.setQueryData(queryKeys.preference('sarwa.locale'), locale);

@@ -1,8 +1,13 @@
 import { ChevronRight } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { shadows } from '@sarwa/tokens';
@@ -42,7 +47,12 @@ export function SlideToConfirm({
   const offset = useSharedValue(0);
   const sign = dir === 'rtl' ? -1 : 1;
   const travel = Math.max(0, width - KNOB - INSET * 2);
+  const reducedMotion = useReducedMotion();
   const locked = confirm.disabled || confirm.sending;
+
+  useEffect(() => {
+    if (!confirm.sending) offset.set(reducedMotion ? 0 : withSpring(0));
+  }, [confirm.sending, offset, reducedMotion]);
 
   const gesture = usePanGesture({
     enabled: !locked,
@@ -54,7 +64,7 @@ export function SlideToConfirm({
         offset.set(travel);
         scheduleOnRN(onConfirm);
       } else {
-        offset.set(withSpring(0));
+        offset.set(reducedMotion ? 0 : withSpring(0));
       }
     },
   });

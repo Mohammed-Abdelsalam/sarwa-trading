@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { shadows } from '@sarwa/tokens';
@@ -20,10 +21,17 @@ export function Sheet({
   const insets = useSafeAreaInsets();
   const themeVars = useThemeVars();
   const { t, dir } = useCopy();
+  const reducedMotion = useReducedMotion();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={reducedMotion ? 'fade' : 'slide'}
+      onRequestClose={onClose}
+    >
+      {/* Edge-to-edge Android no longer resizes the window for the keyboard, so both platforms pad. */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         style={[{ flex: 1, direction: dir }, themeVars]}
         className="justify-end"
       >

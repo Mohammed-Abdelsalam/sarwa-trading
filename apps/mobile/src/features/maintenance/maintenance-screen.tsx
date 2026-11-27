@@ -23,7 +23,7 @@ function MaintenanceArt() {
       <View className="absolute inset-[26px] items-center justify-center rounded-[26px] bg-brand">
         <Wrench size={32} color={colors['on-brand']} />
       </View>
-      <View className="absolute -right-1.5 top-2 h-[34px] w-[34px] items-center justify-center rounded-full border border-border bg-surface">
+      <View className="absolute -end-1.5 top-2 h-[34px] w-[34px] items-center justify-center rounded-full border border-border bg-surface">
         <Clock size={16} color={colors.warn} />
       </View>
     </View>

@@ -30,7 +30,8 @@ jest.mock('react-native-reanimated', () => {
       };
     },
     useAnimatedStyle: <T>(style: () => T) => style(),
-    useReducedMotion: () => false,
+    useReducedMotion: jest.fn(() => false),
+    cancelAnimation: jest.fn(),
     FadeInDown: {},
     FadeOutDown: {},
     withTiming: identity,
