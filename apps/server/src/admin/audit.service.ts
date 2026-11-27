@@ -1,9 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Global, Injectable, Module } from '@nestjs/common';
 import { type AuditLog as AuditLogRow } from '@prisma/client';
 
 import { type AuditAction, type AuditLog, type AuditPage, type AuditQuery } from '@sarwa/contracts';
 
-import { PrismaService } from '../prisma.service';
+import { PrismaService, type Tx } from '../prisma.service';
+
+export interface Actor {
+  email: string;
+  ip?: string | undefined;
+}
 
 export interface AuditEntry {
   actorEmail: string;
@@ -17,8 +22,12 @@ export interface AuditEntry {
 export class AuditService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async log({ actorEmail, action, entity, payload = {}, ip }: AuditEntry): Promise<void> {
-    await this.prisma.auditLog.create({
+  // Pass the transaction client so the audit row commits (or rolls back) with the change it records.
+  async log(
+    { actorEmail, action, entity, payload = {}, ip }: AuditEntry,
+    tx: Tx = this.prisma,
+  ): Promise<void> {
+    await tx.auditLog.create({
       data: { actorEmail, action, entity, payload: JSON.stringify(payload), ip: ip ?? null },
     });
   }
@@ -45,6 +54,10 @@ export class AuditService {
     return rows.map(toAuditLog);
   }
 }
+
+@Global()
+@Module({ providers: [AuditService], exports: [AuditService] })
+export class AuditModule {}
 
 function toAuditLog(row: AuditLogRow): AuditLog {
   return {

@@ -196,6 +196,10 @@ const notification = { id: 'n_1', payload: filledPayload, readAt: null, createdA
 const quote = {
   symbol: 'AAPL',
   price: 200,
+  bid: 199.98,
+  ask: 200.02,
+  bidSize: 100,
+  askSize: 200,
   prevClose: 198,
   open: 199,
   dayHigh: 201,
@@ -505,8 +509,11 @@ const cases: Case[] = [
   [
     'HealthResponse',
     HealthResponseSchema,
-    { status: 'ok', uptimeSeconds: 3 },
-    [{ status: 'down', uptimeSeconds: 3 }],
+    { status: 'ok', uptimeSeconds: 3, version: '1.0.0', commit: 'dev' },
+    [
+      { status: 'ok', uptimeSeconds: 3 },
+      { status: 'down', uptimeSeconds: 3, version: '1', commit: 'x' },
+    ],
   ],
   [
     'Problem',

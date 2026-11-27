@@ -7,14 +7,13 @@ import {
   Param,
   Patch,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { type AdminUser as AdminUserRow } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { type Request } from 'express';
 
 import {
+  ADMIN_ROUTES,
   type AdminUser,
   type CreateUser,
   CreateUserSchema,
@@ -25,10 +24,10 @@ import {
 
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { PrismaService } from '../prisma.service';
-import { AuditService } from './audit.service';
-import { AdminGuard, CurrentAdmin, Roles, toAdminUser } from './auth';
+import { type Actor, AuditService } from './audit.service';
+import { AdminGuard, CurrentActor, CurrentAdmin, Roles, toAdminUser } from './auth';
 
-@Controller('admin/users')
+@Controller()
 @UseGuards(AdminGuard)
 export class UsersController {
   constructor(
@@ -36,48 +35,51 @@ export class UsersController {
     private readonly audit: AuditService,
   ) {}
 
-  @Get()
+  // Emails and roles of every admin are only for admins.
+  @Get(ADMIN_ROUTES.users)
+  @Roles(['ADMIN'])
   async list(): Promise<UsersResponse> {
     const rows = await this.prisma.adminUser.findMany({ orderBy: { createdAt: 'asc' } });
     return { items: rows.map(toAdminUser) };
   }
 
-  @Post()
+  @Post(ADMIN_ROUTES.users)
   @Roles(['ADMIN'])
   async create(
     @Body(new ZodValidationPipe(CreateUserSchema)) input: CreateUser,
-    @CurrentAdmin() admin: AdminUserRow,
-    @Req() request: Request,
+    @CurrentActor() actor: Actor,
   ): Promise<AdminUser> {
     const email = input.email.toLowerCase();
     if (await this.prisma.adminUser.findUnique({ where: { email } })) {
       throw new ConflictException(`${email} already has an account`);
     }
-    const row = await this.prisma.adminUser.create({
-      data: {
-        email,
-        name: input.name,
-        role: input.role,
-        passwordHash: await bcrypt.hash(input.password, 10),
-      },
-    });
-    await this.audit.log({
-      actorEmail: admin.email,
-      action: 'user.create',
-      entity: `User · ${email}`,
-      payload: { email, role: input.role },
-      ip: request.ip,
+    const passwordHash = await bcrypt.hash(input.password, 10);
+    const row = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.adminUser.create({
+        data: { email, name: input.name, role: input.role, passwordHash },
+      });
+      await this.audit.log(
+        {
+          actorEmail: actor.email,
+          action: 'user.create',
+          entity: `User · ${email}`,
+          payload: { email, role: input.role },
+          ip: actor.ip,
+        },
+        tx,
+      );
+      return created;
     });
     return toAdminUser(row);
   }
 
-  @Patch(':id')
+  @Patch(ADMIN_ROUTES.user)
   @Roles(['ADMIN'])
   async update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateUserSchema)) changes: UpdateUser,
     @CurrentAdmin() admin: AdminUserRow,
-    @Req() request: Request,
+    @CurrentActor() actor: Actor,
   ): Promise<AdminUser> {
     if (id === admin.id) throw new BadRequestException("You can't change your own role or status");
 
@@ -93,30 +95,37 @@ export class UsersController {
       if (activeAdmins <= 1) throw new BadRequestException('At least one ADMIN must remain active');
     }
 
-    const row = await this.prisma.adminUser.update({ where: { id }, data: changes });
     const entries = [
       changes.role && changes.role !== target.role
         ? {
             action: 'user.role' as const,
-            payload: { role: { from: target.role, to: changes.role } },
+            payload: { before: { role: target.role }, after: { role: changes.role } },
           }
         : null,
       changes.status && changes.status !== target.status
         ? {
             action: 'user.status' as const,
-            payload: { status: { from: target.status, to: changes.status } },
+            payload: { before: { status: target.status }, after: { status: changes.status } },
           }
         : null,
     ].filter((entry) => entry !== null);
-    for (const { action, payload } of entries) {
-      await this.audit.log({
-        actorEmail: admin.email,
-        action,
-        entity: `User · ${row.email}`,
-        payload,
-        ip: request.ip,
-      });
-    }
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.adminUser.update({ where: { id }, data: changes });
+      for (const { action, payload } of entries) {
+        await this.audit.log(
+          {
+            actorEmail: actor.email,
+            action,
+            entity: `User · ${updated.email}`,
+            payload,
+            ip: actor.ip,
+          },
+          tx,
+        );
+      }
+      return updated;
+    });
     return toAdminUser(row);
   }
 }

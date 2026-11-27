@@ -25,6 +25,8 @@ export const AdminUserSchema = z.object({
 export const LoginRequestSchema = z.object({
   email: z.email('Enter a valid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters').max(128),
+  // "Keep me signed in for 7 days" instead of the default 8-hour session.
+  remember: z.boolean().default(false),
 });
 
 export const SessionResponseSchema = z.object({ user: AdminUserSchema });
@@ -161,7 +163,7 @@ export const AdminStatsSchema = z.object({
 export type Role = z.infer<typeof RoleSchema>;
 export type UserStatus = z.infer<typeof UserStatusSchema>;
 export type AdminUser = z.infer<typeof AdminUserSchema>;
-export type LoginRequest = z.infer<typeof LoginRequestSchema>;
+export type LoginRequest = z.input<typeof LoginRequestSchema>;
 export type SessionResponse = z.infer<typeof SessionResponseSchema>;
 export type CreateUser = z.infer<typeof CreateUserSchema>;
 export type UpdateUser = z.infer<typeof UpdateUserSchema>;

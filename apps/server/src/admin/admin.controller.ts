@@ -1,8 +1,7 @@
-import { Body, Controller, Get, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { type AdminUser as AdminUserRow } from '@prisma/client';
-import { type Request } from 'express';
+import { Body, Controller, Get, Patch, Post, Query, UseGuards } from '@nestjs/common';
 
 import {
+  ADMIN_ROUTES,
   type AdminStats,
   type AppConfig,
   type AuditPage,
@@ -11,6 +10,7 @@ import {
   type MarketCommand,
   type MarketCommandResponse,
   MarketCommandSchema,
+  type MarketStatus,
   type UpdateAppConfig,
   UpdateAppConfigSchema,
 } from '@sarwa/contracts';
@@ -20,10 +20,10 @@ import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { MarketGateway } from '../market/market.gateway';
 import { MarketService } from '../market/market.service';
 import { PrismaService } from '../prisma.service';
-import { AuditService } from './audit.service';
-import { AdminGuard, CurrentAdmin, Roles } from './auth';
+import { type Actor, type AuditEntry, AuditService } from './audit.service';
+import { AdminGuard, CurrentActor, Roles } from './auth';
 
-@Controller('admin')
+@Controller()
 @UseGuards(AdminGuard)
 export class AdminController {
   constructor(
@@ -34,7 +34,7 @@ export class AdminController {
     private readonly audit: AuditService,
   ) {}
 
-  @Get('stats')
+  @Get(ADMIN_ROUTES.stats)
   async stats(): Promise<AdminStats> {
     const [devices, watchlistItems, top, recentActivity] = await Promise.all([
       this.prisma.device.count(),
@@ -63,36 +63,34 @@ export class AdminController {
     };
   }
 
-  @Post('market')
+  @Post(ADMIN_ROUTES.market)
   @Roles(['ADMIN'])
   async command(
     @Body(new ZodValidationPipe(MarketCommandSchema)) command: MarketCommand,
-    @CurrentAdmin() admin: AdminUserRow,
-    @Req() request: Request,
+    @CurrentActor() actor: Actor,
   ): Promise<MarketCommandResponse> {
     const before = this.market.getStatus();
-    const log = (
-      action: Parameters<AuditService['log']>[0]['action'],
-      payload: Record<string, unknown>,
-    ) =>
-      this.audit.log({
-        actorEmail: admin.email,
-        action,
-        entity: 'Market',
-        payload,
-        ip: request.ip,
+    const log = (action: AuditEntry['action'], payload: Record<string, unknown>) =>
+      this.audit.log({ actorEmail: actor.email, action, entity: 'Market', payload, ip: actor.ip });
+    const change = async (
+      action: AuditEntry['action'],
+      apply: () => MarketStatus,
+    ): Promise<MarketCommandResponse> => {
+      const status = apply();
+      await log(action, {
+        before: { state: before.state, volatility: before.volatility },
+        after: { state: status.state, volatility: status.volatility },
       });
+      return { status };
+    };
 
     switch (command.action) {
       case 'pause':
-        await log('market.pause', { status: 'paused', prev: before.state });
-        return { status: this.market.pause() };
+        return change('market.pause', () => this.market.pause());
       case 'resume':
-        await log('market.resume', { status: 'running', prev: before.state });
-        return { status: this.market.resume() };
+        return change('market.resume', () => this.market.resume());
       case 'setVolatility':
-        await log('market.volatility', { from: before.volatility, to: command.volatility });
-        return { status: this.market.setVolatility(command.volatility) };
+        return change('market.volatility', () => this.market.setVolatility(command.volatility));
       case 'dropConnections': {
         const dropped = this.gateway.dropAll();
         await log('connections.drop', { dropped });
@@ -101,25 +99,16 @@ export class AdminController {
     }
   }
 
-  @Patch('config')
+  @Patch(ADMIN_ROUTES.config)
   @Roles(['ADMIN'])
-  async updateConfig(
+  updateConfig(
     @Body(new ZodValidationPipe(UpdateAppConfigSchema)) patch: UpdateAppConfig,
-    @CurrentAdmin() admin: AdminUserRow,
-    @Req() request: Request,
+    @CurrentActor() actor: Actor,
   ): Promise<AppConfig> {
-    const config = await this.appConfig.update(patch);
-    await this.audit.log({
-      actorEmail: admin.email,
-      action: 'config.update',
-      entity: `Config · ${Object.keys(patch).join(', ')}`,
-      payload: patch,
-      ip: request.ip,
-    });
-    return config;
+    return this.appConfig.update(patch, actor);
   }
 
-  @Get('audit')
+  @Get(ADMIN_ROUTES.audit)
   auditLog(@Query(new ZodValidationPipe(AuditQuerySchema)) query: AuditQuery): Promise<AuditPage> {
     return this.audit.list(query);
   }

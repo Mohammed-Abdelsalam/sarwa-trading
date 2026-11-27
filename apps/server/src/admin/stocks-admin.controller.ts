@@ -8,17 +8,17 @@ import {
   Param,
   Patch,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
-import { type AdminUser as AdminUserRow, type Stock as StockRow } from '@prisma/client';
-import { type Request } from 'express';
+import { type Stock as StockRow } from '@prisma/client';
 
 import {
+  ADMIN_ROUTES,
   type AdminStock,
   type AdminStocksResponse,
   type CreateStock,
   CreateStockSchema,
+  ErrorCode,
   SymbolSchema,
   type UpdateStock,
   UpdateStockSchema,
@@ -27,10 +27,10 @@ import {
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { MarketService } from '../market/market.service';
 import { PrismaService } from '../prisma.service';
-import { AuditService } from './audit.service';
-import { AdminGuard, CurrentAdmin, Roles } from './auth';
+import { type Actor, AuditService } from './audit.service';
+import { AdminGuard, CurrentActor, Roles } from './auth';
 
-@Controller('admin/stocks')
+@Controller()
 @UseGuards(AdminGuard)
 export class StocksAdminController {
   constructor(
@@ -39,71 +39,103 @@ export class StocksAdminController {
     private readonly audit: AuditService,
   ) {}
 
-  @Get()
+  @Get(ADMIN_ROUTES.stocks)
   async list(): Promise<AdminStocksResponse> {
     const rows = await this.prisma.stock.findMany({ orderBy: { symbol: 'asc' } });
     return { items: rows.map((row) => this.toAdminStock(row)) };
   }
 
-  @Post()
+  @Post(ADMIN_ROUTES.stocks)
   @Roles(['ADMIN'])
   async create(
     @Body(new ZodValidationPipe(CreateStockSchema)) input: Required<CreateStock>,
-    @CurrentAdmin() admin: AdminUserRow,
-    @Req() request: Request,
+    @CurrentActor() actor: Actor,
   ): Promise<AdminStock> {
     const exists = await this.prisma.stock.findUnique({ where: { symbol: input.symbol } });
     if (exists) throw new ConflictException(`Symbol ${input.symbol} already exists`);
 
-    const row = await this.prisma.stock.create({ data: input });
-    await this.market.reload();
-    await this.audit.log({
-      actorEmail: admin.email,
-      action: 'stock.create',
-      entity: `Stock · ${row.symbol}`,
-      payload: input,
-      ip: request.ip,
+    const row = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.stock.create({ data: input });
+      await this.audit.log(
+        {
+          actorEmail: actor.email,
+          action: 'stock.create',
+          entity: `Stock · ${created.symbol}`,
+          payload: input,
+          ip: actor.ip,
+        },
+        tx,
+      );
+      return created;
     });
+    await this.market.reload();
     return this.toAdminStock(row);
   }
 
-  @Patch(':symbol')
+  @Patch(ADMIN_ROUTES.stock)
   @Roles(['ADMIN'])
   async update(
     @Param('symbol', new ZodValidationPipe(SymbolSchema)) symbol: string,
     @Body(new ZodValidationPipe(UpdateStockSchema)) changes: UpdateStock,
-    @CurrentAdmin() admin: AdminUserRow,
-    @Req() request: Request,
+    @CurrentActor() actor: Actor,
   ): Promise<AdminStock> {
-    const row = await this.prisma.stock.update({ where: { symbol }, data: changes });
-    await this.market.reload();
-    await this.audit.log({
-      actorEmail: admin.email,
-      action: 'stock.update',
-      entity: `Stock · ${symbol}`,
-      payload: { symbol, changes },
-      ip: request.ip,
+    const row = await this.prisma.$transaction(async (tx) => {
+      const before = await tx.stock.findUniqueOrThrow({ where: { symbol } });
+      const updated = await tx.stock.update({ where: { symbol }, data: changes });
+      const fields = Object.keys(changes) as (keyof UpdateStock)[];
+      await this.audit.log(
+        {
+          actorEmail: actor.email,
+          action: 'stock.update',
+          entity: `Stock · ${symbol}`,
+          payload: {
+            symbol,
+            before: Object.fromEntries(fields.map((field) => [field, before[field]])),
+            after: Object.fromEntries(fields.map((field) => [field, updated[field]])),
+          },
+          ip: actor.ip,
+        },
+        tx,
+      );
+      return updated;
     });
+    await this.market.reload();
     return this.toAdminStock(row);
   }
 
-  @Delete(':symbol')
+  // Orders, fills and positions are financial history: a traded stock is disabled, never deleted.
+  @Delete(ADMIN_ROUTES.stock)
   @Roles(['ADMIN'])
   @HttpCode(204)
   async remove(
     @Param('symbol', new ZodValidationPipe(SymbolSchema)) symbol: string,
-    @CurrentAdmin() admin: AdminUserRow,
-    @Req() request: Request,
+    @CurrentActor() actor: Actor,
   ): Promise<void> {
-    await this.prisma.stock.delete({ where: { symbol } });
-    await this.market.reload();
-    await this.audit.log({
-      actorEmail: admin.email,
-      action: 'stock.delete',
-      entity: `Stock · ${symbol}`,
-      payload: { symbol },
-      ip: request.ip,
+    const [orders, positions, fills] = await Promise.all([
+      this.prisma.order.count({ where: { symbol } }),
+      this.prisma.position.count({ where: { symbol } }),
+      this.prisma.fill.count({ where: { symbol } }),
+    ]);
+    if (orders + positions + fills > 0) {
+      throw new ConflictException({
+        code: ErrorCode.Conflict,
+        message: 'Disable the stock instead',
+      });
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.stock.delete({ where: { symbol } });
+      await this.audit.log(
+        {
+          actorEmail: actor.email,
+          action: 'stock.delete',
+          entity: `Stock · ${symbol}`,
+          payload: { symbol },
+          ip: actor.ip,
+        },
+        tx,
+      );
     });
+    await this.market.reload();
   }
 
   private toAdminStock(row: StockRow): AdminStock {

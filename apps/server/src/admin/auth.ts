@@ -14,8 +14,10 @@ import { type Request } from 'express';
 import { ADMIN_SESSION_COOKIE, type AdminUser, type Role } from '@sarwa/contracts';
 
 import { PrismaService } from '../prisma.service';
+import { type Actor } from './audit.service';
 
 export const SESSION_TTL_SECONDS = 8 * 60 * 60;
+export const REMEMBER_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 export interface AdminRequest extends Request {
   admin?: AdminUserRow;
@@ -31,18 +33,22 @@ export const CurrentAdmin = createParamDecorator(
   },
 );
 
+// Who did it and from where, for the audit log.
+export const CurrentActor = createParamDecorator((_: unknown, ctx: ExecutionContext): Actor => {
+  const request = ctx.switchToHttp().getRequest<AdminRequest>();
+  if (!request.admin) throw new UnauthorizedException();
+  return { email: request.admin.email, ip: request.ip };
+});
+
+// Reloads the admin on every check so role changes and disabled accounts apply immediately.
 @Injectable()
-// Reloads the admin on every request so role changes and disabled accounts apply immediately.
-export class AdminGuard implements CanActivate {
+export class AdminSessions {
   constructor(
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
-    private readonly reflector: Reflector,
   ) {}
 
-  async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    const request = ctx.switchToHttp().getRequest<AdminRequest>();
-    const token = (request.cookies as Record<string, string | undefined>)[ADMIN_SESSION_COOKIE];
+  async verify(token: string | undefined): Promise<AdminUserRow> {
     if (!token) throw new UnauthorizedException('Sign in required');
 
     let adminId: string;
@@ -54,6 +60,21 @@ export class AdminGuard implements CanActivate {
 
     const admin = await this.prisma.adminUser.findUnique({ where: { id: adminId } });
     if (admin?.status !== 'active') throw new UnauthorizedException('Account disabled');
+    return admin;
+  }
+}
+
+@Injectable()
+export class AdminGuard implements CanActivate {
+  constructor(
+    private readonly sessions: AdminSessions,
+    private readonly reflector: Reflector,
+  ) {}
+
+  async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    const request = ctx.switchToHttp().getRequest<AdminRequest>();
+    const cookies = request.cookies as Record<string, string | undefined>;
+    const admin = await this.sessions.verify(cookies[ADMIN_SESSION_COOKIE]);
 
     const roles = this.reflector.get(Roles, ctx.getHandler()) as Role[] | undefined;
     if (roles && !roles.includes(admin.role as Role)) {
