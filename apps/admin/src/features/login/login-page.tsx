@@ -6,6 +6,7 @@ import { PASSWORD_MIN_LENGTH, REMEMBER_DAYS, useAdminI18n } from '@sarwa/core/ad
 import { Badge, Button, Callout, Card, Field, IconButton, Input, Logo } from '@sarwa/ui';
 
 import { TickerRows } from '../../components/common/ticker';
+import { LanguageMenu } from '../../components/layout/language-menu';
 import { useLoginPage } from './use-login-page';
 
 export function LoginPage() {
@@ -41,7 +42,8 @@ export function LoginPage() {
           {copy.footer({ year: String(new Date().getFullYear()) })}
         </span>
       </aside>
-      <main className="grid place-items-center p-10">
+      <main className="relative grid place-items-center p-10">
+        <LanguageMenu className="absolute end-4 top-4" />
         <form
           noValidate
           aria-labelledby="login-title"

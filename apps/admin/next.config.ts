@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
         headers: [...securityHeaders, { key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
       },
     ]),
+  redirects: () =>
+    Promise.resolve([
+      { source: '/users', destination: '/team', permanent: true },
+      { source: '/accounts', destination: '/customers', permanent: true },
+    ]),
   // Same-origin API: the httpOnly, SameSite=strict session cookie only works without CORS.
   rewrites: () =>
     Promise.resolve([

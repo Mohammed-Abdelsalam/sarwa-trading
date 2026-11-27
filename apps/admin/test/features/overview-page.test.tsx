@@ -43,6 +43,27 @@ describe('OverviewPage', () => {
     expect(screen.getByText('30 / 32')).toBeInTheDocument();
   });
 
+  it('counts registered customers and guest visitors instead of devices', async () => {
+    renderWithApi(<OverviewPage />, {
+      'GET admin/auth/me': me(),
+      'GET admin/stats': makeStats({
+        registeredCustomers: 8_412,
+        signedUpToday: 164,
+        guestVisitors24h: 2_930,
+        guestConversionBps: 610,
+      }),
+      'GET stocks': { items: [] },
+    });
+
+    expect(await screen.findByText('8,412')).toBeInTheDocument();
+    expect(screen.getByText('Registered customers')).toBeInTheDocument();
+    expect(screen.getByText('+164 signed up today')).toBeInTheDocument();
+    expect(screen.getByText('Guest visitors · 24h')).toBeInTheDocument();
+    expect(screen.getByText('2,930')).toBeInTheDocument();
+    expect(screen.getByText('6.10% converted to sign-up')).toBeInTheDocument();
+    expect(screen.queryByText('Devices')).not.toBeInTheDocument();
+  });
+
   it('says so when no stock is watchlisted and nothing has happened yet', async () => {
     renderWithApi(<OverviewPage />, {
       'GET admin/auth/me': me(),

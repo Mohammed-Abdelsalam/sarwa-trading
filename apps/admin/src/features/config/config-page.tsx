@@ -154,12 +154,12 @@ export function ConfigPage() {
 
   return (
     <>
-      {page.canEdit ? null : <ViewerNotice />}
+      {page.isViewer ? <ViewerNotice /> : null}
       <PageHeader
         title={copy.title}
         subtitle={copy.subtitle({ n: f.number(CONFIG_APPLY_SECONDS) })}
       >
-        {page.canEdit ? null : <ReadOnlyBadge />}
+        {page.isViewer ? <ReadOnlyBadge /> : null}
         {draft ? (
           <Badge tone={page.changes === 0 ? 'pos' : 'warn'} role="status">
             {page.changes === 0 ? copy.allSaved : copy.unsaved({ n: f.number(page.changes) })}

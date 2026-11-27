@@ -60,6 +60,7 @@ jest.mock('next/navigation', () => {
     };
   }
   window.addEventListener('popstate', notify);
+  const router = { replace: jest.fn(), push: jest.fn(), refresh: jest.fn() };
   const subscribe = (listener: () => void) => {
     listeners.add(listener);
     return () => {
@@ -67,7 +68,8 @@ jest.mock('next/navigation', () => {
     };
   };
   return {
-    useRouter: () => ({ replace: jest.fn(), push: jest.fn(), refresh: jest.fn() }),
+    // One router for the whole file, so a test reads what a page pushed through useRouter().
+    useRouter: () => router,
     usePathname: () => useSyncExternalStore(subscribe, () => window.location.pathname),
     useSearchParams: () => {
       const search = useSyncExternalStore(subscribe, () => window.location.search);

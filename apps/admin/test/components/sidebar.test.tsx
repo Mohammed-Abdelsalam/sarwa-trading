@@ -25,7 +25,18 @@ describe('Sidebar', () => {
 
     const nav = screen.getByRole('navigation', { name: 'Admin navigation' });
     expect(nav).toBeInTheDocument();
-    expect(screen.getAllByRole('link')).toHaveLength(9);
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Overview',
+      'Market',
+      'Trading',
+      'Orders',
+      'Customers',
+      'Stocks',
+      'Config',
+      'Audit log',
+      'Team',
+    ]);
+    expect(screen.getByRole('link', { name: 'Team' })).toHaveAttribute('href', '/team');
     expect(screen.getByRole('link', { name: 'Trading' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Audit log' })).toHaveAttribute('href', '/audit');
     expect(screen.getByText('Simulator')).toBeInTheDocument();

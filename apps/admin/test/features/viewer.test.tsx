@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { type AdminUser } from '@sarwa/contracts';
 
 import { MarketPage } from '../../src/features/market/market-page';
-import { UsersPage } from '../../src/features/users/users-page';
+import { TeamScreen } from '../../src/features/team/team-page';
 import { type ApiCall, makeStats, makeUser, me, renderWithApi } from '../utils';
 
 const writes = (calls: ApiCall[]) => calls.filter((call) => call.method !== 'GET');
@@ -73,7 +73,7 @@ describe('Market control room', () => {
   });
 });
 
-describe('Users', () => {
+describe('Team', () => {
   const sam = makeUser({ id: 'u2', email: 'sam@minitrading.dev', name: 'Sam Okafor' });
   const lee = makeUser({
     id: 'u3',
@@ -84,9 +84,10 @@ describe('Users', () => {
   });
 
   function renderUsers(role: AdminUser['role'], users: AdminUser[]) {
-    return renderWithApi(<UsersPage />, {
+    return renderWithApi(<TeamScreen />, {
       'GET admin/auth/me': me(role),
       'GET admin/users': { items: users },
+      'GET admin/invites': { items: [] },
       'PATCH admin/users/u2': (call: ApiCall) => ({ ...sam, ...(call.body as object) }),
       'PATCH admin/users/u3': (call: ApiCall) => ({ ...lee, ...(call.body as object) }),
     });
@@ -96,7 +97,7 @@ describe('Users', () => {
     const { calls } = renderUsers('VIEWER', []);
 
     expect(
-      await screen.findByRole('heading', { name: "You don't have access to Users" }),
+      await screen.findByRole('heading', { name: "You don't have access to Team" }),
     ).toBeInTheDocument();
     expect(screen.getByText('ERROR 403')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to overview' })).toHaveAttribute(
@@ -104,6 +105,7 @@ describe('Users', () => {
       '/overview',
     );
     expect(calls.map((call) => call.path)).not.toContain('admin/users');
+    expect(calls.map((call) => call.path)).not.toContain('admin/invites');
   });
 
   it('locks your own row and disables another user after confirming', async () => {

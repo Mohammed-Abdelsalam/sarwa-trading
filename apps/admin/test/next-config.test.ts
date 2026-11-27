@@ -27,6 +27,17 @@ describe('admin next config', () => {
     expect(headers['Strict-Transport-Security']).toMatch(/max-age=\d+/);
   });
 
+  it('sends the renamed boards to their new homes', async () => {
+    const redirects = (await nextConfig.redirects?.()) ?? [];
+
+    expect(redirects).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: '/users', destination: '/team' }),
+        expect.objectContaining({ source: '/accounts', destination: '/customers' }),
+      ]),
+    );
+  });
+
   it('tells crawlers to stay out entirely', () => {
     expect(robots()).toEqual({ rules: { userAgent: '*', disallow: '/' } });
   });

@@ -2,6 +2,7 @@
 
 import { Pause, Play } from 'lucide-react';
 
+import { type AdminOrder, type Order } from '@sarwa/contracts';
 import { bps, cents } from '@sarwa/core';
 import { ORDER_STATUSES, useAdminI18n } from '@sarwa/core/admin';
 import {
@@ -54,11 +55,28 @@ function Kpis({ page }: { page: OrdersPageModel }) {
   );
 }
 
-function OrdersTable({ page }: { page: OrdersPageModel }) {
+// A customer's own orders carry neither the handle nor the latency the live monitor adds.
+export type OrderRow = Order & { notionalCents: number } & Partial<
+    Pick<AdminOrder, 'accountHandle' | 'latencyMs'>
+  >;
+
+export function OrdersTable({
+  orders,
+  isLoading,
+  isError,
+  onRetry,
+  showAccount = true,
+}: {
+  orders: readonly OrderRow[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+  showAccount?: boolean;
+}) {
   const { t, f } = useAdminI18n();
-  if (page.isError) return <LoadError what={t.admin.orders.loading} onRetry={page.actions.retry} />;
-  if (page.isLoading) return <TableSkeleton columns={6} label={t.admin.orders.loading} />;
-  if (page.orders.length === 0) {
+  if (isError) return <LoadError what={t.admin.orders.loading} onRetry={onRetry} />;
+  if (isLoading) return <TableSkeleton columns={6} label={t.admin.orders.loading} />;
+  if (orders.length === 0) {
     return <p className="type-sm text-fg-2 px-4 py-10 text-center">{t.admin.orders.noOrders}</p>;
   }
   return (
@@ -66,7 +84,7 @@ function OrdersTable({ page }: { page: OrdersPageModel }) {
       <THead>
         <TRow>
           <TH className="ps-4">{t.admin.monitorColumns.time}</TH>
-          <TH className="max-md:hidden">{t.admin.monitorColumns.account}</TH>
+          {showAccount ? <TH className="max-md:hidden">{t.admin.monitorColumns.account}</TH> : null}
           <TH>{t.admin.monitorColumns.order}</TH>
           <TH align="end">{t.admin.monitorColumns.notional}</TH>
           <TH>{t.admin.monitorColumns.status}</TH>
@@ -76,12 +94,14 @@ function OrdersTable({ page }: { page: OrdersPageModel }) {
         </TRow>
       </THead>
       <TBody>
-        {page.orders.map((order) => (
+        {orders.map((order) => (
           <TRow key={order.id}>
             <TCell className="text-fg-2 ps-4 tabular-nums">
               {f.time(order.createdAt, { seconds: true })}
             </TCell>
-            <TCell className="type-mono max-md:hidden">{order.accountHandle}</TCell>
+            {showAccount ? (
+              <TCell className="type-mono max-md:hidden">{order.accountHandle}</TCell>
+            ) : null}
             <TCell>
               <span className="flex items-center gap-2">
                 <Badge
@@ -98,12 +118,14 @@ function OrdersTable({ page }: { page: OrdersPageModel }) {
                 </span>
               </span>
             </TCell>
-            <TCell align="end">{f.money(order.notionalCents)}</TCell>
+            <TCell align="end">{f.money(cents(order.notionalCents))}</TCell>
             <TCell>
               <StatusBadge status={order.status} label={t.orderStatus[order.status]} />
             </TCell>
             <TCell align="end" className="text-fg-3 max-md:hidden">
-              {t.admin.orders.latency({ n: f.number(order.latencyMs) })}
+              {order.latencyMs === undefined
+                ? '—'
+                : t.admin.orders.latency({ n: f.number(order.latencyMs) })}
             </TCell>
           </TRow>
         ))}
@@ -158,7 +180,12 @@ export function OrdersPage() {
       <Kpis page={page} />
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <Card className="overflow-hidden">
-          <OrdersTable page={page} />
+          <OrdersTable
+            orders={page.orders}
+            isLoading={page.isLoading}
+            isError={page.isError}
+            onRetry={page.actions.retry}
+          />
         </Card>
         <div className="flex flex-col gap-4">
           <Card className="flex flex-col gap-2.5 px-4.5 py-4">

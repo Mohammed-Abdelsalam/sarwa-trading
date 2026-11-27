@@ -3,14 +3,14 @@ import { Suspense } from 'react';
 
 import { getAdminMessages } from '@sarwa/core/server';
 
-import { AccountsPage } from '../../../features/accounts/accounts-page';
+import { CustomersScreen } from '../../../features/customers/customers-page';
 
-export const metadata: Metadata = { title: getAdminMessages('en').nav.accounts };
+export const metadata: Metadata = { title: getAdminMessages('en').nav.customers };
 
 export default function Page() {
   return (
     <Suspense>
-      <AccountsPage />
+      <CustomersScreen />
     </Suspense>
   );
 }

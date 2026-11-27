@@ -325,9 +325,9 @@ export function TradingPage() {
 
   return (
     <>
-      {page.canEdit ? null : <ViewerNotice />}
+      {page.isViewer ? <ViewerNotice /> : null}
       <PageHeader title={t.admin.tradingControls} subtitle={t.admin.tradingControlsSub}>
-        {page.canEdit ? null : <ReadOnlyBadge />}
+        {page.isViewer ? <ReadOnlyBadge /> : null}
         {session ? (
           <MarketStatusPill
             state={PILL_STATE[session.phase]}

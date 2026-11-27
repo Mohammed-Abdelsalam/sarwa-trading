@@ -4,12 +4,12 @@ import { MARKET_VOLATILITY } from '@sarwa/contracts';
 import { useMarketStatus } from '@sarwa/core';
 import {
   STATS_REFRESH_MS,
-  useAdminSession,
   useAdminStats,
   useLiveTicker,
   useMarketCommand,
 } from '@sarwa/core/admin';
 
+import { useAccess } from '../../components/common/access';
 import { shortActor } from '../overview/use-overview-page';
 
 const TICKER = [
@@ -34,7 +34,7 @@ export const VOLATILITY_PRESETS = {
 } as const;
 
 export function useMarketPage() {
-  const { canEdit } = useAdminSession();
+  const { canEdit, isViewer } = useAccess();
   const stats = useAdminStats({ refetchInterval: STATS_REFRESH_MS });
   const live = useMarketStatus();
   const command = useMarketCommand();
@@ -64,6 +64,7 @@ export function useMarketPage() {
 
   return {
     canEdit,
+    isViewer,
     status,
     paused,
     isLoading: !status && stats.isPending,

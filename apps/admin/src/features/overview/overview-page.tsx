@@ -3,11 +3,12 @@
 import {
   Activity,
   Database,
+  Eye,
   FileText,
-  LayoutGrid,
   RefreshCw,
   SlidersHorizontal,
   Star,
+  UserCheck,
   Users,
   Zap,
 } from 'lucide-react';
@@ -15,6 +16,7 @@ import Link from 'next/link';
 import { type ReactNode } from 'react';
 
 import { type AuditAction } from '@sarwa/contracts';
+import { bps } from '@sarwa/core';
 import { useAdminI18n } from '@sarwa/core/admin';
 import { Badge, Button, Card, ConnectionBadge, Skeleton, Spinner, StockAvatar } from '@sarwa/ui';
 
@@ -146,26 +148,57 @@ export function OverviewPage() {
   }
 
   const stats = page.stats;
+  // Optional customer counts: a server without accounts yet leaves them out.
+  const count = (value: number | undefined) => (stats ? f.number(value ?? 0) : undefined);
   const kpis = [
-    { key: 'connectedClients', icon: <Users />, value: stats?.connectedClients },
-    { key: 'activeSubscriptions', icon: <Zap />, value: stats?.activeSubscriptions },
-    { key: 'devices', icon: <LayoutGrid />, value: stats?.devices },
-    { key: 'watchlistItems', icon: <Star />, value: stats?.watchlistItems },
-  ] as const;
+    {
+      key: 'connectedClients',
+      icon: <Users />,
+      label: copy.kpis.connectedClients,
+      note: copy.kpiNotes.connectedClients,
+      value: count(stats?.connectedClients),
+    },
+    {
+      key: 'activeSubscriptions',
+      icon: <Zap />,
+      label: copy.kpis.activeSubscriptions,
+      note: copy.kpiNotes.activeSubscriptions,
+      value: count(stats?.activeSubscriptions),
+    },
+    {
+      key: 'registeredCustomers',
+      icon: <UserCheck />,
+      label: copy.registeredCustomers,
+      note: copy.signedUpToday({ n: f.number(stats?.signedUpToday ?? 0) }),
+      value: count(stats?.registeredCustomers),
+    },
+    {
+      key: 'guestVisitors',
+      icon: <Eye />,
+      label: copy.guestVisitors({ n: f.number(24) }),
+      note: copy.guestConversion({ pct: f.percent(bps(stats?.guestConversionBps ?? 0)) }),
+      value: count(stats?.guestVisitors24h),
+    },
+    {
+      key: 'watchlistItems',
+      icon: <Star />,
+      label: copy.kpis.watchlistItems,
+      note: copy.kpiNotes.watchlistItems,
+      value: count(stats?.watchlistItems),
+    },
+  ];
 
   return (
     <>
       {header}
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         {kpis.map((kpi) => (
           <KpiCard
             key={kpi.key}
-            label={copy.kpis[kpi.key]}
-            note={copy.kpiNotes[kpi.key]}
+            label={kpi.label}
+            note={kpi.note}
             icon={kpi.icon}
-            value={
-              kpi.value === undefined ? <Skeleton className="h-8 w-24" /> : f.number(kpi.value)
-            }
+            value={kpi.value ?? <Skeleton className="h-8 w-24" />}
           />
         ))}
       </div>

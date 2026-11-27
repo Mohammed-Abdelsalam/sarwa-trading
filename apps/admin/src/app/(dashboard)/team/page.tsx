@@ -3,14 +3,14 @@ import { Suspense } from 'react';
 
 import { getAdminMessages } from '@sarwa/core/server';
 
-import { UsersPage } from '../../../features/users/users-page';
+import { TeamScreen } from '../../../features/team/team-page';
 
-export const metadata: Metadata = { title: getAdminMessages('en').nav.users };
+export const metadata: Metadata = { title: getAdminMessages('en').nav.team };
 
 export default function Page() {
   return (
     <Suspense>
-      <UsersPage />
+      <TeamScreen />
     </Suspense>
   );
 }

@@ -7,7 +7,6 @@ import {
   type RulesDraft,
   rulesPatch,
   rulesToDraft,
-  useAdminSession,
   useAdminStocks,
   useAdminTrading,
   useCreateHalt,
@@ -18,6 +17,7 @@ import {
   marketClock,
 } from '@sarwa/core/admin';
 
+import { useAccess } from '../../components/common/access';
 import { shortActor } from '../overview/use-overview-page';
 
 export type TradingConfirm =
@@ -123,7 +123,7 @@ function useRulesForm(saved: Parameters<typeof rulesToDraft>[0] | undefined) {
 }
 
 export function useTradingPage() {
-  const { canEdit } = useAdminSession();
+  const { canEdit, isViewer } = useAccess();
   const trading = useAdminTrading();
   const update = useUpdateTrading();
   const resume = useResumeHalt();
@@ -142,6 +142,7 @@ export function useTradingPage() {
 
   return {
     canEdit,
+    isViewer,
     trading: data,
     isLoading: trading.isPending,
     isError: trading.isError,

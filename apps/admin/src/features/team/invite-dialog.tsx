@@ -1,84 +1,90 @@
-import { CircleCheck, Eye, UserPlus, Shield } from 'lucide-react';
+import { CircleCheck, Eye, Send, Shield } from 'lucide-react';
 
-import { RoleSchema } from '@sarwa/contracts';
-import { PASSWORD_MIN_LENGTH, useAdminI18n } from '@sarwa/core/admin';
+import { type Role, RoleSchema } from '@sarwa/contracts';
+import { useAdminI18n } from '@sarwa/core/admin';
 import { Button, Callout, cn, Dialog, Field, Input } from '@sarwa/ui';
 
-import { type UsersPageModel } from './use-users-page';
-
-export function AddUserDialog({ add }: { add: UsersPageModel['add'] }) {
-  const { t, f } = useAdminI18n();
-  const copy = t.admin.users;
-  const errorText = (key: 'email' | 'name' | 'password') => {
-    const code = add.errors[key];
-    if (!code) return undefined;
-    return code === 'emailInvalid'
-      ? copy.emailInvalid
-      : code === 'passwordShort'
-        ? copy.passwordShort({ n: f.number(PASSWORD_MIN_LENGTH) })
-        : code === 'exists'
-          ? copy.exists
-          : copy.required;
+export interface InviteDialogView {
+  open: boolean;
+  email: string;
+  role: Role;
+  emailInvalid: boolean;
+  isSending: boolean;
+  failed: boolean;
+  validHours: number;
+  actions: {
+    open: () => void;
+    close: () => void;
+    setEmail: (email: string) => void;
+    setRole: (role: Role) => void;
+    submit: () => void;
   };
-  const field = (key: 'email' | 'name' | 'password', type: string, autoComplete: string) => (
-    <Field label={copy[key]} error={errorText(key)}>
-      {(props) => (
-        <Input
-          {...props}
-          inputSize="lg"
-          type={type}
-          autoComplete={autoComplete}
-          value={add.form[key]}
-          onChange={(event) => {
-            add.actions.set(key, event.target.value);
-          }}
-        />
-      )}
-    </Field>
-  );
+}
 
+export function InviteDialog({ invite }: { invite: InviteDialogView }) {
+  const { t, locale } = useAdminI18n();
+  const copy = t.admin.team.inviteDialog;
+  const duration = new Intl.NumberFormat(locale, {
+    style: 'unit',
+    unit: 'hour',
+    unitDisplay: 'long',
+  }).format(invite.validHours);
   return (
     <Dialog
-      open={add.open}
+      open={invite.open}
       onOpenChange={(open) => {
-        if (!open) add.actions.close();
+        if (!open) invite.actions.close();
       }}
-      title={copy.addTitle}
-      description={copy.addBody}
+      title={copy.title}
+      description={copy.body({ duration })}
       className="max-w-125"
       footer={
         <>
-          <Button variant="ghost" onClick={add.actions.close}>
+          <Button variant="ghost" onClick={invite.actions.close}>
             {t.common.cancel}
           </Button>
           <Button
             type="submit"
-            form="add-user-form"
-            loading={add.isSaving}
-            icon={<UserPlus aria-hidden className="size-4" />}
+            form="invite-form"
+            loading={invite.isSending}
+            icon={<Send aria-hidden className="size-4" />}
           >
-            {copy.create}
+            {invite.isSending ? copy.sending : copy.submit}
           </Button>
         </>
       }
     >
       <form
-        id="add-user-form"
+        id="invite-form"
         noValidate
         className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
-          add.actions.submit();
+          invite.actions.submit();
         }}
       >
-        {field('email', 'email', 'off')}
-        {field('name', 'text', 'off')}
-        {field('password', 'password', 'new-password')}
+        <Field
+          label={copy.email}
+          error={invite.emailInvalid ? t.admin.users.emailInvalid : undefined}
+        >
+          {(props) => (
+            <Input
+              {...props}
+              inputSize="lg"
+              type="email"
+              autoComplete="off"
+              value={invite.email}
+              onChange={(event) => {
+                invite.actions.setEmail(event.target.value);
+              }}
+            />
+          )}
+        </Field>
         <div className="flex flex-col gap-1.5">
           <span className="type-sm text-fg font-semibold">{copy.role}</span>
           <div role="radiogroup" aria-label={copy.role} className="grid grid-cols-2 gap-2.5">
             {RoleSchema.options.map((role) => {
-              const checked = add.form.role === role;
+              const checked = invite.role === role;
               return (
                 <button
                   key={role}
@@ -86,7 +92,7 @@ export function AddUserDialog({ add }: { add: UsersPageModel['add'] }) {
                   role="radio"
                   aria-checked={checked}
                   onClick={() => {
-                    add.actions.set('role', role);
+                    invite.actions.setRole(role);
                   }}
                   className={cn(
                     'border-border bg-surface focus-visible:outline-focus flex cursor-pointer flex-col gap-1 rounded-lg border p-3.5 text-start focus-visible:outline-2',
@@ -104,13 +110,13 @@ export function AddUserDialog({ add }: { add: UsersPageModel['add'] }) {
                       <CircleCheck aria-hidden className="text-brand-fg ms-auto size-4" />
                     ) : null}
                   </span>
-                  <span className="type-caption text-fg-3">{copy.roleShort[role]}</span>
+                  <span className="type-caption text-fg-3">{t.admin.users.roleShort[role]}</span>
                 </button>
               );
             })}
           </div>
         </div>
-        {add.failed ? (
+        {invite.failed ? (
           <Callout tone="neg" urgent>
             {t.admin.states.actionFailed}
           </Callout>

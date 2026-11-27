@@ -5,11 +5,10 @@ import { Fragment } from 'react';
 
 import { AUDIT_ACTIONS, type AuditAction } from '@sarwa/contracts';
 import { useAdminI18n } from '@sarwa/core/admin';
-import { type BadgeTone } from '@sarwa/tokens';
 import {
-  Badge,
   Button,
   Card,
+  Chip,
   IconButton,
   Input,
   StateView,
@@ -22,19 +21,14 @@ import {
   Select,
 } from '@sarwa/ui';
 
+import { ActionBadge } from '../../components/common/action-badge';
 import { UserAvatar } from '../../components/common/identity';
 import { LoadError, PageHeader, Pagination, TableSkeleton } from '../../components/common/states';
 import { type ActionFilter, type AuditPageModel, useAuditPage } from './use-audit-page';
 
-function actionTone(action: AuditAction): BadgeTone {
-  if (action === 'connections.drop' || action.endsWith('.delete') || action === 'account.reset')
-    return 'neg';
-  if (action === 'market.pause' || action === 'halt.create' || action === 'auth.login_failed')
-    return 'warn';
-  if (action.endsWith('.create') || action.endsWith('.resume')) return 'pos';
-  if (action === 'config.update' || action.startsWith('auth.')) return 'info';
-  return 'brand';
-}
+// Matches the retention job: events are kept 400 days.
+const RETENTION_DAYS = 400;
+const QUICK_ACTIONS: readonly AuditAction[] = ['account.reset', 'market.pause'];
 
 type Row = AuditPageModel['rows'][number];
 
@@ -172,9 +166,7 @@ function AuditTable({ page }: { page: AuditPageModel }) {
                   </span>
                 </TCell>
                 <TCell>
-                  <Badge square tone={actionTone(row.action)} className="type-mono font-medium">
-                    {row.action}
-                  </Badge>
+                  <ActionBadge action={row.action} />
                 </TCell>
                 <TCell className="max-md:hidden">{row.entity}</TCell>
                 <TCell className="type-mono text-fg-2 max-w-90 truncate max-md:hidden">
@@ -206,7 +198,10 @@ export function AuditPage() {
 
   return (
     <>
-      <PageHeader title={copy.title} subtitle={copy.subtitle({ n: f.number(page.total) })} />
+      <PageHeader
+        title={copy.title}
+        subtitle={`${copy.subtitle({ n: f.number(page.total) })} · ${copy.retained({ n: f.number(RETENTION_DAYS) })}`}
+      />
       <div role="group" aria-label={copy.filters} className="flex flex-wrap items-center gap-2.5">
         <div className="w-60 max-sm:w-full">
           <Input
@@ -239,6 +234,29 @@ export function AuditPage() {
             ))}
           </Select>
         </span>
+        <Chip
+          active={page.group === 'customer'}
+          aria-pressed={page.group === 'customer'}
+          className="type-mono h-8"
+          onClick={() => {
+            page.actions.setGroup(page.group === 'customer' ? 'all' : 'customer');
+          }}
+        >
+          {copy.customerGroup}
+        </Chip>
+        {QUICK_ACTIONS.map((action) => (
+          <Chip
+            key={action}
+            active={page.action === action}
+            aria-pressed={page.action === action}
+            className="type-mono h-8"
+            onClick={() => {
+              page.actions.setAction(page.action === action ? 'all' : action);
+            }}
+          >
+            {action}
+          </Chip>
+        ))}
         <div className="flex-1" />
         {page.filtered ? (
           <Button variant="ghost" size="sm" onClick={page.actions.clear}>
