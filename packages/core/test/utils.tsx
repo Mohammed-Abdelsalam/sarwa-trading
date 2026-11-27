@@ -4,9 +4,11 @@ import { type ReactNode } from 'react';
 import { type Quote, type StockWithQuote } from '@sarwa/contracts';
 
 import { ApiError, type ApiClient } from '../src/api';
+import { type KeyValueStorage } from '../src/device';
 import { type MarketSocket } from '../src/market-socket';
 import { type SarwaClient, SarwaProvider } from '../src/provider';
 import { createLiveStore } from '../src/store';
+import { createRemovalQueue } from '../src/undo';
 
 export function makeQuote(overrides: Partial<Quote> = {}): Quote {
   return {
@@ -52,7 +54,24 @@ export function createTestClient(api: Partial<ApiClient> = {}): SarwaClient {
     acquire: jest.fn(() => jest.fn()),
     subscribedSymbols: () => [],
   };
-  return { api: api as ApiClient, market, store: createLiveStore() };
+  return {
+    api: api as ApiClient,
+    market,
+    store: createLiveStore(),
+    storage: createMemoryStorage(),
+    removals: createRemovalQueue(),
+  };
+}
+
+export function createMemoryStorage(initial: Record<string, string> = {}): KeyValueStorage {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem: (key) => Promise.resolve(values.get(key) ?? null),
+    setItem: (key, value) => {
+      values.set(key, value);
+      return Promise.resolve();
+    },
+  };
 }
 
 export function createWrapper(client: SarwaClient) {

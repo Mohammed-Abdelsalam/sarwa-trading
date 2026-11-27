@@ -7,13 +7,15 @@ import ReanimatedSwipeable, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { type StockWithQuote } from '@sarwa/contracts';
-import { formatPct } from '@sarwa/core';
+import { formatPct, type SortOption } from '@sarwa/core';
 
 import { AppBanners } from '../../components/layout/app-banners';
 import { ScreenHeader } from '../../components/layout/screen-header';
 import { ChangePill } from '../../components/trading/change-pill';
+import { SortButton } from '../../components/trading/sort-button';
 import { StockListSkeleton, StockRow } from '../../components/trading/stock-row';
 import { Button } from '../../components/ui/button';
+import { Snackbar } from '../../components/ui/snackbar';
 import { StateView } from '../../components/ui/state-view';
 import { Text } from '../../components/ui/text';
 import { useColors } from '../../lib/theme';
@@ -61,30 +63,43 @@ function SwipeToRemoveRow({
   );
 }
 
-function WatchlistSummary({ count, average }: { count: number; average: number | null }) {
+function WatchlistSummary({
+  count,
+  average,
+  sort,
+  onCycleSort,
+}: {
+  count: number;
+  average: number | null;
+  sort: SortOption | null;
+  onCycleSort: () => void;
+}) {
   return (
-    <View className="flex-row items-center gap-1 px-5 pb-4">
-      <Text variant="sm" className="text-fg-2">
-        {count} {count === 1 ? 'stock' : 'stocks'}
-      </Text>
-      {average === null ? null : (
-        <>
-          <Text variant="sm" className="text-fg-2">
-            ·
-          </Text>
-          <ChangePill value={average} label={formatPct(average)} variant="inline" />
-          <Text variant="sm" className="text-fg-2">
-            avg today
-          </Text>
-        </>
-      )}
+    <View className="flex-row items-center justify-between pb-2 pl-5 pr-3">
+      <View className="flex-row items-center gap-1">
+        <Text variant="sm" className="text-fg-2">
+          {count} {count === 1 ? 'stock' : 'stocks'}
+        </Text>
+        {average === null ? null : (
+          <>
+            <Text variant="sm" className="text-fg-2">
+              ·
+            </Text>
+            <ChangePill value={average} label={formatPct(average)} variant="inline" />
+            <Text variant="sm" className="text-fg-2">
+              avg today
+            </Text>
+          </>
+        )}
+      </View>
+      <SortButton sort={sort} onPress={onCycleSort} />
     </View>
   );
 }
 
 export function WatchlistScreen() {
   const colors = useColors();
-  const { rows, average, stale, isLoading, isError, retry, remove } = useWatchlistScreen();
+  const { rows, average, stale, isLoading, isError, sort, removed, actions } = useWatchlistScreen();
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
@@ -100,7 +115,7 @@ export function WatchlistScreen() {
           title="Couldn't load your watchlist"
           description="We couldn't reach the price server. Check your connection and try again."
           action={
-            <Button variant="secondary" onPress={retry}>
+            <Button variant="secondary" onPress={actions.retry}>
               Retry
             </Button>
           }
@@ -112,11 +127,22 @@ export function WatchlistScreen() {
           }}
         />
       ) : (
-        <ScrollView>
-          <WatchlistSummary count={rows.length} average={average} />
+        // ScrollView, not FlashList: a recycled cell would carry one row's open swipe to another stock.
+        <ScrollView contentContainerClassName={removed ? 'pb-24' : undefined}>
+          <WatchlistSummary
+            count={rows.length}
+            average={average}
+            sort={sort}
+            onCycleSort={actions.cycleSort}
+          />
           <View className="border-t border-border">
             {rows.map((stock) => (
-              <SwipeToRemoveRow key={stock.symbol} stock={stock} stale={stale} onRemove={remove} />
+              <SwipeToRemoveRow
+                key={stock.symbol}
+                stock={stock}
+                stale={stale}
+                onRemove={actions.remove}
+              />
             ))}
           </View>
           <View className="flex-row items-center gap-2 px-5 py-4">
@@ -127,6 +153,15 @@ export function WatchlistScreen() {
           </View>
         </ScrollView>
       )}
+
+      {removed ? (
+        <Snackbar
+          message={`${removed} removed from Watchlist`}
+          actionLabel="Undo"
+          onAction={actions.undo}
+          onDismiss={actions.dismissUndo}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

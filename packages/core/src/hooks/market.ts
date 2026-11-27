@@ -1,4 +1,10 @@
-import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import { useState } from 'react';
 
 import {
   type Candle,
@@ -8,7 +14,7 @@ import {
 } from '@sarwa/contracts';
 
 import { isNotFound } from '../api';
-import { axisCandles, chartBaseline, describeChart, withLiveQuote } from '../chart';
+import { axisCandles, chartBaseline, describeChart, periodChange, withLiveQuote } from '../chart';
 import { filterAndSort, keyStats, type MarketFilter, rangePosition } from '../markets';
 import { useSarwa } from '../provider';
 import { queryKeys } from './keys';
@@ -66,6 +72,7 @@ export function useChartSeries(symbol: string, period: Period) {
     rising: (candles.at(-1)?.c ?? 0) >= (baseline ?? 0),
     axisCandles: axisCandles(candles),
     summary: describeChart(symbol, period, candles, baseline),
+    periodChange: periodChange(candles, baseline),
     state,
     retry: () => void query.refetch(),
   };
@@ -109,5 +116,23 @@ export function useMarketList(filter: MarketFilter) {
     isError: stocks.isError && !stocks.data,
     isRefreshing: stocks.isRefetching,
     refresh: () => void stocks.refetch(),
+  };
+}
+
+// The stock key prefixes its candles, so this refreshes the detail and its charts, never the list.
+// Local state rather than isFetching, so period switches and background refetches show no spinner.
+export function useRefreshStock(symbol: string) {
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  return {
+    isRefreshing,
+    refresh: async () => {
+      setIsRefreshing(true);
+      try {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.stock(symbol) });
+      } finally {
+        setIsRefreshing(false);
+      }
+    },
   };
 }

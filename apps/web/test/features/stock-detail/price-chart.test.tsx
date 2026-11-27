@@ -25,6 +25,7 @@ function mockSeries(overrides: Partial<ReturnType<typeof useChartSeries>> = {}) 
     rising: true,
     axisCandles: candles,
     summary: 'AAPL is up 10% today',
+    periodChange: null,
     state: 'ready',
     retry: jest.fn(),
     ...overrides,
@@ -72,5 +73,19 @@ describe('PriceChart', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Chart unavailable');
     expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows open, high, low and close for the scrubbed candle in candlestick mode', async () => {
+    mockSeries();
+    render(<PriceChart symbol="AAPL" period="1D" type="candle" />);
+
+    screen.getByRole('slider', { name: 'AAPL price chart' }).focus();
+    await userEvent.keyboard('{ArrowLeft}');
+
+    for (const label of ['Open', 'High', 'Low', 'Close']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    // Candle 2 opened and bottomed at $10.00; only its OHLC rows show that value.
+    expect(screen.getAllByText('$10.00')).toHaveLength(2);
   });
 });

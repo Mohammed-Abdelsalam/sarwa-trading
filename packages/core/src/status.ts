@@ -14,6 +14,11 @@ export const LIVE_STATUS_LABELS: Record<LiveStatus, string> = {
   paused: 'Market paused',
 };
 
+// Offline or paused means the prices on screen are no longer moving, so they render muted.
+export function isStale(status: LiveStatus): boolean {
+  return status === 'offline' || status === 'paused';
+}
+
 export function liveStatus(connection: ConnectionState, market: MarketStatus | null): LiveStatus {
   switch (connection.status) {
     case 'offline':

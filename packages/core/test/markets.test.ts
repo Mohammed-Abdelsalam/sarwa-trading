@@ -5,10 +5,13 @@ import {
   filterAndSort,
   keyStats,
   nextSort,
+  nextWatchlistSort,
   rangePosition,
+  sectorFilterLabel,
   similarStocks,
   sortByColumn,
   SORTS,
+  sortStocks,
 } from '../src/markets';
 import { makeQuote } from './utils';
 
@@ -142,5 +145,30 @@ describe('sortByColumn', () => {
     expect(byPrice).toMatchObject({ key: 'price', dir: -1 });
     expect(sortByColumn(byPrice, 'price')).toMatchObject({ key: 'price', dir: 1 });
     expect(sortByColumn(byPrice, 'name')).toMatchObject({ key: 'name', dir: 1 });
+  });
+});
+
+describe('sectorFilterLabel', () => {
+  it('names each sector filter, including All', () => {
+    expect(sectorFilterLabel('all')).toBe('All');
+    expect(sectorFilterLabel('fin')).toBe('Finance');
+  });
+});
+
+describe('sortStocks', () => {
+  it('sorts a copy and leaves the input order alone', () => {
+    const input = [...stocks];
+
+    expect(sortStocks(input, byName).map((s) => s.symbol)).toEqual(['AAPL', 'JPM', 'TSLA']);
+    expect(input.map((s) => s.symbol)).toEqual(['AAPL', 'TSLA', 'JPM']);
+  });
+});
+
+describe('nextWatchlistSort', () => {
+  it('cycles from the added order through every sort and back', () => {
+    const seen = [nextWatchlistSort(null)];
+    while (seen.at(-1) !== null) seen.push(nextWatchlistSort(seen.at(-1) ?? null));
+
+    expect(seen).toEqual([...SORTS, null]);
   });
 });

@@ -4,6 +4,7 @@ import {
   queryKeys,
   useAverageChange,
   useConnection,
+  useIsStale,
   useLiveStatus,
   useLiveSymbols,
   useMarketConnection,
@@ -149,5 +150,20 @@ describe('useSyncStocksOnChange', () => {
     });
 
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.stocks });
+  });
+});
+
+describe('useIsStale', () => {
+  it('turns stale when the connection drops', () => {
+    const client = createTestClient();
+    const { Wrapper } = createWrapper(client);
+    const { result } = renderHook(() => useIsStale(), { wrapper: Wrapper });
+    expect(result.current).toBe(false);
+
+    act(() => {
+      client.store.getState().setConnection({ status: 'offline' });
+    });
+
+    expect(result.current).toBe(true);
   });
 });

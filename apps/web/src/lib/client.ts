@@ -3,6 +3,7 @@ import {
   createDeviceIdGetter,
   createLiveStore,
   createMarketSocket,
+  createRemovalQueue,
   type KeyValueStorage,
   type SarwaClient,
 } from '@sarwa/core';
@@ -26,5 +27,7 @@ export function createBrowserClient(): SarwaClient {
       getDeviceId: createDeviceIdGetter(browserStorage, () => crypto.randomUUID()),
     }),
     market: createMarketSocket({ url: API_URL, store }),
+    storage: browserStorage,
+    removals: createRemovalQueue(),
   };
 }

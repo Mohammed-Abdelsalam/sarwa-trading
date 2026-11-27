@@ -4,12 +4,18 @@ import {
   axisCandles,
   axisTicks,
   candleGeometry,
+  candleIndexAt,
   chartBaseline,
   chartGeometry,
   describeChart,
   nearestPointIndex,
+  ohlc,
+  parseChartType,
+  parsePeriod,
   percentChange,
+  periodChange,
   resolvePeriod,
+  scrubPoint,
   withLiveQuote,
 } from '../src/chart';
 
@@ -150,7 +156,7 @@ describe('candleGeometry', () => {
 
     expect([min, max]).toEqual([8, 12]);
     expect(shapes.map((s) => s.up)).toEqual([true, false]);
-    expect(shapes[0]).toMatchObject({ x: 25, width: 30, wickTop: 0, volume: 1 });
+    expect(shapes[0]).toMatchObject({ x: 25, width: 30, wickTop: 0, closeY: 10, volume: 1 });
     expect(shapes[1]?.volume).toBe(0.5);
   });
 
@@ -163,5 +169,59 @@ describe('axisTicks', () => {
   it('spreads labels evenly from the top of the chart to the bottom', () => {
     expect(axisTicks(100, 200)).toEqual([200, 150, 100]);
     expect(axisTicks(100, 200, 1)).toEqual([200]);
+  });
+});
+
+describe('parseChartType and parsePeriod', () => {
+  it('reads a URL or stored value and falls back to the defaults', () => {
+    expect(parseChartType('candle')).toBe('candle');
+    expect(parseChartType('bars')).toBe('area');
+    expect(parsePeriod('1M')).toBe('1M');
+    expect(parsePeriod(null)).toBe('1D');
+  });
+});
+
+describe('candleIndexAt', () => {
+  it('maps a position to its candle slot, clamped at the edges', () => {
+    expect(candleIndexAt(4, 100, 0)).toBe(0);
+    expect(candleIndexAt(4, 100, 30)).toBe(1);
+    expect(candleIndexAt(4, 100, 250)).toBe(3);
+    expect(candleIndexAt(4, 100, -10)).toBe(0);
+  });
+
+  it('returns -1 when there is nothing to select', () => {
+    expect(candleIndexAt(0, 100, 10)).toBe(-1);
+  });
+});
+
+describe('scrubPoint', () => {
+  it('measures the scrubbed close against the baseline', () => {
+    expect(scrubPoint(candle(1, 110), 100)).toEqual({ candle: candle(1, 110), changePct: 10 });
+  });
+
+  it('reads flat without a baseline', () => {
+    expect(scrubPoint(candle(1, 110), null).changePct).toBe(0);
+  });
+});
+
+describe('periodChange', () => {
+  it('compares the last close with the baseline', () => {
+    expect(periodChange([candle(1, 100), candle(2, 90)], 100)).toEqual({ value: -10, pct: -10 });
+  });
+
+  it('is null without candles or a baseline', () => {
+    expect(periodChange([], 100)).toBeNull();
+    expect(periodChange([candle(1, 100)], null)).toBeNull();
+  });
+});
+
+describe('ohlc', () => {
+  it('formats open, high, low and close', () => {
+    expect(ohlc({ t: 1, o: 10, h: 12, l: 9, c: 11, v: 1 })).toEqual([
+      { label: 'Open', value: '$10.00' },
+      { label: 'High', value: '$12.00' },
+      { label: 'Low', value: '$9.00' },
+      { label: 'Close', value: '$11.00' },
+    ]);
   });
 });

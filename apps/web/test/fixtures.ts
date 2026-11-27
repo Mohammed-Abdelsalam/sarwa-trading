@@ -1,4 +1,5 @@
 import { type Quote, type StockWithQuote } from '@sarwa/contracts';
+import { type ApiClient, createLiveStore, createRemovalQueue, type SarwaClient } from '@sarwa/core';
 
 export function makeQuote(overrides: Partial<Quote> = {}): Quote {
   return {
@@ -26,5 +27,27 @@ export function makeStock(symbol: string, overrides: Partial<StockWithQuote> = {
     marketCap: 1_000_000_000,
     quote: makeQuote({ symbol }),
     ...overrides,
+  };
+}
+
+export function createTestClient(api: Partial<ApiClient>): SarwaClient {
+  const values = new Map<string, string>();
+  return {
+    api: api as ApiClient,
+    store: createLiveStore(),
+    market: {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      acquire: jest.fn(() => jest.fn()),
+      subscribedSymbols: () => [],
+    },
+    storage: {
+      getItem: (key) => Promise.resolve(values.get(key) ?? null),
+      setItem: (key, value) => {
+        values.set(key, value);
+        return Promise.resolve();
+      },
+    },
+    removals: createRemovalQueue(),
   };
 }

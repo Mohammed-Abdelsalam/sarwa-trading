@@ -5,9 +5,9 @@ import { useDeferredValue, useState } from 'react';
 import {
   DEFAULT_SORT,
   nextSort,
-  SECTOR_FILTERS,
+  sectorFilterLabel,
   type SectorFilter,
-  useLiveStatus,
+  useIsStale,
   useLiveSymbols,
   useMarketList,
   useToggleWatchlist,
@@ -30,7 +30,7 @@ export function useMarketsPage() {
     sort,
   });
   const watched = useWatchedSymbols();
-  const status = useLiveStatus();
+  const stale = useIsStale();
   const { mutate: toggle } = useToggleWatchlist();
   // Two panes from 1024 px: rows select into the side panel instead of opening a page (W-Markets).
   const twoPane = useMediaQuery(`(min-width: ${String(breakpoints.lg)}px)`);
@@ -47,13 +47,13 @@ export function useMarketsPage() {
     watched,
     selected,
     twoPane,
-    stale: status === 'offline' || status === 'paused',
+    stale,
     isLoading,
     isError,
     filters: {
       query: searchedQuery,
       sector,
-      sectorLabel: SECTOR_FILTERS.find((f) => f.id === sector)?.label ?? 'All',
+      sectorLabel: sectorFilterLabel(sector),
       sort,
     },
     rowHref: (symbol: string): Route =>

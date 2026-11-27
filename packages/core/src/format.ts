@@ -143,3 +143,15 @@ export function formatStockLabel({
   const star = watched ? ' In watchlist.' : '';
   return `${name}, ${symbol}. ${formatPrice(quote.price)}. ${DIRECTION_SENTENCE[dir]}${move} today.${star}`;
 }
+
+export function shareStockMessage({
+  symbol,
+  name,
+  quote,
+}: {
+  symbol: string;
+  name: string;
+  quote: Pick<Quote, 'price' | 'prevClose'>;
+}): string {
+  return `${symbol} · ${name} ${formatPrice(quote.price)}, ${formatPct(changePct(quote))} today`;
+}

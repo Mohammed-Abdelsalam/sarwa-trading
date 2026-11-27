@@ -1,13 +1,22 @@
 import { RefreshCw, TriangleAlert } from 'lucide-react';
-import { type ReactNode, useId } from 'react';
+import { Fragment, type ReactNode, useId } from 'react';
 
 import { type Period } from '@sarwa/contracts';
-import { formatCandleDate, formatCandleTime, formatPct, formatPrice } from '@sarwa/core';
+import {
+  type ChartType,
+  formatCandleDate,
+  formatCandleTime,
+  formatPct,
+  formatPrice,
+  ohlc,
+} from '@sarwa/core';
+import { layout } from '@sarwa/tokens';
 import { Button, ChangePill, cn, Skeleton } from '@sarwa/ui';
 
-import { type ChartType, usePriceChart } from './use-price-chart';
+import { usePriceChart } from './use-price-chart';
 
 const GRID = [0.03, 0.5, 0.97];
+const VOLUME_HEIGHT = layout.detail.volumeHeight;
 
 export function PriceChart({
   symbol,
@@ -190,6 +199,16 @@ export function PriceChart({
                     label={formatPct(cross.changePct)}
                     variant="inline"
                   />
+                  {type === 'candle' ? (
+                    <dl className="type-num-sm mt-1 grid grid-cols-[auto_1fr] gap-x-3">
+                      {ohlc(cross.candle).map(({ label, value }) => (
+                        <Fragment key={label}>
+                          <dt className="text-fg-3">{label}</dt>
+                          <dd className="text-right">{value}</dd>
+                        </Fragment>
+                      ))}
+                    </dl>
+                  ) : null}
                 </div>
                 <span
                   aria-hidden
@@ -210,8 +229,8 @@ export function PriceChart({
 
           <svg
             width="100%"
-            height="44"
-            viewBox="0 0 800 44"
+            height={VOLUME_HEIGHT}
+            viewBox={`0 0 800 ${String(VOLUME_HEIGHT)}`}
             preserveAspectRatio="none"
             aria-hidden
             className="mt-2 block pr-18 max-md:pr-0"
@@ -220,9 +239,9 @@ export function PriceChart({
               <rect
                 key={c.x}
                 x={c.x - c.width / 2}
-                y={44 - c.volume * 40}
+                y={VOLUME_HEIGHT * (1 - c.volume)}
                 width={c.width}
-                height={c.volume * 40}
+                height={VOLUME_HEIGHT * c.volume}
                 className="fill-border-strong"
               />
             ))}

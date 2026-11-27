@@ -6,7 +6,7 @@ import { type MarketStatus, type Quote } from '@sarwa/contracts';
 
 import { averageChangePct } from '../markets';
 import { useSarwa } from '../provider';
-import { type LiveStatus, liveStatus } from '../status';
+import { isStale, type LiveStatus, liveStatus } from '../status';
 import { type ConnectionState } from '../store';
 import { queryKeys } from './keys';
 
@@ -33,6 +33,10 @@ export function useMarketStatus(): MarketStatus | null {
 
 export function useLiveStatus(): LiveStatus {
   return liveStatus(useConnection(), useMarketStatus());
+}
+
+export function useIsStale(): boolean {
+  return isStale(useLiveStatus());
 }
 
 export function useAverageChange(symbols: readonly string[]): number | null {

@@ -1,15 +1,15 @@
 import { ChartArea, ChartCandlestick } from 'lucide-react';
+import { type ReactNode } from 'react';
 
 import { type Period } from '@sarwa/contracts';
-import { formatChange, formatPct } from '@sarwa/core';
+import { CHART_TYPES, type ChartType, formatChange, formatPct } from '@sarwa/core';
 import { ChangePill, PeriodTabs, SegmentedControl } from '@sarwa/ui';
 
-import { type ChartType } from './use-price-chart';
-
-const CHART_TYPES = [
-  { value: 'area', label: 'Area', icon: <ChartArea aria-hidden /> },
-  { value: 'candle', label: 'Candlestick', icon: <ChartCandlestick aria-hidden /> },
-] as const;
+const ICONS: Record<ChartType, ReactNode> = {
+  area: <ChartArea aria-hidden />,
+  candle: <ChartCandlestick aria-hidden />,
+};
+const TYPE_OPTIONS = CHART_TYPES.map((option) => ({ ...option, icon: ICONS[option.value] }));
 
 export function ChartToolbar({
   period,
@@ -32,7 +32,7 @@ export function ChartToolbar({
       {type && onTypeChange ? (
         <SegmentedControl
           label="Chart type"
-          options={CHART_TYPES}
+          options={TYPE_OPTIONS}
           value={type}
           onChange={onTypeChange}
         />

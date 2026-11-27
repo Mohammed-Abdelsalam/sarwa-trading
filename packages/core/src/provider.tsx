@@ -1,13 +1,17 @@
 import { createContext, type ReactNode, useContext } from 'react';
 
 import { type ApiClient } from './api';
+import { type KeyValueStorage } from './device';
 import { type MarketSocket } from './market-socket';
 import { type LiveStore } from './store';
+import { type RemovalQueue } from './undo';
 
 export interface SarwaClient {
   api: ApiClient;
   market: MarketSocket;
   store: LiveStore;
+  storage: KeyValueStorage;
+  removals: RemovalQueue;
 }
 
 const SarwaContext = createContext<SarwaClient | null>(null);

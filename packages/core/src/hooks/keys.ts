@@ -6,4 +6,5 @@ export const queryKeys = {
   candles: (symbol: string, period: Period) => ['stocks', symbol, 'candles', period] as const,
   watchlist: ['watchlist'] as const,
   appConfig: ['app-config'] as const,
+  preference: (key: string) => ['preference', key] as const,
 };
