@@ -513,8 +513,8 @@ describe('helpers', () => {
     expect(TERMINAL_STATUSES).toEqual(terminal);
   });
 
-  it('names who or what canceled an order, including a disabled stock', () => {
-    expect(CANCEL_REASONS).toEqual(['user', 'admin_reset', 'symbol_disabled']);
+  it('names who or what canceled an order, including a disabled stock or suspended account', () => {
+    expect(CANCEL_REASONS).toEqual(['user', 'admin_reset', 'symbol_disabled', 'account_suspended']);
   });
 });
 

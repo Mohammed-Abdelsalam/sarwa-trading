@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "description": "Single source of truth between server and clients: Zod schemas, inferred types, socket events and constants.",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/zod-config.ts"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

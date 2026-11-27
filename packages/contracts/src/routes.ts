@@ -44,8 +44,49 @@ export const ADMIN_ROUTES = {
   resumeHalt: 'admin/halts/:symbol/resume',
   orders: 'admin/orders',
   orderStats: 'admin/orders/stats',
-  accounts: 'admin/accounts',
-  resetAccount: 'admin/accounts/:id/reset',
+  // Customers are addressed by their public account handle (ACC-XXXXXX). Mount the static paths
+  // (kpis, export.csv) before :handle.
+  customers: 'admin/customers',
+  customerKpis: 'admin/customers/kpis',
+  customersExport: 'admin/customers/export.csv',
+  customer: 'admin/customers/:handle',
+  customerOrders: 'admin/customers/:handle/orders',
+  customerSessions: 'admin/customers/:handle/sessions',
+  customerActivity: 'admin/customers/:handle/activity',
+  suspendCustomer: 'admin/customers/:handle/suspend',
+  reactivateCustomer: 'admin/customers/:handle/reactivate',
+  signOutCustomer: 'admin/customers/:handle/sign-out-all',
+  sendCustomerReset: 'admin/customers/:handle/password-reset',
+  resetCustomerAccount: 'admin/customers/:handle/reset-account',
+  revealCustomer: 'admin/customers/:handle/reveal',
+  invites: 'admin/invites',
+  invite: 'admin/invites/:id',
+  resendInvite: 'admin/invites/:id/resend',
+  // Public: the accept page reads the invite, then accepts it with a name and password.
+  inviteByToken: 'admin/invites/token/:token',
+  acceptInvite: 'admin/invites/accept',
+} as const;
+
+// Customer auth and the signed-in customer's own account. The refresh cookie is scoped to auth/.
+export const AUTH_ROUTES = {
+  signUp: 'auth/sign-up',
+  signIn: 'auth/sign-in',
+  signOut: 'auth/sign-out',
+  refresh: 'auth/refresh',
+  forgot: 'auth/forgot',
+  resetInfo: 'auth/reset/:token',
+  reset: 'auth/reset',
+  verify: 'auth/verify',
+  resendVerify: 'auth/verify/resend',
+  sessions: 'auth/sessions',
+  revokeSession: 'auth/sessions/:id',
+  signOutOthers: 'auth/sessions/revoke-others',
+  me: 'me',
+  profile: 'me/profile',
+  password: 'me/password',
+  summary: 'me/summary',
+  deleteAccount: 'me/delete',
+  selfReset: 'me/account/reset',
 } as const;
 
 type RouteParams<R extends string> = R extends `${string}:${infer P}/${infer Rest}`

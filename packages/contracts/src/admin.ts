@@ -31,13 +31,6 @@ export const LoginRequestSchema = z.object({
 
 export const SessionResponseSchema = z.object({ user: AdminUserSchema });
 
-export const CreateUserSchema = z.object({
-  email: z.email('Enter a full email address, e.g. sam@minitrading.dev'),
-  name: z.string().trim().min(1).max(80),
-  role: RoleSchema,
-  password: LoginRequestSchema.shape.password,
-});
-
 export const UpdateUserSchema = z
   .object({ role: RoleSchema, status: UserStatusSchema })
   .partial()
@@ -118,9 +111,35 @@ export const AUDIT_ACTIONS = [
   'halt.create',
   'halt.resume',
   'account.reset',
+  'customer.signup',
+  'customer.signin',
+  'customer.signout',
+  'customer.suspend',
+  'customer.reactivate',
+  'customer.signout_all',
+  'customer.reset_password_sent',
+  'customer.pii_viewed',
+  'customer.export',
+  'customer.delete_requested',
+  'customer.deleted',
+  'user.invite',
+  'user.invite_accepted',
 ] as const;
 
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS);
+
+// Filters by action prefix, e.g. `customer` matches every `customer.*` event.
+export const AUDIT_GROUPS = [
+  'customer',
+  'auth',
+  'user',
+  'market',
+  'trading',
+  'stock',
+  'config',
+  'halt',
+  'account',
+] as const;
 
 export const AuditLogSchema = z.object({
   id: z.string().min(1),
@@ -136,6 +155,7 @@ export const AuditQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   action: AuditActionSchema.optional(),
+  group: z.enum(AUDIT_GROUPS).optional(),
   actor: z.string().optional(),
 });
 
@@ -160,6 +180,11 @@ export const AdminStatsSchema = z.object({
     totalSymbols: z.number().int().nonnegative(),
   }),
   recentActivity: z.array(AuditLogSchema),
+  // Customer accounts. Conversion = sign-ups in 24 h ÷ guest visitors in 24 h, in basis points.
+  registeredCustomers: z.number().int().nonnegative().optional(),
+  signedUpToday: z.number().int().nonnegative().optional(),
+  guestVisitors24h: z.number().int().nonnegative().optional(),
+  guestConversionBps: z.number().int().nonnegative().optional(),
 });
 
 export type Role = z.infer<typeof RoleSchema>;
@@ -167,7 +192,6 @@ export type UserStatus = z.infer<typeof UserStatusSchema>;
 export type AdminUser = z.infer<typeof AdminUserSchema>;
 export type LoginRequest = z.input<typeof LoginRequestSchema>;
 export type SessionResponse = z.infer<typeof SessionResponseSchema>;
-export type CreateUser = z.infer<typeof CreateUserSchema>;
 export type UpdateUser = z.infer<typeof UpdateUserSchema>;
 export type UsersResponse = z.infer<typeof UsersResponseSchema>;
 export type MarketCommand = z.infer<typeof MarketCommandSchema>;
@@ -177,6 +201,7 @@ export type CreateStock = z.input<typeof CreateStockSchema>;
 export type UpdateStock = z.infer<typeof UpdateStockSchema>;
 export type AdminStocksResponse = z.infer<typeof AdminStocksResponseSchema>;
 export type AuditAction = z.infer<typeof AuditActionSchema>;
+export type AuditGroup = (typeof AUDIT_GROUPS)[number];
 export type AuditLog = z.infer<typeof AuditLogSchema>;
 export type AuditQuery = z.input<typeof AuditQuerySchema>;
 export type AuditPage = z.infer<typeof AuditPageSchema>;

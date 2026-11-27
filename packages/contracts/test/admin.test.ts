@@ -1,4 +1,6 @@
 import {
+  AUDIT_ACTIONS,
+  AUDIT_GROUPS,
   AuditQuerySchema,
   CreateStockSchema,
   LoginRequestSchema,
@@ -6,6 +8,7 @@ import {
   UpdateStockSchema,
   UpdateUserSchema,
 } from '../src/admin';
+import { AUDIT_PII_RETENTION_DAYS, AUDIT_RETENTION_DAYS } from '../src/constants';
 
 describe('LoginRequestSchema', () => {
   it('accepts a valid email and password', () => {
@@ -114,5 +117,27 @@ describe('AuditQuerySchema', () => {
 
   it('caps pageSize at 100', () => {
     expect(AuditQuerySchema.safeParse({ pageSize: '500' }).success).toBe(false);
+  });
+
+  it('accepts a known action group and rejects an unknown one', () => {
+    expect(AuditQuerySchema.parse({ group: 'customer' }).group).toBe('customer');
+    expect(AuditQuerySchema.safeParse({ group: 'devices' }).success).toBe(false);
+  });
+});
+
+describe('AUDIT_GROUPS', () => {
+  it('each filter matches at least one audited action', () => {
+    for (const group of AUDIT_GROUPS)
+      expect(AUDIT_ACTIONS.some((action) => action.startsWith(`${group}.`))).toBe(true);
+  });
+});
+
+describe('audit retention', () => {
+  it('keeps events for 400 days and their ip and user agent for 90', () => {
+    expect({ AUDIT_RETENTION_DAYS, AUDIT_PII_RETENTION_DAYS }).toEqual({
+      AUDIT_RETENTION_DAYS: 400,
+      AUDIT_PII_RETENTION_DAYS: 90,
+    });
+    expect(AUDIT_PII_RETENTION_DAYS).toBeLessThan(AUDIT_RETENTION_DAYS);
   });
 });

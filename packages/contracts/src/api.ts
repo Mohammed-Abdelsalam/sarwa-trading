@@ -53,6 +53,15 @@ export const ErrorCode = {
   AlertLimit: 'ALERT_LIMIT',
   InvalidPayload: 'INVALID_PAYLOAD',
   TooManySymbols: 'TOO_MANY_SYMBOLS',
+  InvalidCredentials: 'INVALID_CREDENTIALS',
+  InvalidCurrentPassword: 'INVALID_CURRENT_PASSWORD',
+  EmailInUse: 'EMAIL_IN_USE',
+  WeakPassword: 'WEAK_PASSWORD',
+  TokenExpired: 'TOKEN_EXPIRED',
+  AccountSuspended: 'ACCOUNT_SUSPENDED',
+  SessionRevoked: 'SESSION_REVOKED',
+  GuestDataPresent: 'GUEST_DATA_PRESENT',
+  CsrfFailed: 'CSRF_FAILED',
 } as const;
 
 // A 422 carries the rule that refused it. A code this client doesn't know yet still parses, so the

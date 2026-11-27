@@ -1,10 +1,23 @@
-import { type ExecutionRules, type SessionMode } from '@sarwa/domain';
+import {
+  type AuthFieldError,
+  type ExecutionRules,
+  type SessionMode,
+  type SuspensionCategory,
+} from '@sarwa/domain';
 
 import { type Count } from '../copy';
 import { plural } from '../locale';
 
 export interface N {
   n: string;
+}
+
+interface Pct {
+  pct: string;
+}
+
+interface Amount {
+  amount: string;
 }
 
 export const adminEn = {
@@ -103,34 +116,16 @@ export const adminEn = {
   rejectionsByReason: 'Rejections by reason · today',
   orderMix: 'Order mix',
   fractional: 'Fractional ($)',
-  accounts: 'Accounts',
-  accountsSub: ({ n, start }: Count & { start: string }) =>
-    `${n} paper accounts · ${start} virtual start · read-only except Reset`,
-  accountColumns: {
-    equity: 'Equity',
-    cash: 'Cash',
-    today: 'Today',
-    allTime: 'All-time',
-    positions: 'Positions',
-    openOrders: 'Open orders',
-    lastTrade: 'Last trade',
-  },
-  searchAccounts: 'Search by handle',
-  accountsNote: "Admins see balances and orders but can't place or edit trades for a user.",
-  resetAccount: 'Reset account',
-  resetBody: ({ start }: { start: string }) =>
-    `Reset closes positions at last price, cancels open orders and restores ${start}. It is audited as account.reset.`,
-  resetConfirmLabel: ({ handle }: { handle: string }) => `Type ${handle} to confirm`,
   nav: {
     overview: 'Overview',
     market: 'Market',
     trading: 'Trading',
     orders: 'Orders',
-    accounts: 'Accounts',
     stocks: 'Stocks',
     config: 'Config',
     audit: 'Audit log',
-    users: 'Users',
+    customers: 'Customers',
+    team: 'Team',
   },
   shell: {
     admin: 'Admin',
@@ -143,6 +138,7 @@ export const adminEn = {
     accountMenu: 'Account menu',
     signOut: 'Sign out',
     skipToContent: 'Skip to content',
+    openNav: 'Open navigation',
     live: {
       live: 'Market running',
       paused: 'Market paused',
@@ -170,6 +166,7 @@ export const adminEn = {
     retry: 'Retry',
     loadError: ({ what }: { what: string }) => `Couldn't load ${what}`,
     loadErrorBody: 'The admin API returned an error. Nothing was changed.',
+    requestId: ({ id }: { id: string }) => `Request ID ${id}`,
     actionFailed: "That didn't go through. Nothing was changed — try again.",
     notFound: 'Page not found',
     notFoundBody: "This link doesn't lead anywhere in the admin.",
@@ -240,6 +237,10 @@ export const adminEn = {
     recentActivity: 'Recent activity',
     noActivity: 'No admin activity yet.',
     stats: 'platform stats',
+    registeredCustomers: 'Registered customers',
+    signedUpToday: ({ n }: N) => `+${n} signed up today`,
+    guestVisitors: ({ n }: N) => `Guest visitors · ${n}h`,
+    guestConversion: ({ pct }: Pct) => `${pct} converted to sign-up`,
   },
   market: {
     title: 'Market control room',
@@ -339,19 +340,6 @@ export const adminEn = {
     typeMix: 'Order type mix',
     latency: ({ n }: N) => `${n} ms`,
     loading: 'orders',
-  },
-  accountList: {
-    searchLabel: 'Search accounts',
-    account: 'Account',
-    since: ({ date }: { date: string }) => `Since ${date}`,
-    noMatch: ({ q }: { q: string }) => `No accounts match “${q}”`,
-    empty: 'No paper accounts yet.',
-    sortBy: 'Sort by',
-    details: ({ handle }: { handle: string }) => `Account ${handle}`,
-    created: 'Created',
-    reset: 'Reset',
-    resetDone: ({ handle }: { handle: string }) => `${handle} was reset.`,
-    loading: 'accounts',
   },
   stocks: {
     title: 'Stocks',
@@ -469,6 +457,9 @@ export const adminEn = {
   audit: {
     title: 'Audit log',
     subtitle: ({ n }: N) => `Every admin action, immutable · ${n} events`,
+    retained: ({ n }: N) => `retained ${n} days`,
+    customerGroup: 'customer.*',
+    entityCustomer: ({ handle }: { handle: string }) => `Customer · ${handle}`,
     actor: 'Actor',
     actorPlaceholder: 'Filter by email',
     action: 'Action',
@@ -515,12 +506,21 @@ export const adminEn = {
     'halt.create': 'halted a symbol',
     'halt.resume': 'resumed a symbol',
     'account.reset': 'reset an account',
+    'customer.signup': 'signed up',
+    'customer.signin': 'signed in',
+    'customer.signout': 'signed out',
+    'customer.suspend': 'suspended a customer',
+    'customer.reactivate': 'reactivated a customer',
+    'customer.signout_all': 'signed out all devices',
+    'customer.reset_password_sent': 'sent a password reset',
+    'customer.pii_viewed': 'viewed full customer details',
+    'customer.export': 'exported customers',
+    'customer.delete_requested': 'requested account deletion',
+    'customer.deleted': 'deleted an account',
+    'user.invite': 'invited an admin',
+    'user.invite_accepted': 'accepted an invite',
   },
   users: {
-    title: 'Users',
-    subtitle: ({ n, admins, viewers }: Record<'n' | 'admins' | 'viewers', string>) =>
-      `${n} admin accounts · ${admins} ADMIN · ${viewers} VIEWER`,
-    add: 'Add user',
     search: 'Search by email',
     searchLabel: 'Search users',
     filter: 'Status',
@@ -547,19 +547,287 @@ export const adminEn = {
       submit: 'Change role',
     },
     note: "You can't change your own role or disable yourself. At least one ADMIN must remain active. Role changes take effect on the user's next request and are audited as",
-    addTitle: 'Add admin user',
-    addBody: 'They sign in with this email and password.',
-    email: 'Work email',
-    name: 'Full name',
-    password: 'Temporary password',
-    role: 'Role',
-    create: 'Create user',
     emailInvalid: 'Enter a full email address, e.g. sam@minitrading.dev',
-    required: 'Required',
-    passwordShort: ({ n }: N) => `At least ${n} characters`,
-    exists: 'That email already has an account',
     noMatch: 'No users match.',
     loading: 'users',
+  },
+  customers: {
+    title: 'Customers',
+    subtitle: ({ n }: N) =>
+      `${n} registered · customers sign up themselves · admins can’t create customers`,
+    export: 'Export CSV',
+    exportLocked: 'Only ADMIN can export customer data',
+    searchPlaceholder: 'Search email, name or ACC-…',
+    searchLabel: 'Search customers',
+    segments: {
+      all: 'All',
+      active: 'Active',
+      suspended: ({ n }: N) => `Suspended · ${n}`,
+    },
+    filters: { verified: 'Verified', hasOpenOrders: 'Has open orders' },
+    virtualized: ({ n }: N) => `Virtualized · ${n} px rows`,
+    columns: {
+      customer: 'Customer',
+      handle: 'Handle',
+      status: 'Status',
+      verified: 'Verified',
+      equity: 'Equity',
+      allTime: 'All-time P&L',
+      openOrders: 'Open orders',
+      lastActive: 'Last active',
+      joined: 'Joined',
+      actions: 'Actions',
+    },
+    statuses: { active: 'Active', suspended: 'Suspended', deleted: 'Deleted' },
+    verifiedBadge: 'Verified',
+    unverifiedBadge: 'Unverified',
+    deletionPending: 'Deletion pending',
+    platforms: { web: 'Web', ios: 'iOS', android: 'Android' },
+    kpis: {
+      registered: 'Registered customers',
+      registeredDelta: ({ pct }: Pct) => `${pct} this week`,
+      signedUpToday: 'Signed up today',
+      mobileShare: ({ pct }: Pct) => `${pct} from mobile`,
+      active24h: ({ n }: N) => `Active · ${n}h`,
+      activeShare: ({ pct }: Pct) => `${pct} of registered`,
+      suspended: 'Suspended',
+      suspendedDelta: ({ pct, n }: Pct & N) => `${pct} · ${n} today`,
+      verified: 'Verified email',
+      verifiedDelta: ({ pt }: { pt: string }) => `${pt} pt`,
+      guests24h: ({ n }: N) => `Guest visitors · ${n}h`,
+      conversion: ({ pct }: Pct) => `${pct} converted to sign-up`,
+    },
+    empty: {
+      title: ({ q }: { q: string }) => `No customers match “${q}”`,
+      titleFilters: 'No customers match these filters',
+      body: ({ filters }: { filters: string }) =>
+        `Search covers email, name and account ID. Filters: ${filters}.`,
+      noFilters: 'none',
+      clear: 'Clear filters',
+    },
+    error: {
+      title: "Couldn't load customers",
+      body: 'The admin API returned an error. Nothing was changed.',
+      meta: ({ status, requestId }: Record<'status' | 'requestId', string>) =>
+        `${status} · GET /admin/customers · ${requestId}`,
+    },
+    zero: {
+      title: 'No customers yet',
+      body: 'Customers create their own accounts from web or mobile — admins never create them. Share the app link to get your first sign-up.',
+      copyLink: 'Copy app link',
+      copied: 'App link copied',
+    },
+    viewerBanner: 'View-only access. You can see customers but not change them.',
+    viewerMasked: 'Emails are masked for VIEWER —',
+    viewerWhy: 'why?',
+    viewerWhyBody:
+      'Viewers can do their job without full personal data. ADMINs see full emails; every reveal of full IPs is audited.',
+    rowActions: ({ name }: { name: string }) => `Actions for ${name}`,
+    loading: 'customers',
+    loadMore: 'Loading more customers…',
+    reasonCategories: {
+      abuse: 'Abuse · automated trading scripts',
+      fraud: 'Fraud or suspicious activity',
+      terms: 'Terms violation',
+      customer_request: 'Customer request',
+      other: 'Other',
+    } satisfies Record<SuspensionCategory, string>,
+  },
+  customer: {
+    breadcrumb: 'Customers',
+    emailVerified: 'Email verified',
+    emailUnverified: 'Email not verified',
+    joined: ({ date }: { date: string }) => `Joined ${date}`,
+    lastActive: ({ time, device }: Record<'time' | 'device', string>) =>
+      `Last active ${time} · ${device}`,
+    deletionPending: ({ date }: { date: string }) => `Deletion requested · purges ${date}`,
+    tabsLabel: 'Customer sections',
+    tabs: {
+      overview: 'Overview',
+      orders: ({ n }: N) => `Orders · ${n} open`,
+      sessions: ({ n }: N) => `Sessions / devices · ${n}`,
+      activity: 'Activity',
+    },
+    kpis: {
+      equity: 'Equity',
+      dayPl: ({ amount }: Amount) => `${amount} today`,
+      cash: 'Cash',
+      reserved: ({ amount }: Amount) => `${amount} reserved`,
+      allTime: 'All-time P&L',
+      positions: 'Positions',
+      openOrders: ({ n }: N) => `${n} open orders`,
+    },
+    positions: {
+      title: 'Positions',
+      columns: {
+        position: 'Position',
+        shares: 'Shares',
+        avgCost: 'Avg cost',
+        marketValue: 'Market value',
+        totalReturn: 'Total return',
+      },
+      empty: 'No open positions.',
+    },
+    sessions: {
+      since: ({ date }: { date: string }) => `Since ${date}`,
+      meta: ({ ip, time }: Record<'ip' | 'time', string>) => `${ip} · active ${time}`,
+      note: 'Sessions are per device. Revoking ends them within seconds; the customer sees “You were signed out”.',
+      showIps: 'Show full IPs',
+      hideIps: 'Hide full IPs',
+      revealNote: 'Revealing full IPs is recorded in the audit log.',
+      empty: 'No active sessions.',
+    },
+    activity: {
+      columns: { time: 'Time', actor: 'Actor', action: 'Action', detail: 'Detail' },
+      actorCustomer: 'customer',
+      actorSystem: 'system',
+      actorAdmin: ({ email }: { email: string }) => `${email} (admin)`,
+      empty: 'No activity yet.',
+      loadMore: 'Load more',
+      events: {
+        'order.placed': 'placed an order',
+        'order.filled': 'order filled',
+        'order.canceled': 'order canceled',
+        'alert.created': 'created an alert',
+        'email.verified': 'verified email',
+      },
+    },
+    actions: {
+      title: 'Admin actions',
+      suspend: 'Suspend customer…',
+      suspendHint: 'Signs out all devices',
+      reactivate: 'Reactivate customer',
+      reactivateHint: 'Restores sign-in; customer is notified',
+      signOutAll: 'Sign out all devices…',
+      signOutAllHint: 'Revokes every session',
+      sendReset: 'Send password reset email',
+      sendResetHint: 'Customer sets a new password themselves',
+      resetAccount: 'Reset practice account…',
+      resetAccountHint: ({ amount }: Amount) => `Restore ${amount}`,
+      footer:
+        'Admins can’t view passwords, trade for, or edit a customer’s balance. Every action needs a reason and is audited.',
+    },
+    viewerBanner: 'View-only access. Actions are disabled for VIEWER. Email is masked.',
+    suspension: {
+      title: 'Suspended',
+      by: ({ who, date }: Record<'who' | 'date', string>) => `By ${who} · ${date}`,
+    },
+    reason: 'Reason',
+    reasonHint: ({ min, max }: Record<'min' | 'max', string>) =>
+      `Required · ${min}–${max} characters · stored in the audit log`,
+    reasonCount: ({ n, max }: N & { max: string }) => `${n} / ${max}`,
+    suspendDialog: {
+      title: ({ name }: { name: string }) => `Suspend ${name}?`,
+      body: ({ devices }: { devices: string }) =>
+        `They’ll be signed out on ${devices} within seconds and see “Your account is suspended”. Open orders are canceled; the portfolio is kept.`,
+      category: 'Reason category',
+      reason: 'Reason (shown to the customer)',
+      submit: 'Suspend customer',
+    },
+    reactivateDialog: {
+      title: ({ name }: { name: string }) => `Reactivate ${name}?`,
+      body: 'They can sign in again right away and are notified by email.',
+      submit: 'Reactivate customer',
+    },
+    signOutDialog: {
+      title: ({ name }: { name: string }) => `Sign ${name} out of all devices?`,
+      body: ({ sessions }: { sessions: string }) =>
+        `${sessions} will end within seconds. Open orders keep working.`,
+      submit: 'Sign out all devices',
+    },
+    sendResetDialog: {
+      title: 'Send a password reset email?',
+      body: ({ email }: { email: string }) =>
+        `We’ll email ${email} a single-use link. The customer sets the new password themselves.`,
+      submit: 'Send reset email',
+    },
+    resetDialog: {
+      title: 'Reset practice account?',
+      body: ({ positions, orders, amount }: Record<'positions' | 'orders' | 'amount', string>) =>
+        `Closes ${positions} at last price, cancels ${orders} and restores ${amount}. Order history and audit trail are kept. The customer is notified.`,
+      equityNow: 'Equity now',
+      afterReset: 'After reset',
+      type: ({ phrase }: { phrase: string }) => `Type ${phrase} to confirm`,
+      submit: 'Reset account',
+    },
+    counts: {
+      positions: ({ count, n }: Count) =>
+        `${n} ${plural('en', count, { one: 'position', other: 'positions' })}`,
+      openOrders: ({ count, n }: Count) =>
+        `${n} open ${plural('en', count, { one: 'order', other: 'orders' })}`,
+      sessions: ({ count, n }: Count) =>
+        `${n} ${plural('en', count, { one: 'session', other: 'sessions' })}`,
+      devices: ({ count, n }: Count) =>
+        `${n} ${plural('en', count, { one: 'device', other: 'devices' })}`,
+    },
+    toasts: {
+      suspended: ({ name }: { name: string }) => `${name} was suspended`,
+      reactivated: ({ name }: { name: string }) => `${name} was reactivated`,
+      signedOut: ({ sessions }: { sessions: string }) => `Signed out ${sessions}`,
+      resetSent: 'Password reset email sent',
+      accountReset: 'Practice account reset',
+      exported: 'Customer export downloaded',
+    },
+    notFound: 'This customer doesn’t exist or was deleted.',
+    loading: 'this customer',
+  },
+  team: {
+    title: 'Team',
+    subtitle: ({ n, admins, viewers }: Record<'n' | 'admins' | 'viewers', string>) =>
+      `Admin staff only · ${n} accounts · ${admins} ADMIN · ${viewers} VIEWER · customers live in Customers`,
+    invite: 'Invite admin',
+    revokeInvite: ({ email }: { email: string }) => `Revoke the invite for ${email}`,
+    resendInvite: ({ email }: { email: string }) => `Resend the invite to ${email}`,
+    inviteDialog: {
+      title: 'Invite admin',
+      body: ({ duration }: { duration: string }) =>
+        `They’ll get an email link valid for ${duration}.`,
+      email: 'Work email',
+      role: 'Role',
+      submit: 'Send invite',
+      sending: 'Sending…',
+    },
+    invites: {
+      title: 'Pending invites',
+      columns: {
+        email: 'Email',
+        role: 'Role',
+        invitedBy: 'Invited by',
+        expires: 'Expires',
+        actions: 'Actions',
+      },
+      expired: 'Expired',
+      revoke: 'Revoke',
+      resend: 'Resend',
+      revokeTitle: ({ email }: { email: string }) => `Revoke the invite for ${email}?`,
+      revokeBody: 'The link stops working right away.',
+      empty: 'No pending invites.',
+    },
+    toasts: {
+      sent: ({ email }: { email: string }) => `Invite sent to ${email}`,
+      revoked: 'Invite revoked',
+    },
+  },
+  invite: {
+    title: 'Join the admin team',
+    subtitle: ({ email, role }: Record<'email' | 'role', string>) =>
+      `You were invited as ${role} with ${email}. Choose your name and a password.`,
+    name: 'Full name',
+    password: 'Password',
+    passwordHint: ({ n }: N) => `At least ${n} characters · not a common password`,
+    submit: 'Create admin account',
+    loading: 'Creating account…',
+    expiredTitle: 'This invite has expired',
+    expiredBody:
+      'Invite links work once and only for a limited time. Ask an ADMIN to send a new one.',
+    backToLogin: 'Back to sign in',
+    fieldErrors: {
+      NAME_REQUIRED: () => 'Enter your name',
+      NAME_TOO_LONG: ({ n }: N) => `Use at most ${n} characters`,
+      PASSWORD_TOO_SHORT: ({ n }: N) => `Use at least ${n} characters`,
+      PASSWORD_TOO_LONG: ({ n }: N) => `Use at most ${n} characters`,
+      PASSWORD_COMMON: () => 'This password is too common — try a longer phrase',
+    } satisfies Partial<Record<AuthFieldError, (params: N) => string>>,
   },
 };
 

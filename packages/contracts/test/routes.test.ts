@@ -1,4 +1,4 @@
-import { ADMIN_ROUTES, MARKET_ROUTES, routePath, TRADING_ROUTES } from '../src';
+import { ADMIN_ROUTES, AUTH_ROUTES, MARKET_ROUTES, routePath, TRADING_ROUTES } from '../src';
 
 describe('routePath', () => {
   it('returns a route without params as an absolute path', () => {
@@ -12,6 +12,10 @@ describe('routePath', () => {
     );
     expect(routePath(MARKET_ROUTES.candles, { symbol: 'AAPL' })).toBe('/stocks/AAPL/candles');
     expect(routePath(ADMIN_ROUTES.user, { id: 'a/b c' })).toBe('/admin/users/a%2Fb%20c');
+    expect(routePath(ADMIN_ROUTES.suspendCustomer, { handle: 'ACC-7F2C9A' })).toBe(
+      '/admin/customers/ACC-7F2C9A/suspend',
+    );
+    expect(routePath(AUTH_ROUTES.revokeSession, { id: 's1' })).toBe('/auth/sessions/s1');
   });
 
   it('never writes "undefined" for a param a caller forgot', () => {
@@ -24,9 +28,16 @@ describe('routePath', () => {
       ...Object.values(MARKET_ROUTES),
       ...Object.values(TRADING_ROUTES),
       ...Object.values(ADMIN_ROUTES),
+      ...Object.values(AUTH_ROUTES),
     ];
 
     expect(paths.every((path) => !path.startsWith('/'))).toBe(true);
     expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  it('keeps the refresh-cookie routes under auth/', () => {
+    expect([AUTH_ROUTES.refresh, AUTH_ROUTES.signOut].every((p) => p.startsWith('auth/'))).toBe(
+      true,
+    );
   });
 });

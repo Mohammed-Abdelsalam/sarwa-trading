@@ -1,16 +1,35 @@
 import {
   type AlertCondition,
+  type AuthFieldError,
   type AlertRepeat,
   type CancelReason,
   type OrderStatus,
   type OrderType,
   type SessionPhase,
   type Side,
+  type SuspensionCategory,
   type TimeInForce,
 } from '@sarwa/domain';
 
 import { type AlertIssueCopy, type Count, type RejectionCopy } from '../copy';
 import { plural } from '../locale';
+
+interface N {
+  n: string;
+}
+
+interface Amount {
+  amount: string;
+}
+
+interface SymbolParam {
+  symbol: string;
+}
+
+type DeviceTime = Record<'device' | 'time', string>;
+
+const hours = ({ count, n }: Count) =>
+  `${n} ${plural('en', count, { one: 'hour', other: 'hours' })}`;
 
 const rejections: RejectionCopy = {
   TRADING_DISABLED: () => ({
@@ -119,7 +138,9 @@ export const en = {
     justNow: 'Just now',
     minutesAgo: ({ n }: Count) => `${n} min ago`,
     hoursAgo: ({ n }: Count) => `${n} h ago`,
+    inTime: ({ time }: { time: string }) => `in ${time}`,
     minutes: ({ n }: Count) => `${n} min`,
+    hours,
     sides: { buy: 'BUY', sell: 'SELL' } satisfies Record<Side, string>,
     sharesShort: ({ shares }: { shares: string }) => `${shares} sh`,
     loadErrorBody: 'Check your connection and try again.',
@@ -189,6 +210,7 @@ export const en = {
       after: 'on a focused row — and it shows up here with live prices.',
     },
     browse: 'Browse markets',
+    guestNote: 'Create an account to keep your watchlist on all your devices',
     columns: {
       stock: 'Stock',
       price: 'Price',
@@ -586,6 +608,7 @@ export const en = {
       user: 'Canceled by you',
       admin_reset: 'Canceled · account reset',
       symbol_disabled: 'Canceled · stock no longer trades',
+      account_suspended: 'Canceled · account suspended',
     } satisfies Record<CancelReason, string>,
     expiredAtClose: 'Expired at close',
     proceedsSoFar: 'Proceeds so far',
@@ -742,6 +765,526 @@ export const en = {
       `Your alert “${rule}” triggered at ${price}.`,
     marketClosesEarly: 'Markets close early today',
     marketClosesEarlyBody: ({ time }: { time: string }) => `Regular session ends at ${time}.`,
+  },
+  counts: {
+    positions: ({ count, n }: Count) =>
+      `${n} ${plural('en', count, { one: 'position', other: 'positions' })}`,
+    openOrders: ({ count, n }: Count) =>
+      `${n} open ${plural('en', count, { one: 'order', other: 'orders' })}`,
+    watchlist: ({ n }: Count) => `a ${n}-stock watchlist`,
+    watchlists: ({ count, n }: Count) =>
+      `${n} ${plural('en', count, { one: 'watchlist', other: 'watchlists' })}`,
+    alerts: ({ count, n }: Count) =>
+      `${n} ${plural('en', count, { one: 'alert', other: 'alerts' })}`,
+    sessions: ({ count, n }: Count) =>
+      `${n} ${plural('en', count, { one: 'session', other: 'sessions' })}`,
+    devices: ({ count, n }: Count) =>
+      `${n} ${plural('en', count, { one: 'device', other: 'devices' })}`,
+    days: ({ count, n }: Count) => `${n} ${plural('en', count, { one: 'day', other: 'days' })}`,
+    hours,
+    minutes: ({ count, n }: Count) =>
+      `${n} ${plural('en', count, { one: 'minute', other: 'minutes' })}`,
+  },
+  auth: {
+    backToMarkets: 'Back to markets',
+    valueLine: ({ amount }: Amount) => `Practice trading US stocks with ${amount} virtual cash`,
+    or: 'or',
+    field: { name: 'Name', email: 'Email', password: 'Password' },
+    placeholder: { name: 'Sara Ali', email: 'name@example.com' },
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+    signUp: {
+      title: 'Create your account',
+      submit: 'Create account',
+      loading: 'Creating account…',
+      terms:
+        'I agree to the Terms and Privacy Policy. I understand prices are simulated and money is virtual.',
+      termsShort: 'I agree to the Terms and understand money is virtual.',
+      termsModal: 'I agree to the Terms and Privacy Policy.',
+      haveAccount: 'Already have an account?',
+      signInLink: 'Sign in',
+    },
+    terms: {
+      page: {
+        prefix: 'I agree to the ',
+        termsLink: 'Terms',
+        and: ' and ',
+        privacyLink: 'Privacy Policy',
+        suffix: '. I understand prices are simulated and money is virtual.',
+      },
+      modal: {
+        prefix: 'I agree to the ',
+        termsLink: 'Terms',
+        and: ' and ',
+        privacyLink: 'Privacy Policy',
+        suffix: '.',
+      },
+      mobile: {
+        prefix: 'I agree to the ',
+        termsLink: 'Terms',
+        and: ' and ',
+        privacyLink: 'Privacy Policy',
+        suffix: ' and understand money is virtual.',
+      },
+    },
+    signIn: {
+      title: 'Welcome back',
+      subtitleMobile: 'Sign in to your practice account',
+      forgot: 'Forgot password?',
+      forgotShort: 'Forgot?',
+      keep: ({ n }: Count) => `Keep me signed in on this device for ${n} days`,
+      submit: 'Sign in',
+      loading: 'Signing in…',
+      newHere: 'New here?',
+      createLink: 'Create an account',
+      signUpLink: 'Sign up',
+      invalidHint: 'Check both and try again, or reset your password.',
+    },
+    oauth: {
+      google: 'Google',
+      apple: 'Apple',
+      soon: 'Soon',
+      comingSoonA11y: ({ provider }: { provider: string }) =>
+        `Continue with ${provider} — coming soon`,
+    },
+    faceId: 'Use Face ID next time · Coming soon',
+    faceIdParts: { label: 'Use Face ID next time', soon: 'Coming soon' },
+    strength: {
+      label: 'Strength',
+      levels: { weak: 'Weak', fair: 'Fair', good: 'Good', strong: 'Strong' },
+      minLength: ({ n }: N) => `At least ${n} characters`,
+      notCommon: 'Not a common password',
+      tip: 'Tip: add a number or symbol',
+      met: 'Requirement met',
+      notMet: 'Requirement not met',
+    },
+    fieldErrors: {
+      NAME_REQUIRED: () => 'Enter your name',
+      NAME_TOO_LONG: ({ n }: N) => `Use at most ${n} characters`,
+      EMAIL_INVALID: () => 'Enter a full email address, e.g. name@example.com',
+      PASSWORD_REQUIRED: () => 'Enter your password',
+      PASSWORD_TOO_SHORT: ({ n }: N) => `Use at least ${n} characters`,
+      PASSWORD_TOO_LONG: ({ n }: N) => `Use at most ${n} characters`,
+      PASSWORD_COMMON: () => 'This password is too common — try a longer phrase',
+      PASSWORDS_DIFFER: () => "Passwords don't match",
+      TERMS_REQUIRED: () => 'Accept the terms to continue',
+      CONFIRMATION_MISMATCH: () => "That doesn't match — type it exactly as shown",
+      REASON_LENGTH: ({ n }: N) => `Write a reason of ${n} characters`,
+    } satisfies Record<AuthFieldError, (params: N) => string>,
+    errors: {
+      INVALID_CREDENTIALS: 'Email or password is incorrect.',
+      RATE_LIMITED: ({ time }: { time: string }) => `Too many attempts — try again in ${time}.`,
+      EMAIL_IN_USE: 'An account with this email already exists. Sign in instead?',
+      WEAK_PASSWORD: 'This password is too common — try a longer phrase.',
+      TOKEN_EXPIRED: 'This link has expired. We can send a new one.',
+      ACCOUNT_SUSPENDED: 'Your account is suspended.',
+      SESSION_REVOKED: 'You were signed out on this device.',
+      INVALID_CURRENT_PASSWORD: 'Current password is incorrect.',
+      CONFIRMATION_MISMATCH: "That doesn't match — type it exactly as shown.",
+      CSRF_FAILED: 'Your session needs a refresh. Reload the page and try again.',
+      OFFLINE: 'You’re offline. Reconnect to continue.',
+      UNKNOWN: 'Something went wrong. Nothing was changed — try again.',
+    },
+    rateLimitedHint: 'For your security we paused sign-in on this account for a few minutes.',
+    retryIn: ({ time }: { time: string }) => `Try again in ${time}`,
+    retryReady: 'You can try again now',
+    offlineSignIn: 'You’re offline. Reconnect to sign in — we’ll keep what you typed.',
+    backToSignIn: 'Back to sign in',
+    forgot: {
+      title: 'Reset your password',
+      body: 'Enter the email you signed up with and we’ll send you a reset link.',
+      submit: 'Send reset link',
+      sending: 'Sending…',
+      sentTitle: 'Check your inbox',
+      sentBody: ({ email, duration }: { email: string; duration: string }) =>
+        `If an account exists for ${email}, we sent a link to reset your password. It expires in ${duration}.`,
+      sentBodyMobile: ({ email, duration }: { email: string; duration: string }) =>
+        `If an account exists for ${email}, we sent a reset link. It expires in ${duration}.`,
+      openEmail: 'Open email app',
+      openMail: 'Open Mail',
+      resendIn: ({ time }: { time: string }) => `Didn’t get it? Check spam or resend in ${time}`,
+      resendInShort: ({ time }: { time: string }) => `Resend in ${time}`,
+      resend: 'Resend link',
+    },
+    reset: {
+      title: 'Choose a new password',
+      for: ({ email }: { email: string }) => `For ${email}`,
+      new: 'New password',
+      confirm: 'Confirm new password',
+      confirmShort: 'Confirm password',
+      match: 'Passwords match ✓',
+      warn: 'Saving signs you out on every other device.',
+      submit: 'Save new password',
+      loading: 'Saving…',
+      doneTitle: 'Password updated',
+      doneBody: ({ sessions }: { sessions: string }) =>
+        `You’re signed in. Other devices were signed out — ${sessions} ended.`,
+      doneBodyMobile: 'You’re signed in on this phone. Other devices were signed out.',
+      goHome: 'Go to Home',
+      continueHome: 'Continue to Home',
+      notice: 'We also emailed you a security notice.',
+      expiredTitle: 'This reset link has expired',
+      expiredBody: ({ duration }: { duration: string }) =>
+        `Reset links work for ${duration} and only once. Request a new one to choose your password.`,
+      requestNew: 'Request a new link',
+    },
+    verify: {
+      checking: 'Verifying your email…',
+      okTitle: 'Email verified ✓',
+      okBody: ({ email }: { email: string }) => `${email} is confirmed. Your account is secured.`,
+      continue: 'Continue trading',
+      expiredTitle: 'This link has expired',
+      expiredBody: ({ duration, email }: { duration: string; email: string }) =>
+        `Verification links work for ${duration} and only once. Send a fresh one to ${email}.`,
+      expiredBodyNoEmail: ({ duration }: { duration: string }) =>
+        `Verification links work for ${duration} and only once. Sign in to send a fresh one.`,
+      resend: 'Resend verification email',
+      sent: ({ email }: { email: string }) => `We sent a new link to ${email}.`,
+    },
+  },
+  gate: {
+    ticket: {
+      buyCta: ({ symbol }: SymbolParam) => `Sign up to buy ${symbol}`,
+      sellCta: ({ symbol }: SymbolParam) => `Sign up to sell ${symbol}`,
+      haveAccount: 'Already have an account? Sign in',
+      foot: ({ amount }: Amount) => `Free · ${amount} virtual cash · simulated prices`,
+      buyingPower: 'Buying power — sign in',
+    },
+    title: {
+      buy: ({ symbol }: SymbolParam) => `Create an account to buy ${symbol}`,
+      sell: ({ symbol }: SymbolParam) => `Create an account to sell ${symbol}`,
+      watch: ({ symbol }: SymbolParam) => `Create an account to save ${symbol} to your watchlist`,
+      alert: 'Create an account to get price alerts',
+      portfolio: 'Create an account to track your portfolio',
+      orders: 'Create an account to place and track orders',
+      notifications: 'Create an account to get notifications',
+    },
+    tabs: { signUp: 'Create account', signIn: 'Sign in' },
+    modal: {
+      sub: ({ amount }: Amount) => `Free · ${amount} practice cash · ready instantly`,
+      pwHint: ({ n }: N) => `At least ${n} characters · not a common password`,
+      submit: 'Create account & continue',
+      signInSubmit: 'Sign in & continue',
+      returnNote: ({ amount }: Amount) =>
+        `You’ll land back on this order with ${amount} pre-filled.`,
+    },
+    cta: { createFree: 'Create free account', signIn: 'Sign in' },
+    sheet: {
+      buySub: ({ n }: N) => `Free, no card, no KYC — about ${n} seconds.`,
+      benefitCash: ({ amount }: Amount) => `${amount} practice cash, ready instantly`,
+      benefitSync: 'Same account on web and phone',
+      benefitOrder: ({ amount, symbol }: Amount & SymbolParam) =>
+        `Your ${amount} ${symbol} order stays filled in`,
+      watchSub: 'Your watchlist syncs across web and phone.',
+      alertSub: ({ symbol }: SymbolParam) =>
+        `We’ll notify you when ${symbol} crosses your price — even when the app is closed.`,
+    },
+    order: {
+      footer: ({ amount }: Amount) =>
+        `Create a free account to place this order — you’ll get ${amount} in practice cash.`,
+      buyingPower: 'Buying power · Sign in to see',
+      submit: 'Sign up to buy',
+    },
+  },
+  guest: {
+    portfolio: {
+      title: ({ amount }: Amount) => `Track a ${amount} practice portfolio`,
+      body: 'Create a free account to buy your first shares, see live P&L and keep it in sync on your phone.',
+      bodyMobile: 'Create a free account to buy shares and see live P&L on every device.',
+    },
+    steps: {
+      create: {
+        title: 'Create an account',
+        body: ({ n }: N) => `Takes ${n} seconds · no card, no KYC`,
+      },
+      cash: {
+        title: ({ amount }: Amount) => `Get ${amount} virtual cash`,
+        body: 'Ready instantly',
+      },
+      trade: {
+        title: ({ n }: N) => `Trade ${n} US stocks`,
+        body: 'Market, limit & stop orders',
+      },
+    },
+    bell: {
+      title: 'Get notified when it matters',
+      body: 'Order fills, price alerts and market news — in one inbox, on every device.',
+      a11y: 'Notifications — sign in to see yours',
+    },
+    empty: {
+      portfolioTitle: 'Your portfolio lives here',
+      portfolioBody: ({ amount }: Amount) =>
+        `Sign up to get ${amount} in practice cash and track every position.`,
+      ordersTitle: 'No orders yet',
+      ordersBody: 'Create an account to place market, limit and stop orders.',
+      watchlistTitle: 'Save stocks you care about',
+      watchlistBody: 'Star any stock to follow it here — synced on web and phone.',
+      alertsTitle: 'Price alerts need an account',
+      alertsBody: ({ symbol }: SymbolParam) =>
+        `Get notified when ${symbol} crosses your price, even with the app closed.`,
+      alertsBodyAny: 'Get notified when a stock crosses your price, even with the app closed.',
+    },
+    starA11y: ({ symbol }: SymbolParam) => `Add ${symbol} to watchlist — requires an account`,
+  },
+  home: {
+    guest: {
+      badge: 'Free · no card needed',
+      h1: ({ amount }: Amount) => `Start practicing with ${amount}`,
+      body: ({ n }: N) =>
+        `Trade ${n} US stocks with live simulated prices. Learn order types, track P&L and build a watchlist — without risking a cent.`,
+      bodyMobile: ({ n }: N) =>
+        `Trade ${n} US stocks with live simulated prices — without risking a cent.`,
+      howItWorks: 'How it works',
+      stepSignUp: ({ n }: N) => `Sign up in ${n} s`,
+      stepCash: ({ amount }: Amount) => `Get ${amount} virtual cash`,
+      stepTrade: 'Place your first trade',
+      stepsShort: {
+        signUp: 'Sign up',
+        getCash: ({ amount }: Amount) => `Get ${amount}`,
+        trade: 'Trade',
+      },
+    },
+    checklist: {
+      title: 'Get started',
+      created: 'Account created',
+      verify: 'Verify your email',
+      resend: 'Resend link',
+      firstTrade: 'Make your first trade',
+      browse: 'Browse markets',
+    },
+    newAccount: 'New account · no positions yet',
+  },
+  verifyBanner: {
+    body: ({ email }: { email: string }) =>
+      `Verify your email to secure your account — we sent a link to ${email}.`,
+    resend: 'Resend',
+    sent: 'Link sent',
+    dismissA11y: 'Dismiss verify-email message',
+  },
+  toasts: {
+    readyTitle: ({ amount }: Amount) => `Your ${amount} practice account is ready`,
+    readyBody: 'Place your first trade — prices are live and simulated.',
+    readyBodyHome: ({ name }: { name: string }) =>
+      `Welcome, ${name}. Prices are live and simulated.`,
+    readyBodyMobile: ({ name }: { name: string }) => `Welcome, ${name} — place your first trade.`,
+    trade: 'Trade',
+    claimedTitle: 'Your practice portfolio was saved',
+    claimedBody: ({ positions, orders }: Record<'positions' | 'orders', string>) =>
+      `The ${positions} and ${orders} from this device are now in your account.`,
+    claimedTitleMobile: 'Your practice portfolio was saved to your account',
+    claimedBodyMobile: ({ positions, orders }: Record<'positions' | 'orders', string>) =>
+      `${positions} and ${orders} are now on web too.`,
+    savedToWatchlist: 'Saved to Watchlist',
+    deletionCanceledTitle: 'Welcome back — your account is no longer being deleted',
+    deletionCanceledBody: 'Deletion was canceled because you signed in.',
+    signedOut: 'You’re signed out',
+    passwordUpdated: 'Password updated',
+    profileSaved: 'Profile saved',
+    verificationSent: 'Verification email sent',
+    otherDevicesSignedOut: ({ sessions }: { sessions: string }) => `Signed out ${sessions}`,
+    sessionSignedOut: ({ device }: { device: string }) => `${device} was signed out`,
+    accountReset: ({ amount }: Amount) => `Practice account reset to ${amount}`,
+    deletionRequested: ({ date }: { date: string }) =>
+      `Your account will be deleted on ${date}. Sign in before then to cancel.`,
+  },
+  discard: {
+    title: 'Signing in will replace this device’s practice data',
+    body: ({ positions, orders }: Record<'positions' | 'orders', string>) =>
+      `${positions} and ${orders} on this device will be discarded and your account’s portfolio loaded. They are never merged.`,
+    confirm: 'Sign in anyway',
+    cancel: 'Cancel',
+    titleMobile: 'Replace this phone’s practice data?',
+    subMobile: 'You’re signing in to an existing account.',
+    bodyMobile: ({
+      positions,
+      orders,
+      watchlist,
+    }: Record<'positions' | 'orders' | 'watchlist', string>) =>
+      `On this phone: ${positions}, ${orders} and ${watchlist}. They will be discarded and your account’s portfolio loaded. We never merge two portfolios.`,
+  },
+  account: {
+    sections: {
+      profile: 'Profile',
+      security: 'Security',
+      notifications: 'Notifications',
+      appearance: 'Appearance',
+      trading: 'Trading',
+      danger: 'Danger zone',
+    },
+    profile: {
+      title: 'Profile',
+      memberSince: ({ date }: { date: string }) => `Member since ${date}`,
+      edit: 'Edit profile',
+      editTitle: 'Edit profile',
+      nameLabel: 'Name',
+      save: 'Save',
+      email: 'Email',
+      verified: 'Verified',
+      unverified: 'Unverified',
+      resend: 'Resend',
+      accountId: 'Account ID',
+      practiceLabel: 'Practice account',
+      practice: ({ amount }: Amount) => `${amount} start · Paper`,
+    },
+    password: {
+      title: 'Password',
+      lastChanged: ({ count, n }: Count) =>
+        `Last changed ${n} ${plural('en', count, { one: 'day', other: 'days' })} ago`,
+      changedToday: 'Changed today',
+      neverChanged: 'Set when you signed up',
+      change: 'Change password',
+      current: 'Current password',
+      new: 'New password',
+      newHint: ({ n }: N) => `Strong · at least ${n} characters`,
+      confirm: 'Confirm new password',
+      warn: 'Changing your password signs out every other device.',
+      warnMobile: 'Other devices will be signed out.',
+      submit: 'Update password',
+      loading: 'Updating…',
+    },
+    sessions: {
+      title: 'Active sessions',
+      titleCount: ({ n }: Count) => `Active sessions · ${n}`,
+      sub: ({ devices }: { devices: string }) => `${devices} · IP addresses are partly hidden`,
+      signOutOthers: 'Sign out of all other devices',
+      thisDevice: 'This device',
+      activeNow: 'Active now',
+      signOut: 'Sign out',
+      meta: ({ ip, time }: Record<'ip' | 'time', string>) => `${ip} · ${time}`,
+      deviceWeb: ({ browser, os }: Record<'browser' | 'os', string>) => `${browser} on ${os}`,
+      deviceIos: ({ model }: { model: string }) => `Mini Trading for iOS · ${model}`,
+      deviceAndroid: ({ model }: { model: string }) => `Mini Trading for Android · ${model}`,
+      signOutA11y: ({ device }: { device: string }) => `Sign out ${device}`,
+      loadError: "Couldn't load your sessions",
+    },
+    signOutOthers: {
+      title: 'Sign out of all other devices?',
+      body: ({ sessions, devices }: Record<'sessions' | 'devices', string>) =>
+        `${sessions} will end within a few seconds: ${devices}. Open orders keep working. You stay signed in here.`,
+      sub: ({ sessions }: { sessions: string }) => `${sessions} are active.`,
+      bodyMobile: ({ devices }: { devices: string }) =>
+        `${devices} will be signed out within a few seconds. Open orders keep working.`,
+      confirm: ({ devices }: { devices: string }) => `Sign out ${devices}`,
+    },
+    twoFactor: {
+      title: 'Two-factor authentication & passkeys',
+      sub: 'Authenticator app, passkeys and Face ID unlock',
+      soon: 'Coming soon',
+      mobile: 'Two-factor, passkeys & Face ID · Coming soon',
+      mobileTitle: 'Two-factor, passkeys & Face ID',
+    },
+    danger: {
+      title: 'Danger zone',
+      signOutTitle: 'Sign out',
+      signOutBody: 'Only this browser. Your data stays in your account.',
+      resetTitle: 'Reset practice account',
+      resetBody: ({ amount }: Amount) =>
+        `Close all positions, cancel orders, restore ${amount}. History is kept.`,
+      resetAction: 'Reset…',
+      deleteTitle: 'Delete account',
+      deleteBody: ({ days }: { days: string }) =>
+        `Permanently deletes your profile, practice portfolio, watchlists and alerts after ${days}.`,
+      deleteAction: 'Delete account…',
+    },
+    deleteDialog: {
+      title: 'Delete your account?',
+      body: ({
+        equity,
+        orders,
+        watchlists,
+        alerts,
+        days,
+      }: Record<'equity' | 'orders' | 'watchlists' | 'alerts' | 'days', string>) =>
+        `Your practice portfolio (${equity}), ${orders}, ${watchlists} and ${alerts} will be deleted. You can cancel within ${days} by signing in.`,
+      password: 'Password',
+      type: ({ word }: { word: string }) => `Type ${word} to confirm`,
+      caseSensitive: 'Case-sensitive',
+      confirm: 'Delete account',
+      confirmMobile: 'Delete my account',
+      deleting: 'Deleting…',
+      subMobile: ({ days }: { days: string }) => `This can’t be undone after ${days}.`,
+    },
+    resetDialog: {
+      title: 'Reset practice account?',
+      body: ({ positions, orders, amount }: Record<'positions' | 'orders' | 'amount', string>) =>
+        `Closes ${positions} at last price, cancels ${orders} and restores ${amount}. Order history is kept.`,
+      equityNow: 'Equity now',
+      afterReset: 'After reset',
+      type: ({ word }: { word: string }) => `Type ${word} to confirm`,
+      confirm: 'Reset account',
+      resetting: 'Resetting…',
+    },
+    rows: {
+      personalInfo: 'Personal info',
+      security: 'Security',
+      notifications: 'Notifications',
+      appearance: 'Appearance',
+      trading: 'Trading',
+      tradingSub: 'Confirm large orders',
+      language: 'Language',
+      signOut: 'Sign out',
+      deleteAccount: 'Delete account',
+    },
+    guest: {
+      title: 'Welcome to Mini Trading',
+      body: ({ amount }: Amount) =>
+        `One free account for web and phone: ${amount} practice cash, watchlists, alerts and order history.`,
+      appSettings: 'App settings',
+      about: 'About & disclosures',
+    },
+  },
+  suspended: {
+    title: 'Your account is suspended',
+    body: 'You’ve been signed out on all devices. Your practice portfolio is kept and nothing was deleted.',
+    bodyMobile: 'You’ve been signed out on all devices. Your practice portfolio is kept.',
+    reasonLabel: 'Reason from our team',
+    reason: ({ reason, date }: Record<'reason' | 'date', string>) => `“${reason}” · ${date}`,
+    contact: 'Contact support',
+    signOut: 'Sign out',
+    reference: ({ handle }: { handle: string }) =>
+      `Reference ${handle} · You can still browse markets as a guest.`,
+    browseGuest: 'Browse as guest',
+    reasonCategories: {
+      abuse: 'Automated trading scripts',
+      fraud: 'Suspicious activity',
+      terms: 'Terms of use violation',
+      customer_request: 'Suspended at your request',
+      other: 'Other',
+    } satisfies Record<SuspensionCategory, string>,
+  },
+  revoked: {
+    title: 'You were signed out',
+    reasons: {
+      signed_out: 'This session was ended from another device. Sign in again to continue.',
+      password_changed:
+        'Your session ended because your password was changed on another device. If this wasn’t you, reset your password.',
+      suspended: 'Your account is suspended.',
+      revoked: 'This device was signed out from your account settings.',
+      deleted: 'Your account is scheduled for deletion. Sign in again to cancel it.',
+      expired: 'Your session expired. Sign in again to continue.',
+    },
+    reasonsDetailed: {
+      signed_out: ({ device, time }: DeviceTime) =>
+        `This session was ended from ${device} ${time}. Sign in again to continue.`,
+      password_changed: ({ device, time }: DeviceTime) =>
+        `Your password was changed on ${device} ${time}, so this session ended. If this wasn’t you, reset your password.`,
+      revoked: ({ device, time }: DeviceTime) =>
+        `This device was signed out from ${device} ${time}.`,
+      deleted: ({ device, time }: DeviceTime) =>
+        `Deletion of your account was requested on ${device} ${time}. Sign in again to cancel it.`,
+      expired: ({ time }: DeviceTime) => `Your session expired ${time}. Sign in again to continue.`,
+    },
+    signInAgain: 'Sign in again',
+    resetPassword: 'Reset password',
+  },
+  support: {
+    contactLabel: 'Contact support',
+    email: 'support@minitrading.dev',
+  },
+  welcomeNotification: {
+    title: ({ name }: { name: string }) => `Welcome to Mini Trading, ${name}`,
+    body: ({ amount }: Amount) =>
+      `Your ${amount} practice account is ready. Place your first trade whenever you like.`,
   },
   rejections,
   alertIssues,
