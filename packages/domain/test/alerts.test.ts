@@ -1,5 +1,6 @@
 import {
   ALERT_CONDITIONS,
+  ALERT_ISSUE_CODES,
   ALERT_REPEATS,
   type AlertRule,
   type AlertState,
@@ -59,6 +60,15 @@ describe('isAlertMet', () => {
 });
 
 describe('validateAlert', () => {
+  it('lists every issue code it can report', () => {
+    expect(ALERT_ISSUE_CODES).toEqual([
+      'ALREADY_ABOVE',
+      'ALREADY_BELOW',
+      'ALREADY_MOVED',
+      'MISSING_THRESHOLD',
+    ]);
+  });
+
   it.each(ALERT_CONDITIONS.flatMap((condition) => [null, 0].map((v) => [condition, v] as const)))(
     'rejects a %s alert with a %p threshold',
     (condition, value) => {

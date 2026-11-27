@@ -1,5 +1,6 @@
 import { bps, cents, micros, ticks } from '../src/money';
 import {
+  CANCEL_REASONS,
   collarRange,
   estimateOrder,
   isMarketable,
@@ -510,6 +511,10 @@ describe('helpers', () => {
 
     expect(terminal).toEqual(['filled', 'canceled', 'rejected', 'expired']);
     expect(TERMINAL_STATUSES).toEqual(terminal);
+  });
+
+  it('names who or what canceled an order, including a disabled stock', () => {
+    expect(CANCEL_REASONS).toEqual(['user', 'admin_reset', 'symbol_disabled']);
   });
 });
 
