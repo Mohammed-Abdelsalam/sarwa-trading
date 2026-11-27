@@ -4,7 +4,9 @@ import {
   axisCandles,
   chartBaseline,
   chartGeometry,
+  describeChart,
   nearestPointIndex,
+  percentChange,
   resolvePeriod,
   withLiveQuote,
 } from '../src/chart';
@@ -108,5 +110,27 @@ describe('resolvePeriod', () => {
 
   it('falls back to the first enabled period when the admin disables the selected one', () => {
     expect(resolvePeriod(['1M', '1Y'], '1D')).toBe('1M');
+  });
+});
+
+describe('percentChange', () => {
+  it('measures a move relative to where it started', () => {
+    expect(percentChange(200, 210)).toBe(5);
+  });
+});
+
+describe('describeChart', () => {
+  it('summarises the move and the range instead of reading every point', () => {
+    const candles = [candle(1, 100), candle(2, 104)];
+    expect(describeChart('AAPL', '1D', candles, 100)).toBe(
+      'AAPL up 4.00% today, low $99.00, high $105.00',
+    );
+    expect(describeChart('AAPL', '1M', candles, 104)).toBe(
+      'AAPL flat over 1M, low $99.00, high $105.00',
+    );
+  });
+
+  it('falls back to a plain label without data', () => {
+    expect(describeChart('AAPL', '1W', [], null)).toBe('AAPL price chart, 1W');
   });
 });

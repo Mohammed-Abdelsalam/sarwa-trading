@@ -1,4 +1,4 @@
-import { type LucideIcon, Megaphone, PauseCircle, RefreshCw, WifiOff } from 'lucide-react-native';
+import { type LucideIcon, Megaphone, Pause, WifiOff } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { type NoticeKind, useAppNotices } from '@sarwa/core';
@@ -6,10 +6,10 @@ import { type NoticeKind, useAppNotices } from '@sarwa/core';
 import { Banner } from '../ui/banner';
 import { Text } from '../ui/text';
 
-const NOTICE_ICONS: Record<NoticeKind, LucideIcon> = {
+const NOTICE_ICONS: Record<NoticeKind, LucideIcon | undefined> = {
   offline: WifiOff,
-  reconnecting: RefreshCw,
-  paused: PauseCircle,
+  reconnecting: undefined,
+  paused: Pause,
   remote: Megaphone,
 };
 
@@ -24,6 +24,14 @@ export function AppBanners() {
           key={notice.kind}
           tone={notice.tone}
           icon={NOTICE_ICONS[notice.kind]}
+          busy={notice.kind === 'reconnecting'}
+          action={
+            notice.meta ? (
+              <Text variant="caption" className="text-fg-3">
+                {notice.meta}
+              </Text>
+            ) : undefined
+          }
           onDismiss={
             notice.dismissible
               ? () => {
@@ -32,7 +40,10 @@ export function AppBanners() {
               : undefined
           }
         >
-          <Text variant="sm">{notice.message}</Text>
+          <Text variant="sm" weight={500}>
+            {notice.title ? <Text variant="sm" weight={700}>{`${notice.title} `}</Text> : null}
+            {notice.message}
+          </Text>
         </Banner>
       ))}
     </View>

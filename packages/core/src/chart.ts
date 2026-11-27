@@ -1,5 +1,7 @@
 import { type Candle, type Period, type Quote } from '@sarwa/contracts';
 
+import { direction, formatPrice } from './format';
+
 export interface ChartPoint {
   x: number;
   y: number;
@@ -82,4 +84,28 @@ export function axisCandles(candles: readonly Candle[]): (Candle | undefined)[] 
 // The admin can disable the selected period while a chart is open; fall back to the first one left.
 export function resolvePeriod(enabled: readonly Period[], selected: Period): Period {
   return enabled.includes(selected) ? selected : (enabled[0] ?? '1D');
+}
+
+export function percentChange(from: number, to: number): number {
+  return ((to - from) / from) * 100;
+}
+
+const DIRECTION_WORD = { up: 'up', down: 'down', flat: 'flat' } as const;
+
+// The text alternative for a chart: overall move plus the range, read once instead of every tick.
+export function describeChart(
+  symbol: string,
+  period: Period,
+  candles: readonly Candle[],
+  baseline: number | null,
+): string {
+  const last = candles.at(-1);
+  if (!last || baseline === null) return `${symbol} price chart, ${period}`;
+  const pct = percentChange(baseline, last.c);
+  const dir = direction(pct);
+  const move = dir === 'flat' ? 'flat' : `${DIRECTION_WORD[dir]} ${Math.abs(pct).toFixed(2)}%`;
+  const when = period === '1D' ? 'today' : `over ${period}`;
+  const low = Math.min(...candles.map((c) => c.l));
+  const high = Math.max(...candles.map((c) => c.h));
+  return `${symbol} ${move} ${when}, low ${formatPrice(low)}, high ${formatPrice(high)}`;
 }

@@ -24,6 +24,19 @@ export function restrictedImports({ patterns = [], paths = [] } = {}) {
   return ['error', { paths, patterns: [...boundaryPatterns, ...patterns] }];
 }
 
+// Components take colours and fonts from @sarwa/tokens, never as raw strings.
+export const designSystemSyntax = [
+  'error',
+  {
+    selector: 'Literal[value=/^#[0-9a-fA-F]{3,8}$/]',
+    message: 'No hex colours in components: use a theme colour role from @sarwa/tokens.',
+  },
+  {
+    selector: 'Literal[value=/^(Inter|Manrope|JetBrainsMono)_/]',
+    message: 'No font-file names in components: use a Text variant/weight or fontFile().',
+  },
+];
+
 export default [
   {
     name: 'sarwa/ignores',

@@ -1,16 +1,17 @@
 import { useState } from 'react';
 
 import { type Direction, formatPrice } from '@sarwa/core';
+import { type PriceSize } from '@sarwa/tokens';
 
 import { cn } from '../lib/cn';
 
-const PRICE_SIZES = {
+const PRICE_SIZES: Record<PriceSize, string> = {
   display: 'type-display',
   'display-web': 'type-display-web',
   lg: 'type-num-lg',
   md: 'type-num-md',
   sm: 'type-num-sm',
-} as const;
+};
 
 export function PriceText({
   value,
@@ -18,7 +19,7 @@ export function PriceText({
   className,
 }: {
   value: number;
-  size?: keyof typeof PRICE_SIZES;
+  size?: PriceSize;
   className?: string;
 }) {
   return <span className={cn(PRICE_SIZES[size], 'text-fg', className)}>{formatPrice(value)}</span>;
@@ -41,10 +42,14 @@ export function usePriceFlash(price: number): { direction: Direction | null; key
 export function PriceFlash({
   price,
   size = 'md',
+  format = formatPrice,
+  muted = false,
   className,
 }: {
   price: number;
-  size?: keyof typeof PRICE_SIZES;
+  size?: PriceSize;
+  format?: (price: number) => string;
+  muted?: boolean;
   className?: string;
 }) {
   const { direction, key } = usePriceFlash(price);
@@ -53,13 +58,14 @@ export function PriceFlash({
       key={key}
       className={cn(
         PRICE_SIZES[size],
-        'text-fg -mx-1.5 -my-px inline-block rounded-sm px-1.5 py-px',
+        '-mx-1.5 -my-px inline-block rounded-sm px-1.5 py-px',
+        muted ? 'text-fg-2' : 'text-fg',
         direction === 'up' && 'animate-flash-up',
         direction === 'down' && 'animate-flash-down',
         className,
       )}
     >
-      {formatPrice(price)}
+      {format(price)}
     </span>
   );
 }

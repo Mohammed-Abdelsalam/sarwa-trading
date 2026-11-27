@@ -1,4 +1,4 @@
-import base, { restrictedImports } from '@sarwa/eslint-config/base';
+import base, { designSystemSyntax, restrictedImports } from '@sarwa/eslint-config/base';
 import { jestConfig } from '@sarwa/eslint-config/jest';
 import react from '@sarwa/eslint-config/react';
 
@@ -34,6 +34,11 @@ export default [
         ],
       }),
     },
+  },
+  {
+    name: 'sarwa/ui/design-system',
+    files: ['src/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-syntax': designSystemSyntax },
   },
   { languageOptions: { parserOptions: { tsconfigRootDir: import.meta.dirname } } },
 ];

@@ -1,12 +1,13 @@
 import { type Sector } from '@sarwa/contracts';
+import { type AvatarSize } from '@sarwa/tokens';
 
 import { cn } from '../lib/cn';
 
-const AVATAR_SIZES = {
-  sm: 'size-8 rounded-[10px] text-[13px]',
-  md: 'size-10 rounded-[12px] text-base',
-  lg: 'size-14 rounded-[16px] text-[22px]',
-} as const;
+const AVATAR_SIZES: Record<AvatarSize, string> = {
+  32: 'type-avatar-sm size-8 rounded-md',
+  40: 'type-avatar rounded-control-lg size-10',
+  56: 'type-avatar-lg rounded-avatar-lg size-14',
+};
 
 const SECTOR_STYLES: Record<Sector, string> = {
   tech: 'bg-sector-tech-subtle text-sector-tech',
@@ -20,19 +21,19 @@ const SECTOR_STYLES: Record<Sector, string> = {
 export function StockAvatar({
   symbol,
   sector,
-  size = 'md',
+  size = 40,
   className,
 }: {
   symbol: string;
   sector: Sector;
-  size?: keyof typeof AVATAR_SIZES;
+  size?: AvatarSize;
   className?: string;
 }) {
   return (
     <span
       aria-hidden
       className={cn(
-        'font-display grid shrink-0 place-items-center font-extrabold leading-none',
+        'grid shrink-0 place-items-center',
         AVATAR_SIZES[size],
         SECTOR_STYLES[sector],
         className,

@@ -64,6 +64,7 @@ function viewModel(
   return {
     rows: [],
     average: null,
+    stale: false,
     isLoading: false,
     isError: false,
     retry: jest.fn(),

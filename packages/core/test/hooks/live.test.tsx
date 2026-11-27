@@ -70,7 +70,7 @@ describe('live store hooks', () => {
       { wrapper: Wrapper },
     );
     expect(result.current.quote).toBeUndefined();
-    expect(result.current.live).toBe('reconnecting');
+    expect(result.current.live).toBe('connecting');
 
     act(() => {
       client.store.getState().applyQuotes([makeQuote({ price: 300 })]);

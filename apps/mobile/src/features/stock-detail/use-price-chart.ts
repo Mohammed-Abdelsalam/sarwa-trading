@@ -4,11 +4,16 @@ import { useAnimatedProps, useSharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { type Candle, type Period } from '@sarwa/contracts';
-import { chartGeometry, nearestPointIndex, useChartSeries } from '@sarwa/core';
+import { chartGeometry, nearestPointIndex, percentChange, useChartSeries } from '@sarwa/core';
 
 const LONG_PRESS_MS = 150;
 const PADDING = 12;
 const NONE = -1;
+
+export interface ScrubPoint {
+  candle: Candle;
+  changePct: number;
+}
 
 export function usePriceChart({
   symbol,
@@ -21,7 +26,7 @@ export function usePriceChart({
   period: Period;
   width: number;
   height: number;
-  onScrub: (candle: Candle | null) => void;
+  onScrub: (point: ScrubPoint | null) => void;
 }) {
   const series = useChartSeries(symbol, period);
   const activeIndex = useSharedValue(NONE);
@@ -34,8 +39,11 @@ export function usePriceChart({
     series.showBaseline ? (series.baseline ?? undefined) : undefined,
   );
   const select = (index: number) => {
-    onScrub(index === NONE ? null : (series.candles[index] ?? null));
-    if (index !== NONE) void Haptics.selectionAsync();
+    const candle = index === NONE ? undefined : series.candles[index];
+    onScrub(
+      candle ? { candle, changePct: percentChange(series.baseline ?? candle.c, candle.c) } : null,
+    );
+    if (candle) void Haptics.selectionAsync();
   };
 
   // Runs on the UI thread; React only hears about it when the selected candle changes.
@@ -79,6 +87,7 @@ export function usePriceChart({
   return {
     state: series.state,
     retry: series.retry,
+    summary: series.summary,
     line,
     area,
     rising: series.rising,

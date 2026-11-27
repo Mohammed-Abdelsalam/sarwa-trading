@@ -33,6 +33,8 @@ export const COLOR_ROLES = [
   'focus',
   'scrim',
   'chart-grid',
+  'skel-a',
+  'skel-b',
 ] as const;
 
 export type ColorRole = (typeof COLOR_ROLES)[number];
@@ -75,6 +77,8 @@ export const themes: Record<ThemeName, ThemeColors> = {
     focus: '#8B8EFF',
     scrim: 'rgba(5,7,12,0.72)',
     'chart-grid': 'rgba(169,177,195,0.10)',
+    'skel-a': '#222836',
+    'skel-b': '#2E3544',
   },
   light: {
     bg: '#F5F6FA',
@@ -111,6 +115,8 @@ export const themes: Record<ThemeName, ThemeColors> = {
     focus: '#5457E8',
     scrim: 'rgba(14,18,32,0.45)',
     'chart-grid': 'rgba(71,80,102,0.10)',
+    'skel-a': '#E6E9F0',
+    'skel-b': '#D5DAE4',
   },
 };
 

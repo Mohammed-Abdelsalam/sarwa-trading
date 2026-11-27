@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { Button, IconButton } from '../src/primitives/button';
+import { Banner, StateView } from '../src/primitives/feedback';
 import { Field, Input } from '../src/primitives/form';
 
 describe('Button', () => {
@@ -29,6 +30,49 @@ describe('Button', () => {
       'href',
       '/markets',
     );
+  });
+});
+
+describe('Button icon', () => {
+  it('renders the icon before the label and swaps it for a spinner while loading', () => {
+    const { rerender } = render(<Button icon={<svg data-testid="icon" />}>Retry</Button>);
+    expect(screen.getByTestId('icon')).toBeInTheDocument();
+
+    rerender(
+      <Button icon={<svg data-testid="icon" />} loading>
+        Retry
+      </Button>,
+    );
+    expect(screen.queryByTestId('icon')).not.toBeInTheDocument();
+  });
+});
+
+describe('Banner', () => {
+  it('offers a dismiss button only when it can be dismissed', async () => {
+    const onDismiss = jest.fn();
+    const { rerender } = render(<Banner tone="warn">Reconnecting…</Banner>);
+    expect(screen.queryByRole('button', { name: 'Dismiss message' })).not.toBeInTheDocument();
+
+    rerender(
+      <Banner tone="brand" onDismiss={onDismiss}>
+        Markets close early today
+      </Banner>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss message' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('StateView', () => {
+  it('shows the footnote under the action', () => {
+    render(
+      <StateView
+        icon={<svg />}
+        title="We'll be right back"
+        footnote="We'll also retry automatically every 30 s."
+      />,
+    );
+    expect(screen.getByText("We'll also retry automatically every 30 s.")).toBeInTheDocument();
   });
 });
 

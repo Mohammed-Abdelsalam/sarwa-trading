@@ -1,12 +1,13 @@
 import { type Direction, DIRECTION_ARROW, direction as toDirection } from '@sarwa/core';
+import { type ChangePillSize } from '@sarwa/tokens';
 
 import { cn } from '../lib/cn';
 
-const PILL_SIZES = {
-  sm: 'h-[22px] min-w-[68px] rounded-sm px-1.5 text-xs',
-  md: 'h-[26px] min-w-[78px] rounded-[7px] px-2 text-[13px]',
-  lg: 'h-8 rounded-[9px] px-2.5 text-[15px]',
-} as const;
+const PILL_SIZES: Record<ChangePillSize, string> = {
+  sm: 'h-pill-sm min-w-pill-sm-min rounded-sm px-1.5 text-xs',
+  md: 'h-pill-md min-w-pill-md-min rounded-pill type-sm px-2',
+  lg: 'rounded-pill-lg type-body h-8 px-2.5',
+};
 
 const DIRECTION_STYLES: Record<Direction, string> = {
   up: 'bg-pos-subtle text-pos',
@@ -14,18 +15,35 @@ const DIRECTION_STYLES: Record<Direction, string> = {
   flat: 'bg-flat-subtle text-flat',
 };
 
+const INLINE_STYLES: Record<Direction, string> = {
+  up: 'text-pos',
+  down: 'text-neg',
+  flat: 'text-flat',
+};
+
 export function ChangePill({
   value,
   label,
   size = 'md',
+  variant = 'pill',
   className,
 }: {
   value: number;
   label: string;
-  size?: keyof typeof PILL_SIZES;
+  size?: ChangePillSize;
+  variant?: 'pill' | 'inline';
   className?: string;
 }) {
   const direction = toDirection(value);
+  if (variant === 'inline') {
+    return (
+      <span
+        className={cn('type-sm font-semibold tabular-nums', INLINE_STYLES[direction], className)}
+      >
+        {DIRECTION_ARROW[direction]} {label}
+      </span>
+    );
+  }
   return (
     <span
       className={cn(

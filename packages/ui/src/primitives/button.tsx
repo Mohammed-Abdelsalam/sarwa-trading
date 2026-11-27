@@ -1,6 +1,8 @@
 import { Slot } from '@radix-ui/react-slot';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { type ComponentProps } from 'react';
+import { cva } from 'class-variance-authority';
+import { type ComponentProps, type ReactNode } from 'react';
+
+import { type ButtonSize, type ButtonVariant, type IconButtonSize } from '@sarwa/tokens';
 
 import { cn } from '../lib/cn';
 
@@ -9,8 +11,8 @@ const focusRing =
 
 export const buttonVariants = cva(
   [
-    'inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap border border-transparent font-semibold',
-    'ease-standard transition-[background-color,border-color,transform] duration-[120ms] active:scale-[0.98]',
+    'inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap border border-transparent',
+    'ease-standard duration-120 active:scale-98 transition-[background-color,border-color,transform]',
     'disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100',
     focusRing,
   ],
@@ -21,19 +23,22 @@ export const buttonVariants = cva(
         secondary:
           'border-border bg-surface-3 text-fg hover:border-border-strong hover:bg-border active:bg-border-strong',
         ghost: 'text-fg hover:bg-surface-3 active:bg-border bg-transparent',
-        danger: 'bg-danger hover:bg-danger-hover active:bg-danger-press text-white',
-      },
+        danger: 'bg-danger text-on-brand hover:bg-danger-hover active:bg-danger-press',
+      } satisfies Record<ButtonVariant, string>,
       size: {
-        sm: 'h-8 gap-1.5 rounded-[8px] px-3 text-[13px]',
-        md: 'h-10 rounded-md px-4 text-sm',
-        lg: 'h-12 rounded-[12px] px-5 text-[15px]',
-      },
+        sm: 'type-sm rounded-control-sm h-8 gap-1.5 px-3 font-semibold',
+        md: 'type-button h-10 rounded-md px-4',
+        lg: 'type-button-lg rounded-control-lg h-12 px-5',
+      } satisfies Record<ButtonSize, string>,
     },
     defaultVariants: { variant: 'primary', size: 'md' },
   },
 );
 
-export interface ButtonProps extends ComponentProps<'button'>, VariantProps<typeof buttonVariants> {
+export interface ButtonProps extends ComponentProps<'button'> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  icon?: ReactNode;
   asChild?: boolean;
   loading?: boolean;
 }
@@ -42,6 +47,7 @@ export function Button({
   className,
   variant,
   size,
+  icon,
   asChild = false,
   loading = false,
   disabled,
@@ -60,7 +66,7 @@ export function Button({
         children
       ) : (
         <>
-          {loading ? <Spinner /> : null}
+          {loading ? <Spinner /> : icon}
           {children}
         </>
       )}
@@ -80,33 +86,38 @@ export function Spinner({ className }: { className?: string }) {
   );
 }
 
-const iconButtonVariants = cva(
-  [
-    'text-fg-2 inline-grid shrink-0 cursor-pointer place-items-center border border-transparent transition-colors duration-[120ms]',
-    'hover:bg-surface-3 hover:text-fg active:bg-border active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40',
-    focusRing,
-  ],
-  {
-    variants: {
-      size: { sm: 'size-8 rounded-[8px]', md: 'size-10 rounded-md', lg: 'size-11 rounded-[12px]' },
-      solid: { true: 'border-border bg-surface-3', false: '' },
-    },
-    defaultVariants: { size: 'md', solid: false },
-  },
-);
+const ICON_BUTTON_SIZE: Record<IconButtonSize, string> = {
+  32: 'rounded-control-sm size-8',
+  40: 'size-10 rounded-md',
+  44: 'rounded-control-lg size-11',
+};
 
-export interface IconButtonProps
-  extends ComponentProps<'button'>, VariantProps<typeof iconButtonVariants> {
+export interface IconButtonProps extends ComponentProps<'button'> {
   label: string;
+  size?: IconButtonSize;
+  solid?: boolean;
 }
 
-export function IconButton({ label, size, solid, className, ...props }: IconButtonProps) {
+export function IconButton({
+  label,
+  size = 40,
+  solid = false,
+  className,
+  ...props
+}: IconButtonProps) {
   return (
     <button
       type="button"
       aria-label={label}
       title={label}
-      className={cn(iconButtonVariants({ size, solid }), className)}
+      className={cn(
+        'text-fg-2 duration-120 inline-grid shrink-0 cursor-pointer place-items-center border border-transparent transition-colors',
+        'hover:bg-surface-3 hover:text-fg active:bg-border active:scale-96 disabled:cursor-not-allowed disabled:opacity-40',
+        focusRing,
+        ICON_BUTTON_SIZE[size],
+        solid && 'border-border bg-surface-3',
+        className,
+      )}
       {...props}
     />
   );

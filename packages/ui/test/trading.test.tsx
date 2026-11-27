@@ -28,6 +28,13 @@ describe('ChangePill', () => {
   });
 });
 
+describe('ChangePill inline variant', () => {
+  it('drops the background for header use but keeps the arrow', () => {
+    render(<ChangePill value={2.84} label="+2.84 (+1.24%)" variant="inline" />);
+    expect(screen.getByText('▲ +2.84 (+1.24%)')).toHaveClass('text-pos');
+  });
+});
+
 describe('StarButton', () => {
   it('announces its state and toggles', async () => {
     const onToggle = jest.fn();
@@ -44,6 +51,11 @@ describe('ConnectionBadge', () => {
   it('describes the status in words', () => {
     render(<ConnectionBadge status="reconnecting" />);
     expect(screen.getByRole('status')).toHaveTextContent('Reconnecting…');
+  });
+
+  it('says connecting before the first connection', () => {
+    render(<ConnectionBadge status="connecting" />);
+    expect(screen.getByRole('status')).toHaveTextContent('Connecting…');
   });
 });
 
