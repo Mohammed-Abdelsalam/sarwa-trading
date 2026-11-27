@@ -1,4 +1,4 @@
-import { designSystemSyntax, restrictedImports } from '@sarwa/eslint-config/base';
+import { appImportRules, designSystemSyntax } from '@sarwa/eslint-config/base';
 import { jestConfig } from '@sarwa/eslint-config/jest';
 import next from '@sarwa/eslint-config/next';
 
@@ -8,18 +8,11 @@ const VIEW_ONLY =
 export default [
   ...next,
   ...jestConfig({ dom: true }),
-  {
-    name: 'sarwa/admin/view-only',
-    files: ['src/features/**/*.tsx', 'src/components/**/*.tsx'],
-    rules: {
-      'no-restricted-imports': restrictedImports({
-        paths: [
-          { name: '@tanstack/react-query', message: VIEW_ONLY },
-          { name: '@sarwa/core', importNames: ['useSarwa'], message: VIEW_ONLY },
-        ],
-      }),
-    },
-  },
+  ...appImportRules({
+    customer: false,
+    viewOnly: ['src/features/**/*.tsx', 'src/components/**/*.tsx'],
+    viewOnlyMessage: VIEW_ONLY,
+  }),
   {
     name: 'sarwa/admin/design-system',
     files: ['src/**/*.{ts,tsx}'],

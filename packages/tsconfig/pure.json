@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Platform-free library: no DOM, no JSX (domain, contracts, i18n)",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["jest"]
+  }
+}

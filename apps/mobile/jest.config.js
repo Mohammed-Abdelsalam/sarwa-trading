@@ -1,6 +1,7 @@
 module.exports = {
   preset: 'jest-expo',
   displayName: 'mobile',
+  coverageThreshold: { global: { statements: 55, branches: 46, functions: 58, lines: 57 } },
   setupFiles: ['<rootDir>/test/setup.ts'],
   testMatch: ['<rootDir>/test/**/*.test.{ts,tsx}'],
   // lucide ships ESM (.mjs) for React Native; Jest needs its CommonJS build.

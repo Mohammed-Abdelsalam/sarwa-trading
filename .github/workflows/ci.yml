@@ -6,11 +6,15 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
+
+env:
+  GIT_SHA: ${{ github.sha }}
+  TURBO_TELEMETRY_DISABLED: 1
 
 jobs:
   quality:
@@ -30,23 +34,27 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Restore Turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            turbo-${{ runner.os }}-
+
+      # The Tailwind prettier plugin loads the mobile config, which imports the built tokens.
       - name: Build tokens
-        run: pnpm --filter @sarwa/tokens build
+        run: pnpm exec turbo run build --filter=@sarwa/tokens
 
       - name: Format
         run: pnpm format:check
 
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Lint · Typecheck · Build
+        run: pnpm exec turbo run lint typecheck build
 
       - name: Test (with coverage)
         run: pnpm exec turbo run test -- --coverage --ci
-
-      - name: Build
-        run: pnpm build
 
       - name: Upload coverage
         if: always()
@@ -58,7 +66,7 @@ jobs:
 
   commits:
     name: Conventional commits
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -4,7 +4,7 @@
   "description": "Sarwa Mini Trading Platform — mobile (Expo), web (Next.js), admin dashboard (Next.js) and a NestJS server in one monorepo.",
   "packageManager": "pnpm@10.34.9",
   "engines": {
-    "node": ">=22"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "turbo run dev",
