@@ -8,6 +8,8 @@ export default {
         'repo',
         'config',
         'contracts',
+        'domain',
+        'i18n',
         'core',
         'ui',
         'tokens',

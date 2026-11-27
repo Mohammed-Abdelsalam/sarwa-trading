@@ -9,8 +9,6 @@ const TEST_FILES = [
   '**/__tests__/**/*.{ts,tsx}',
   '**/test-utils/**/*.{ts,tsx}',
 ];
-// Playwright specs share the .spec name but run in a real browser, not Jest.
-const NOT_JEST = ['**/e2e/**'];
 
 export function jestConfig({ dom = false, native = false } = {}) {
   const configs = [
@@ -18,18 +16,15 @@ export function jestConfig({ dom = false, native = false } = {}) {
       ...jestPlugin.configs['flat/recommended'],
       name: 'sarwa/jest',
       files: TEST_FILES,
-      ignores: NOT_JEST,
     },
     {
       ...jestPlugin.configs['flat/style'],
       name: 'sarwa/jest/style',
       files: TEST_FILES,
-      ignores: NOT_JEST,
     },
     {
       name: 'sarwa/jest/rules',
       files: TEST_FILES,
-      ignores: NOT_JEST,
       languageOptions: { globals: { ...globals.jest } },
       rules: {
         'jest/consistent-test-it': ['error', { fn: 'it' }],
@@ -55,14 +50,12 @@ export function jestConfig({ dom = false, native = false } = {}) {
       ...testingLibrary.configs['flat/react'],
       name: 'sarwa/testing-library',
       files: TEST_FILES,
-      ignores: NOT_JEST,
     });
   }
   if (native) {
     configs.push({
       name: 'sarwa/testing-library/native',
       files: TEST_FILES,
-      ignores: NOT_JEST,
       // React Native Testing Library 14 made render/fireEvent async; this rule predates that.
       rules: { 'testing-library/no-await-sync-events': 'off' },
     });
@@ -72,7 +65,6 @@ export function jestConfig({ dom = false, native = false } = {}) {
       ...jestDom.configs['flat/recommended'],
       name: 'sarwa/jest-dom',
       files: TEST_FILES,
-      ignores: NOT_JEST,
     });
   }
   return configs;
