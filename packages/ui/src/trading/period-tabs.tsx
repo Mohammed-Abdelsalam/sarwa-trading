@@ -9,12 +9,14 @@ export function PeriodTabs({
   onChange,
   enabled = PERIODS,
   size = 'md',
+  label = 'Chart period',
   className,
 }: {
   value: Period;
   onChange: (period: Period) => void;
   enabled?: readonly Period[];
   size?: 'md' | 'lg';
+  label?: string;
   className?: string;
 }) {
   const choices = PERIODS.filter((period) => enabled.includes(period));
@@ -36,7 +38,7 @@ export function PeriodTabs({
   return (
     <div
       role="tablist"
-      aria-label="Chart period"
+      aria-label={label}
       onKeyDown={onKeyDown}
       className={cn(
         'bg-surface-3 rounded-seg p-seg-pad inline-flex gap-0.5',

@@ -14,7 +14,7 @@ export function Chip({ active = false, className, ...props }: ChipProps) {
     <button
       type="button"
       className={cn(
-        'type-sm duration-120 inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 font-semibold transition-colors',
+        'type-sm inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 font-semibold whitespace-nowrap transition-colors duration-120',
         active
           ? 'border-fg bg-fg text-bg'
           : 'border-border-strong text-fg-2 hover:bg-surface-3 hover:text-fg bg-transparent',
@@ -37,15 +37,18 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  disabled = false,
   className,
 }: {
   label: string;
   options: readonly SegmentOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  disabled?: boolean;
   className?: string;
 }) {
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return;
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
     if (!step) return;
     event.preventDefault();
@@ -60,6 +63,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
+      aria-disabled={disabled || undefined}
       onKeyDown={onKeyDown}
       className={cn('bg-surface-3 rounded-seg p-seg-pad inline-flex gap-0.5', className)}
     >
@@ -74,12 +78,14 @@ export function SegmentedControl<T extends string>({
             aria-checked={checked}
             aria-label={option.icon ? option.label : undefined}
             tabIndex={checked ? 0 : -1}
+            disabled={disabled}
             onClick={() => {
               onChange(option.value);
             }}
             className={cn(
               'text-fg-2 type-sm rounded-control-sm hover:text-fg inline-flex h-8 min-w-11 cursor-pointer items-center justify-center gap-1.5 px-2.5 font-semibold transition-colors duration-200 [&>svg]:size-4',
               checked && 'bg-surface text-fg shadow-e1 dark:bg-border-strong',
+              'disabled:hover:text-fg-2 disabled:cursor-not-allowed disabled:opacity-50',
               focusRing,
             )}
           >

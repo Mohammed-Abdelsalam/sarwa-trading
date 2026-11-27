@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { type Direction, formatPrice } from '@sarwa/core';
+import { type Direction } from '@sarwa/core';
 import { type PriceSize } from '@sarwa/tokens';
 
 import { cn } from '../lib/cn';
@@ -13,16 +13,19 @@ const PRICE_SIZES: Record<PriceSize, string> = {
   sm: 'type-num-sm',
 };
 
+// Formatting comes from the caller (useI18n's f), so prices follow the locale and digit setting.
 export function PriceText({
   value,
+  format,
   size = 'md',
   className,
 }: {
   value: number;
+  format: (price: number) => string;
   size?: PriceSize;
   className?: string;
 }) {
-  return <span className={cn(PRICE_SIZES[size], 'text-fg', className)}>{formatPrice(value)}</span>;
+  return <span className={cn(PRICE_SIZES[size], 'text-fg', className)}>{format(value)}</span>;
 }
 
 export function usePriceFlash(price: number): { direction: Direction | null; key: number } {
@@ -42,13 +45,13 @@ export function usePriceFlash(price: number): { direction: Direction | null; key
 export function PriceFlash({
   price,
   size = 'md',
-  format = formatPrice,
+  format,
   muted = false,
   className,
 }: {
   price: number;
   size?: PriceSize;
-  format?: (price: number) => string;
+  format: (price: number) => string;
   muted?: boolean;
   className?: string;
 }) {

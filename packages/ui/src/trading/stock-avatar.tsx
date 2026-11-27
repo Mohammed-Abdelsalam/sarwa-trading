@@ -4,6 +4,7 @@ import { type AvatarSize } from '@sarwa/tokens';
 import { cn } from '../lib/cn';
 
 const AVATAR_SIZES: Record<AvatarSize, string> = {
+  24: 'type-avatar-sm size-6 rounded-sm',
   32: 'type-avatar-sm size-8 rounded-md',
   40: 'type-avatar rounded-control-lg size-10',
   56: 'type-avatar-lg rounded-avatar-lg size-14',

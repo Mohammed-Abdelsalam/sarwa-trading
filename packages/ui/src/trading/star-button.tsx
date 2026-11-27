@@ -4,18 +4,14 @@ import { type StarSize } from '@sarwa/tokens';
 
 import { cn } from '../lib/cn';
 
-export function starLabel(symbol: string, watched: boolean): string {
-  return watched ? `Remove ${symbol} from watchlist` : `Add ${symbol} to watchlist`;
-}
-
 export function StarButton({
-  symbol,
+  label,
   watched,
   onToggle,
   size = 44,
   className,
 }: {
-  symbol: string;
+  label: string;
   watched: boolean;
   onToggle: () => void;
   size?: StarSize;
@@ -25,7 +21,7 @@ export function StarButton({
     <button
       type="button"
       aria-pressed={watched}
-      aria-label={starLabel(symbol, watched)}
+      aria-label={label}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();

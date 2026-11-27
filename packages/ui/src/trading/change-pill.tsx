@@ -47,7 +47,7 @@ export function ChangePill({
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center gap-1 whitespace-nowrap font-semibold tabular-nums leading-none',
+        'inline-flex items-center justify-center gap-1 leading-none font-semibold whitespace-nowrap tabular-nums',
         PILL_SIZES[size],
         DIRECTION_STYLES[direction],
         className,

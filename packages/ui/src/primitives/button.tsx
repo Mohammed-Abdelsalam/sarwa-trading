@@ -11,8 +11,8 @@ const focusRing =
 
 export const buttonVariants = cva(
   [
-    'inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap border border-transparent',
-    'ease-standard duration-120 active:scale-98 transition-[background-color,border-color,transform]',
+    'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 border border-transparent whitespace-nowrap select-none',
+    'ease-standard transition-[background-color,border-color,transform] duration-120 active:scale-98',
     'disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100',
     focusRing,
   ],
@@ -111,7 +111,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cn(
-        'text-fg-2 duration-120 inline-grid shrink-0 cursor-pointer place-items-center border border-transparent transition-colors',
+        'text-fg-2 inline-grid shrink-0 cursor-pointer place-items-center border border-transparent transition-colors duration-120',
         'hover:bg-surface-3 hover:text-fg active:bg-border active:scale-96 disabled:cursor-not-allowed disabled:opacity-40',
         focusRing,
         ICON_BUTTON_SIZE[size],

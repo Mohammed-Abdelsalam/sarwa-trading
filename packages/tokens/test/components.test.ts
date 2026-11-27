@@ -4,6 +4,7 @@ import {
   BUTTON_VARIANTS,
   componentRadius,
   componentSpacing,
+  componentTypography,
   ICON_BUTTON_SIZES,
 } from '../src/components';
 import { buildWebThemeCss } from '../src/css';
@@ -38,6 +39,14 @@ describe('component tokens', () => {
     expect(preset.theme.extend.spacing['pill-sm']).toBe(`${componentSpacing['pill-sm']}px`);
     expect(preset.theme.extend.borderRadius['control-lg']).toBe('12px');
     expect(preset.theme.extend.borderRadius.lg).toBe('14px');
+  });
+});
+
+describe('component type', () => {
+  it('sizes the keypad digits and the Home equity number as on the canvas', () => {
+    expect(componentTypography.keypad).toMatchObject({ size: 24, weight: 500, tabular: true });
+    expect(componentTypography['display-equity']).toMatchObject({ size: 34, lineHeight: 40 });
+    expect(buildWebThemeCss()).toMatch(/@utility type-display-equity \{[^}]*font-size: 2.125rem;/);
   });
 });
 

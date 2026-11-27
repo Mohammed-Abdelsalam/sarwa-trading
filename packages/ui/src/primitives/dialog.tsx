@@ -28,7 +28,7 @@ export function Dialog({
         <DialogPrimitive.Overlay className="bg-scrim fixed inset-0 z-40" />
         <DialogPrimitive.Content
           className={cn(
-            'max-w-dialog fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto',
+            'max-w-dialog fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto',
             'border-border bg-surface-2 shadow-e3 rounded-dialog border p-6 focus:outline-none',
             className,
           )}

@@ -10,7 +10,7 @@ export const STATE_TONES = ['neutral', 'neg', 'brand'] as const;
 export const CHANGE_PILL_SIZES = ['sm', 'md', 'lg'] as const;
 export const PRICE_SIZES = ['display', 'display-web', 'lg', 'md', 'sm'] as const;
 export const STAR_SIZES = [44, 36] as const;
-export const AVATAR_SIZES = [32, 40, 56] as const;
+export const AVATAR_SIZES = [24, 32, 40, 56] as const;
 
 export type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
 export type ButtonSize = (typeof BUTTON_SIZES)[number];
@@ -68,6 +68,15 @@ export const componentTypography = {
   'avatar-lg': { family: 'display', size: 22, lineHeight: 26, weight: 800 },
   logo: { family: 'display', size: 17, lineHeight: 20, weight: 800, tracking: -0.01 },
   kbd: { family: 'mono', size: 11, lineHeight: 12, weight: 500 },
+  keypad: { family: 'sans', size: 24, lineHeight: 28, weight: 500, tabular: true },
+  'display-equity': {
+    family: 'sans',
+    size: 34,
+    lineHeight: 40,
+    weight: 600,
+    tracking: -0.02,
+    tabular: true,
+  },
 } as const satisfies Record<string, TypeToken>;
 
 export type ComponentTypographyToken = keyof typeof componentTypography;
