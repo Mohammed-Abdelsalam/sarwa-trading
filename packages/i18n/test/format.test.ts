@@ -157,8 +157,17 @@ describe('relative', () => {
     expect(en.relative(minutes(2 * 24 * 60), now)).toBe('Nov 25');
   });
 
-  it('treats a future time as just now', () => {
+  it('treats a time under a minute ahead as just now', () => {
     expect(en.relative(now + 5_000, now)).toBe('Just now');
+  });
+
+  it('counts down to a future time', () => {
+    expect(en.relative(minutes(-5), now)).toBe('in 5 minutes');
+    expect(en.relative(minutes(-180), now)).toBe('in 3 hours');
+    expect(en.relative(minutes(-47 * 60), now)).toBe('in 2 days');
+    expect(ar.relative(minutes(-2), now)).toBe('بعد دقيقتين');
+    expect(ar.relative(minutes(-11 * 60), now)).toBe('بعد ١١ ساعة');
+    expect(ar.relative(minutes(-5 * 24 * 60), now)).toBe('بعد ٥ أيام');
   });
 
   it('uses Arabic plural forms', () => {

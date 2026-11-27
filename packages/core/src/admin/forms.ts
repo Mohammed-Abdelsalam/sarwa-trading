@@ -16,7 +16,7 @@ import {
   type UpdateAppConfig,
   type UpdateStock,
 } from '@sarwa/contracts';
-import { parseCents, parsePercentBps } from '@sarwa/domain';
+import { normalizeDecimal, parseCents, parsePercentBps } from '@sarwa/domain';
 
 import { type I18n } from '../hooks/i18n';
 import { type AdminI18n } from './i18n';
@@ -62,7 +62,7 @@ export function stockToDraft(stock: AdminStock): StockDraft {
 }
 
 const toNumber = (text: string): number | null => {
-  const trimmed = text.trim();
+  const trimmed = normalizeDecimal(text);
   return trimmed === '' || !Number.isFinite(Number(trimmed)) ? null : Number(trimmed);
 };
 

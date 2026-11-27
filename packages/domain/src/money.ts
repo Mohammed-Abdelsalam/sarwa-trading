@@ -110,9 +110,21 @@ export const percentToBps = (percent: number) => Math.round(percent * 100) as Bp
 export const ticksToCents = (price: Ticks, rounding: Rounding) =>
   divide(BigInt(price), BigInt(TICKS_PER_CENT), rounding) as Cents;
 
+// Arabic-Indic and Persian digits → 0-9, "٫" → "."; a lone comma with no "." is the decimal mark,
+// any other comma (and "٬") is grouping, which stays unparseable.
+export function normalizeDecimal(text: string): string {
+  const ascii = text
+    .trim()
+    .replace(/[٠-٩۰-۹]/g, (digit) => String(digit.charCodeAt(0) & 0xf))
+    .replace(/٫/g, '.');
+  return ascii.includes('.') || ascii.indexOf(',') !== ascii.lastIndexOf(',')
+    ? ascii
+    : ascii.replace(',', '.');
+}
+
 // Keypad and input text → integer units; null when the text is not a valid amount at that precision.
 function parseDecimal(text: string, digits: number): number | null {
-  const trimmed = text.trim();
+  const trimmed = normalizeDecimal(text);
   if (!new RegExp(`^\\d+(\\.\\d{0,${String(digits)}})?$`).test(trimmed)) return null;
   const [whole, fraction = ''] = trimmed.split('.') as [string, string?];
   const value = Number(whole) * 10 ** digits + Number(fraction.padEnd(digits, '0'));
