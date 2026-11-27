@@ -42,7 +42,12 @@ export function createBrowserClients(): { sarwa: SarwaClient; admin: AdminClient
   const sarwa: SarwaClient = {
     store,
     api: createApiClient({ baseUrl: '', getDeviceId }),
-    market: createMarketSocket({ url: origin(), store, getDeviceId }),
+    market: createMarketSocket({
+      url: origin(),
+      store,
+      getDeviceId,
+      transports: ['polling', 'websocket'],
+    }),
     storage: browserStorage,
     removals: createRemovalQueue(),
     analytics: noopAnalytics,

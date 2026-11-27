@@ -51,6 +51,23 @@ describe('OrdersPage', () => {
     expect(screen.getByText('No orders yet today.')).toBeInTheDocument();
   });
 
+  it('lists each order type with its count and share, once each', () => {
+    mockedHook.mockReturnValue(
+      viewModel({
+        typeMix: [
+          { type: 'market', count: 10, shareBps: bps(6_250), weight: 0.625 },
+          { type: 'limit', count: 6, shareBps: bps(3_750), weight: 0.375 },
+        ],
+      }),
+    );
+    renderWithProviders(<OrdersPage />);
+
+    const mix = screen.getByRole('list', { name: 'Order type mix' });
+    expect(mix).toHaveTextContent('Market1062.50%');
+    expect(mix).toHaveTextContent('Limit637.50%');
+    expect(screen.getAllByText('62.50%')).toHaveLength(1);
+  });
+
   it('pauses the stream and then offers to resume it', async () => {
     const model = viewModel();
     mockedHook.mockReturnValue(model);

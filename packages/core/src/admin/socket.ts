@@ -23,9 +23,14 @@ export interface AdminSocket {
   onConnect(listener: () => void): () => void;
 }
 
+// Polling first: the dashboard reaches the API through a Next rewrite, which can't proxy a WebSocket
+// upgrade. Socket.IO upgrades on its own wherever the proxy allows it.
+// Its own connection: the server reads the session cookie from the handshake, and a connection shared
+// with the market socket may have been opened on the login page, before the cookie existed.
 const defaultCreateSocket = (url: string): AdminIo =>
   io(url, {
-    transports: ['websocket'],
+    multiplex: false,
+    transports: ['polling', 'websocket'],
     autoConnect: false,
     withCredentials: true,
     reconnectionDelay: 1_000,

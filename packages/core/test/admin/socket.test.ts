@@ -1,7 +1,11 @@
 import { EventEmitter } from 'node:events';
 
+import { io as socketIo } from 'socket.io-client';
+
 import { createAdminSocket, type AdminIo } from '../../src/admin/socket';
 import { makeAdminOrder, makeAdminTrading } from './fixtures';
+
+jest.mock('socket.io-client', () => ({ io: jest.fn(() => ({ on: jest.fn() })) }));
 
 class FakeIo extends EventEmitter {
   connected = false;
@@ -58,6 +62,19 @@ describe('createAdminSocket', () => {
     stop();
     io.emit('admin.order', { v: 1, order });
     expect(onOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens its own connection, polling first, so the session cookie reaches the handshake', () => {
+    createAdminSocket({ url: 'http://admin' });
+
+    expect(socketIo).toHaveBeenCalledWith(
+      'http://admin/admin',
+      expect.objectContaining({
+        multiplex: false,
+        transports: ['polling', 'websocket'],
+        withCredentials: true,
+      }),
+    );
   });
 
   it('reports a rejected session handshake', () => {

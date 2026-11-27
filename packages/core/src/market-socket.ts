@@ -43,8 +43,12 @@ export interface MarketSocketOptions {
   flushMs?: number;
   syncDelayMs?: number;
   reconnectJitterMs?: number;
-  createSocket?: (url: string, auth: SocketAuthProvider) => MarketIo;
+  // The admin dashboard passes ['polling', 'websocket'] because its Next rewrite can't proxy a WebSocket.
+  transports?: SocketTransport[];
+  createSocket?: (url: string, auth: SocketAuthProvider, transports: SocketTransport[]) => MarketIo;
 }
+
+export type SocketTransport = 'polling' | 'websocket';
 
 export interface MarketSocket {
   connect(): void;
@@ -54,9 +58,13 @@ export interface MarketSocket {
   onTradingEvent(listener: TradingEventListener): () => void;
 }
 
-const defaultCreateSocket = (url: string, auth: SocketAuthProvider): MarketIo =>
+const defaultCreateSocket = (
+  url: string,
+  auth: SocketAuthProvider,
+  transports: SocketTransport[],
+): MarketIo =>
   io(url, {
-    transports: ['websocket'],
+    transports,
     autoConnect: false,
     reconnectionDelay: 500,
     reconnectionDelayMax: 15_000,
@@ -71,6 +79,7 @@ export function createMarketSocket({
   flushMs = 100,
   syncDelayMs = 200,
   reconnectJitterMs = 1_000,
+  transports = ['websocket'],
   createSocket = defaultCreateSocket,
 }: MarketSocketOptions): MarketSocket {
   // Resolved on every (re)connect, so the handshake always carries the stored device id.
@@ -84,7 +93,7 @@ export function createMarketSocket({
       },
     );
   };
-  const socket = createSocket(`${url.replace(/\/$/, '')}${MARKET_NAMESPACE}`, auth);
+  const socket = createSocket(`${url.replace(/\/$/, '')}${MARKET_NAMESPACE}`, auth, transports);
   const tradingListeners = new Set<TradingEventListener>();
   const refCounts = new Map<string, number>();
   const subscribed = new Set<string>();

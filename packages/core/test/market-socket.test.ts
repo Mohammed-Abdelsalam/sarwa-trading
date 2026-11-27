@@ -81,6 +81,27 @@ afterEach(() => {
 });
 
 describe('market socket', () => {
+  it('uses WebSocket only unless the app asks for polling first', () => {
+    const createSocket = jest.fn(() => new FakeSocket() as never);
+    const options = {
+      url: 'http://api',
+      store: createLiveStore(),
+      getDeviceId: () => Promise.resolve(DEVICE_ID),
+      createSocket,
+    };
+
+    createMarketSocket(options);
+    createMarketSocket({ ...options, transports: ['polling', 'websocket'] });
+
+    expect(createSocket).toHaveBeenNthCalledWith(1, 'http://api/market', expect.any(Function), [
+      'websocket',
+    ]);
+    expect(createSocket).toHaveBeenNthCalledWith(2, 'http://api/market', expect.any(Function), [
+      'polling',
+      'websocket',
+    ]);
+  });
+
   it('subscribes once per symbol, batched after a short delay', () => {
     const { fake, market } = setup();
     market.connect();

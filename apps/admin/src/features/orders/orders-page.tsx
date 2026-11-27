@@ -182,8 +182,9 @@ export function OrdersPage() {
               segments={page.typeMix.map((row) => ({
                 key: row.type,
                 label: t.ticket.types[row.type],
-                value: f.percent(row.shareBps),
+                value: f.number(row.count),
                 weight: row.weight,
+                weightLabel: f.percent(row.shareBps),
                 colorRole: TYPE_COLORS[row.type] ?? 'cash',
               }))}
             />
