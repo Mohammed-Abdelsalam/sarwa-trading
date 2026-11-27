@@ -1,4 +1,4 @@
-import { REJECTION_CODES, type Rejection } from '@sarwa/domain';
+import { REJECTION_CODES, type Rejection, ticks } from '@sarwa/domain';
 
 import {
   CreateAlertRequestSchema,
@@ -11,11 +11,11 @@ import {
   RejectionCodeSchema,
   type RejectionWire,
   resetConfirmation,
+  toDomain,
   UpdateTradingSchema,
 } from '../src';
 
-// The wire rejection and the domain rejection must stay the same shape in both directions.
-const toDomain = (rejection: RejectionWire): Rejection => rejection;
+// The domain rejection fits the wire as is; back from the wire it only regains its unit brands.
 const toWire = (rejection: Rejection): RejectionWire => rejection;
 
 const marketBuy = {
@@ -84,9 +84,14 @@ describe('rejections', () => {
   });
 
   it('round-trips a rejection between the domain and the wire', () => {
-    const collar: Rejection = { code: 'PRICE_COLLAR', field: 'limit', minTicks: 1, maxTicks: 2 };
+    const collar: Rejection = {
+      code: 'PRICE_COLLAR',
+      field: 'limit',
+      minTicks: ticks(1),
+      maxTicks: ticks(2),
+    };
 
-    expect(toDomain(toWire(collar))).toEqual(collar);
+    expect(toDomain<Rejection>(toWire(collar))).toEqual(collar);
   });
 });
 
