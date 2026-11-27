@@ -47,7 +47,7 @@ export function Keypad({ onKey }: { onKey: (key: KeypadKey) => void }) {
                   style={dir === 'rtl' ? { transform: [{ scaleX: -1 }] } : undefined}
                 />
               ) : (
-                <Text variant="keypad">{labelOf(key)}</Text>
+                <Text variant="keypad">{localDigits(key, digits)}</Text>
               )}
             </Pressable>
           ))}
