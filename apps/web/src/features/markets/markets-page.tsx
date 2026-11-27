@@ -67,15 +67,14 @@ export function MarketsPage() {
             <Kbd className="absolute end-2 top-1/2 -translate-y-1/2">/</Kbd>
           </form>
           <div
-            role="tablist"
+            role="group"
             aria-label={t.markets.sector}
             className="flex gap-2 overflow-x-auto max-md:-mx-4 max-md:px-4 md:flex-wrap"
           >
             {SECTOR_FILTERS.map((sector) => (
               <Chip
                 key={sector}
-                role="tab"
-                aria-selected={sector === filters.sector}
+                aria-pressed={sector === filters.sector}
                 active={sector === filters.sector}
                 className="h-8"
                 onClick={() => {
@@ -132,7 +131,7 @@ export function MarketsPage() {
         )}
       </section>
 
-      {page.twoPane && page.selected ? <StockPreview symbol={page.selected} /> : null}
+      {page.preview ? <StockPreview symbol={page.preview} className="max-lg:hidden" /> : null}
     </div>
   );
 }

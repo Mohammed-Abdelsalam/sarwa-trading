@@ -4,6 +4,11 @@ import { useState } from 'react';
 
 import { type Order, type OrderFilter } from '@sarwa/contracts';
 import {
+  isCancellable,
+  orderNote,
+  orderSizeLabel,
+  orderTime,
+  orderTypeLabel,
   toTradeQuote,
   useCancelOrder,
   useOrderPages,
@@ -12,11 +17,10 @@ import {
   useStocks,
   useTradingStatus,
 } from '@sarwa/core';
+import { downloadCsv, toCsv } from '@sarwa/ui';
 
 import { replaceSearchParam, useSearchParam } from '../../lib/browser';
-import { downloadCsv, toCsv } from '../../lib/csv';
 import { type Copy, useCopy } from '../../lib/i18n';
-import { CANCELLABLE, orderDetail, orderSizeLabel, orderTime, orderTypeLabel } from './order-copy';
 
 const FILTERS: readonly OrderFilter[] = ['open', 'filled', 'all'];
 export const RANGES = ['1', '7', '30', 'all'] as const;
@@ -42,9 +46,9 @@ export function orderRow(order: Order, lastTicks: number | null, now: number, co
     size: orderSizeLabel(order, copy),
     status: order.status,
     statusLabel: t.orderStatus[order.status],
-    detail: orderDetail(order, lastTicks, copy),
+    detail: orderNote(order, copy, lastTicks),
     time: orderTime(order.createdAt, now, copy),
-    cancellable: CANCELLABLE.includes(order.status),
+    cancellable: isCancellable(order),
   };
 }
 
@@ -140,7 +144,7 @@ export function useOrdersPage(routeOrderId?: string) {
       columns: t.orders.columns,
       cancel: t.common.cancel,
       cancelA11y: (sym: string) => m.orders.cancelA11y({ symbol: sym }),
-      openA11y: (id: string) => m.orders.openA11y({ id }),
+      openA11y: (id: string, sym: string) => m.orders.openA11y({ id, symbol: sym }),
       empty: t.orders.empty,
       emptyFiltered: m.orders.emptyFiltered,
       loadError: m.orders.loadError,

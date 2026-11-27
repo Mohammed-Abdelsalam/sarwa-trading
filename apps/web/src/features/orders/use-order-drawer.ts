@@ -2,12 +2,17 @@ import { useState } from 'react';
 
 import { type ModifyOrderRequest, type Order } from '@sarwa/contracts';
 import {
-  cents,
-  direction,
-  micros,
+  cancelLabel,
+  fillProgress,
+  isCancellable,
+  orderPriceTicks,
+  orderRealized,
+  orderSoFar,
+  orderTimeline,
+  orderTitle,
+  orderTypeLabel,
   parseMicros,
   parseTicks,
-  ticks,
   useCancelOrder,
   useModifyOrder,
   useOrder,
@@ -16,86 +21,15 @@ import {
 import { type TimelineStep } from '@sarwa/ui';
 
 import { type Copy, useCopy } from '../../lib/i18n';
-import { CANCELLABLE, orderPriceTicks, orderTypeLabel, remainingMicros } from './order-copy';
 
-export function orderTimeline(order: Order, copy: Copy): TimelineStep[] {
-  const { t, f } = copy;
-  const steps: TimelineStep[] = [
-    {
-      id: 'placed',
-      title: t.orders.placed,
-      meta: f.time(order.createdAt, { seconds: true }),
-      state: 'done',
-    },
-    ...order.fills.map((fill): TimelineStep => ({
-      id: fill.id,
-      title: t.orders.filledLine({
-        shares: f.shares(micros(fill.qtyMicros)),
-        price: f.price(ticks(fill.priceTicks)),
-      }),
-      meta: f.time(fill.at, { seconds: true }),
-      state: 'done',
-    })),
-  ];
-  const closedAt = order.closedAt === null ? undefined : f.time(order.closedAt, { seconds: true });
-  const remaining = remainingMicros(order);
-  if (CANCELLABLE.includes(order.status)) {
-    steps.push({
-      id: 'working',
-      title:
-        order.status === 'queued'
-          ? t.orderStatus.queued
-          : t.orders.working({ shares: remaining === null ? '—' : f.shares(micros(remaining)) }),
-      ...(order.expiresAt === null
-        ? {}
-        : {
-            meta:
-              order.tif === 'day'
-                ? t.orders.expiresAtClose({ time: f.time(order.expiresAt) })
-                : f.dateTime(order.expiresAt),
-          }),
-      state: 'now',
-    });
-  } else if (order.status !== 'filled') {
-    const title =
-      order.status === 'canceled'
-        ? order.cancelReason === 'user'
-          ? t.orders.canceledByYou
-          : t.orderStatus.canceled
-        : order.status === 'expired'
-          ? t.orders.expiredAtClose
-          : order.rejection
-            ? copy.rejection(order.rejection, order.symbol).reason
-            : t.orderStatus.rejected;
-    steps.push({ id: 'closed', title, ...(closedAt ? { meta: closedAt } : {}), state: 'done' });
-  }
-  return steps;
-}
-
-function fillProgress(order: Order, { t, f }: Copy) {
-  if (order.qtyMicros !== null && order.qtyMicros > 0) {
-    const params = {
-      filled: f.shares(micros(order.filledMicros)),
-      total: f.shares(micros(order.qtyMicros)),
-    };
-    return {
-      value: order.filledMicros / order.qtyMicros,
-      text: t.orders.filledOf(params),
-      a11y: t.orders.filledOfA11y(params),
-    };
-  }
-  if (order.amountCents !== null) {
-    const params = {
-      filled: f.money(cents(order.filledNotionalCents)),
-      total: f.money(cents(order.amountCents)),
-    };
-    return {
-      value: order.filledNotionalCents / order.amountCents,
-      text: t.orders.filledOf(params),
-      a11y: t.orders.filledOfA11y(params),
-    };
-  }
-  return null;
+// The web timeline has no failed state: a closed order's last step simply reads as done.
+function timelineSteps(order: Order, copy: Copy): TimelineStep[] {
+  return orderTimeline(order, copy).map((step) => ({
+    id: step.key,
+    title: step.title,
+    ...(step.detail ? { meta: step.detail } : {}),
+    state: step.state === 'failed' ? 'done' : step.state,
+  }));
 }
 
 export function useOrderDrawer(id: string) {
@@ -115,7 +49,7 @@ export function useOrderDrawer(id: string) {
   const view = order
     ? (() => {
         const price = orderPriceTicks(order);
-        const realized = order.fills.reduce((sum, fill) => sum + fill.realizedCents, 0);
+        const progress = fillProgress(order, copy);
         const sector = stocks.data?.find((stock) => stock.symbol === order.symbol)?.sector;
         return {
           id: order.id,
@@ -123,28 +57,15 @@ export function useOrderDrawer(id: string) {
           status: order.status,
           statusLabel:
             order.status === 'partially_filled' ? t.orders.partial : t.orderStatus[order.status],
-          title: `${(order.side === 'buy' ? t.ticket.buyTitle : t.ticket.sellTitle)({ symbol: order.symbol })} · ${t.ticket.types[order.type]}`,
+          title: orderTitle(order, copy),
           subtitle: orderTypeLabel(order, copy),
-          progress: fillProgress(order, copy),
-          avg:
-            order.avgFillTicks === null
-              ? null
-              : t.orders.avg({ price: f.price(ticks(order.avgFillTicks)) }),
-          timeline: orderTimeline(order, copy),
+          progress,
+          avg: progress?.avg ?? null,
+          timeline: timelineSteps(order, copy),
           sector: sector ?? 'tech',
-          soFar: {
-            label: order.side === 'sell' ? t.orders.proceedsSoFar : t.orders.costSoFar,
-            value: f.money(cents(order.filledNotionalCents)),
-          },
-          realized:
-            order.side === 'sell'
-              ? {
-                  label: t.orders.realizedPl,
-                  value: f.money(cents(realized), { signed: true }),
-                  direction: direction(realized),
-                }
-              : null,
-          cancellable: CANCELLABLE.includes(order.status) && outcome !== 'already_filled',
+          soFar: orderSoFar(order, copy),
+          realized: orderRealized(order, copy),
+          cancellable: isCancellable(order) && outcome !== 'already_filled',
           modifiable:
             (order.status === 'open' || order.status === 'partially_filled') &&
             (price !== null || order.qtyMicros !== null),
@@ -176,6 +97,7 @@ export function useOrderDrawer(id: string) {
     isLoading: query.isPending,
     isError: query.isError && !order,
     editing,
+    currency: f.currencyAffix(),
     priceText,
     qtyText,
     cancelling: cancel.isPending,
@@ -199,7 +121,7 @@ export function useOrderDrawer(id: string) {
       title: t.orders.details,
       close: t.common.close,
       modify: t.orders.modify,
-      cancelRemaining: order?.filledMicros ? t.orders.cancelRemaining : t.orders.cancelOrder,
+      cancelRemaining: cancelLabel(order ?? { filledMicros: 0 }, copy),
       newPrice: m.orders.newPrice,
       newQuantity: m.orders.newQuantity,
       save: m.orders.saveChanges,

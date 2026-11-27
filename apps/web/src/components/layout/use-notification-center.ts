@@ -4,7 +4,11 @@ import { useState } from 'react';
 
 import { type Notification, type NotificationPayload } from '@sarwa/contracts';
 import {
-  notificationText,
+  notificationKind,
+  type NotificationKind,
+  notificationRows as sharedRows,
+  notificationTarget as sharedTarget,
+  type NotificationTarget,
   useMarkAllRead,
   useMarkNotificationRead,
   useNotifications,
@@ -14,38 +18,32 @@ import { type Copy, useCopy } from '../../lib/i18n';
 
 export type NotificationTone = 'pos' | 'neg' | 'brand' | 'info' | 'muted';
 
+const TONE: Record<NotificationKind, NotificationTone> = {
+  filled: 'pos',
+  expired: 'muted',
+  rejected: 'neg',
+  alert: 'brand',
+  halted: 'info',
+  notice: 'info',
+};
+
+function href(target: NotificationTarget | null): Route {
+  if (target === null) return '/';
+  if (target.kind === 'order') return `/orders?order=${target.orderId}` as Route;
+  if (target.kind === 'stock') return `/stocks/${target.symbol}` as Route;
+  return '/alerts';
+}
+
 // Icon tone and destination per kind; the sentence itself comes from core.
-export function notificationTarget(payload: NotificationPayload): {
-  tone: NotificationTone;
-  href: Route;
-} {
-  switch (payload.kind) {
-    case 'order_filled':
-    case 'order_partially_filled':
-      return { tone: 'pos', href: `/orders?order=${payload.orderId}` as Route };
-    case 'order_expired':
-    case 'order_canceled':
-      return { tone: 'muted', href: `/orders?order=${payload.orderId}` as Route };
-    case 'order_rejected':
-      return { tone: 'neg', href: `/orders?order=${payload.orderId}` as Route };
-    case 'alert_triggered':
-      return { tone: 'brand', href: '/alerts' };
-    case 'symbol_halted':
-      return { tone: 'info', href: `/stocks/${payload.symbol}` as Route };
-    case 'market_notice':
-      return { tone: 'info', href: '/' };
-  }
+export function notificationTarget(payload: NotificationPayload) {
+  return { tone: TONE[notificationKind(payload)], href: href(sharedTarget(payload)) };
 }
 
 export function notificationRows(items: readonly Notification[], now: number, copy: Copy) {
-  const today = new Date(now).toDateString();
-  return items.map((item) => ({
-    id: item.id,
-    ...notificationText(item.payload, copy),
-    ...notificationTarget(item.payload),
-    when: copy.f.relative(item.createdAt, now),
-    unread: item.readAt === null,
-    today: new Date(item.createdAt).toDateString() === today,
+  return sharedRows(items, now, copy).map(({ kind, target, ...row }) => ({
+    ...row,
+    tone: TONE[kind],
+    href: href(target),
   }));
 }
 

@@ -5,7 +5,6 @@ import {
   axisTicks,
   candleGeometry,
   candleIndexAt,
-  chartGeometry,
   type ChartType,
   formatPrice,
   nearestPointIndex,
@@ -30,17 +29,11 @@ export function usePriceChart({
   height: number;
 }) {
   const { f } = useI18n();
-  const series = useChartSeries(symbol, period);
+  const series = useChartSeries(symbol, period, { width: VIEW_WIDTH, height, padding: PADDING });
   const [active, setActive] = useState<number | null>(null);
   const count = series.candles.length;
 
-  const area = chartGeometry(
-    series.candles.map((c) => c.c),
-    VIEW_WIDTH,
-    height,
-    PADDING,
-    series.showBaseline ? (series.baseline ?? undefined) : undefined,
-  );
+  const { area } = series;
   const candles = candleGeometry(series.candles, VIEW_WIDTH, height, PADDING);
   const [min, max] = type === 'candle' ? [candles.min, candles.max] : [area.min, area.max];
 

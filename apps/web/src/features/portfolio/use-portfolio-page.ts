@@ -4,9 +4,8 @@ import { useState } from 'react';
 
 import { type EquityPeriod, type Sector } from '@sarwa/contracts';
 import { cents, direction, POLICY, useEquityCurve, usePortfolio, useStocks } from '@sarwa/core';
-import { type AllocationSegment, type SortDirection } from '@sarwa/ui';
+import { type AllocationSegment, downloadCsv, type SortDirection, toCsv } from '@sarwa/ui';
 
-import { downloadCsv, toCsv } from '../../lib/csv';
 import { type Copy, useCopy } from '../../lib/i18n';
 
 type Summary = NonNullable<ReturnType<typeof usePortfolio>['summary']>;

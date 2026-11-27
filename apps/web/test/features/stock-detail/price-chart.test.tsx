@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { type ReactElement } from 'react';
 
 import { type Candle } from '@sarwa/contracts';
-import { createFormatter, formatPrice, useChartSeries } from '@sarwa/core';
+import { chartGeometry, createFormatter, formatPrice, useChartSeries } from '@sarwa/core';
 
 import { PriceChart } from '../../../src/features/stock-detail/price-chart';
 import { providers } from '../../copy';
@@ -23,8 +23,14 @@ const candles: Candle[] = [
 ];
 
 function mockSeries(overrides: Partial<ReturnType<typeof useChartSeries>> = {}) {
-  jest.mocked(useChartSeries).mockReturnValue({
+  jest.mocked(useChartSeries).mockImplementation((_symbol, _period, frame) => ({
     candles,
+    area: chartGeometry(
+      candles.map((c) => c.c),
+      frame.width,
+      frame.height,
+      frame.padding,
+    ),
     baseline: 10,
     showBaseline: false,
     rising: true,
@@ -34,7 +40,7 @@ function mockSeries(overrides: Partial<ReturnType<typeof useChartSeries>> = {}) 
     state: 'ready',
     retry: jest.fn(),
     ...overrides,
-  });
+  }));
 }
 
 function pointText(candle: Candle) {

@@ -90,7 +90,9 @@ export function AlertDialog({
               inputMode="decimal"
               autoComplete="off"
               className="tabular-nums"
-              {...(dialog.condition === 'move_today' ? { suffix: '%' } : { prefix: '$' })}
+              {...(dialog.condition === 'move_today'
+                ? { suffix: '%' }
+                : { prefix: dialog.currency })}
               value={dialog.target}
               onChange={(event) => {
                 actions.setTarget(event.target.value);

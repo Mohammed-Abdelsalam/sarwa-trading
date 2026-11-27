@@ -8,6 +8,7 @@ import { DIRECTION_ARROW } from '@sarwa/core';
 import { Banner, Card, cn, Heatmap, SegmentedControl, Skeleton } from '@sarwa/ui';
 
 import { NotificationIcon } from '../../components/layout/notification-center';
+import { RouteLink } from '../../components/route-link';
 import { EquityChart } from '../../components/trading/equity-chart';
 import { StockListSkeleton, StockRow } from '../../components/trading/stock-row';
 import { type HeatmapView, type MoversTab, useHomePage } from './use-home-page';
@@ -94,7 +95,13 @@ export function HomePage() {
               </div>
             </div>
             {page.heatmap.view === 'map' ? (
-              <Heatmap tiles={page.heatmap.tiles} label={labels.heatmap} largeAt={0.08} />
+              <Heatmap
+                tiles={page.heatmap.tiles}
+                label={labels.heatmap}
+                largeAt={0.08}
+                tileHref={(symbol) => `/stocks/${symbol}`}
+                link={RouteLink}
+              />
             ) : (
               <ul aria-label={labels.heatmap} className="flex flex-col">
                 {page.heatmap.rows.map((row) => (

@@ -1,8 +1,7 @@
-import { type Metadata } from 'next';
-
 import { SettingsPage } from '../../features/settings/settings-page';
+import { personalMetadata } from '../../lib/seo';
 
-export const metadata: Metadata = { title: 'Settings' };
+export const generateMetadata = () => personalMetadata('settings');
 
 export default function Page() {
   return <SettingsPage />;

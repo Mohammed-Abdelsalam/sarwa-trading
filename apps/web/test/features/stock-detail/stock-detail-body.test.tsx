@@ -2,7 +2,7 @@ import { render as rtlRender, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactElement } from 'react';
 
-import { StockDetailPage } from '../../../src/features/stock-detail/stock-detail-page';
+import { StockDetailBody } from '../../../src/features/stock-detail/stock-detail-body';
 import { useStockDetailPage } from '../../../src/features/stock-detail/use-stock-detail-page';
 import { providers } from '../../copy';
 
@@ -10,7 +10,6 @@ const render = (ui: ReactElement, options?: Parameters<typeof providers>[0]) =>
   rtlRender(ui, { wrapper: providers(options).wrapper });
 
 jest.mock('../../../src/features/stock-detail/use-stock-detail-page');
-jest.mock('../../../src/features/trade/order-panel', () => ({ OrderPanel: () => null }));
 jest.mock('../../../src/features/stock-detail/price-chart', () => ({ PriceChart: () => null }));
 jest.mock('../../../src/features/stock-detail/detail-parts', () => ({
   PriceSummary: () => null,
@@ -34,16 +33,11 @@ function viewModel(
     retry: jest.fn(),
     watched: false,
     live: true,
-    sectorLabel: 'Tech',
     similar: [],
     chart: { period: '1D', type: 'area', enabledPeriods: ['1D', '1W'] },
     quoteLine: 'Bid $231.46 × 300 · Ask $231.50 × 200 · Spread 0.02%',
     position: null,
     labels: {
-      alert: 'Alert',
-      watch: 'Watch',
-      watchA11y: 'Add AAPL to watchlist',
-      markets: 'Markets',
       similar: 'More in Tech',
       loadError: "Couldn't load AAPL",
       loadErrorBody: 'Check your connection and try again.',
@@ -59,30 +53,21 @@ function viewModel(
   };
 }
 
-describe('StockDetailPage', () => {
-  it('links back to Markets from the breadcrumbs', () => {
-    mockedHook.mockReturnValue(viewModel());
-    render(<StockDetailPage symbol="AAPL" />);
-
-    expect(screen.getByRole('link', { name: 'Markets' })).toHaveAttribute('href', '/markets');
-  });
-
-  it('adds the stock to the watchlist from the header button', async () => {
-    const model = viewModel();
+describe('StockDetailBody', () => {
+  it('offers a retry when the stock fails to load', async () => {
+    const model = viewModel({ isError: true });
     mockedHook.mockReturnValue(model);
-    render(<StockDetailPage symbol="AAPL" />);
+    render(<StockDetailBody symbol="AAPL" />);
 
-    const button = screen.getByRole('button', { name: 'Add AAPL to watchlist' });
-    expect(button).toHaveAttribute('aria-pressed', 'false');
-    await userEvent.click(button);
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
-    expect(model.actions.toggleWatch).toHaveBeenCalledTimes(1);
+    expect(model.retry).toHaveBeenCalledTimes(1);
   });
 
   it('explains a removed stock and lets the user unstar it', async () => {
     const model = viewModel({ notFound: true, watched: true });
     mockedHook.mockReturnValue(model);
-    render(<StockDetailPage symbol="OLD" />);
+    render(<StockDetailBody symbol="OLD" />);
 
     expect(
       screen.getByRole('heading', { name: 'This stock is no longer available' }),

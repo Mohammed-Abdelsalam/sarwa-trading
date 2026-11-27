@@ -100,6 +100,21 @@ describe('OrdersPage', () => {
     expect(screen.getByRole('radio', { name: 'Open · 1' })).toBeInTheDocument();
   });
 
+  it('opens an order from a link stretched over its row and marks it current', async () => {
+    window.history.replaceState(null, '', '/orders');
+    renderPage();
+
+    const link = await screen.findByRole('link', { name: 'Open XOM order o_8ef3' });
+    expect(link).toHaveAttribute('href', '/orders/o_8ef3');
+    expect(screen.getByRole('row', { name: /XOM/ })).not.toHaveAttribute('aria-selected');
+    await userEvent.click(link);
+
+    expect(window.location.search).toBe('?order=o_8ef3');
+    expect(
+      screen.getByRole('link', { name: 'Open XOM order o_8ef3', hidden: true }),
+    ).toHaveAttribute('aria-current', 'true');
+  });
+
   it('opens the drawer with fill progress, timeline and realized P&L', async () => {
     window.history.replaceState(null, '', '/orders?order=o_8ef3');
     renderPage();
@@ -108,7 +123,7 @@ describe('OrdersPage', () => {
     expect(
       await within(drawer).findByRole('progressbar', { name: 'Filled 8 of 15' }),
     ).toBeInTheDocument();
-    expect(within(drawer).getByText('Filled 5 @ $116.50')).toBeInTheDocument();
+    expect(within(drawer).getByText('Partially filled · 5 @ $116.50')).toBeInTheDocument();
     expect(within(drawer).getByText('Working · 7 remaining')).toBeInTheDocument();
     expect(within(drawer).getByText('Proceeds so far')).toBeInTheDocument();
     expect(within(drawer).getByText('$932.15')).toBeInTheDocument();

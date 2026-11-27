@@ -3,14 +3,14 @@ import { type Route } from 'next';
 import Link from 'next/link';
 
 import { useI18n, watchLabel } from '@sarwa/core';
-import { Badge, buttonVariants, StarButton, StockAvatar } from '@sarwa/ui';
+import { Badge, buttonVariants, cn, StarButton, StockAvatar } from '@sarwa/ui';
 
 import { ChartToolbar } from '../stock-detail/chart-toolbar';
 import { KeyStats, PriceSummary } from '../stock-detail/detail-parts';
 import { PriceChart } from '../stock-detail/price-chart';
 import { useStockPreview } from './use-stock-preview';
 
-export function StockPreview({ symbol }: { symbol: string }) {
+export function StockPreview({ symbol, className }: { symbol: string; className?: string }) {
   const { t } = useI18n();
   const preview = useStockPreview(symbol);
   const { stock, quote, stats } = preview;
@@ -18,7 +18,7 @@ export function StockPreview({ symbol }: { symbol: string }) {
   return (
     <section
       aria-label={t.markets.detail({ symbol })}
-      className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-8 py-7"
+      className={cn('flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-8 py-7', className)}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3.5">

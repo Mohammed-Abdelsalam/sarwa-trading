@@ -1,3 +1,5 @@
+'use client';
+
 import { Card, Drawer, Sheet } from '@sarwa/ui';
 
 import { TicketEntry } from './ticket-entry';
@@ -5,6 +7,7 @@ import { TicketResult, TicketReview } from './ticket-review';
 import { useOrderPanel } from './use-order-panel';
 
 // ≥1280 a sticky side panel; 768–1279 a right drawer; below that a bottom sheet with a trade bar.
+// The body is left out of the hidden panel while an overlay shows it, so it is never in the DOM twice.
 export function OrderPanel({ symbol }: { symbol: string }) {
   const panel = useOrderPanel(symbol);
   const { labels, actions } = panel;
@@ -17,24 +20,20 @@ export function OrderPanel({ symbol }: { symbol: string }) {
       <TicketResult panel={panel} />
     );
 
-  if (panel.mode === 'panel') {
-    return (
-      <Card
-        role="region"
-        aria-label={labels.title}
-        className="shadow-e2 sticky top-20 flex flex-col gap-3.5 p-4.5"
-      >
-        {body}
-      </Card>
-    );
-  }
-
   const onOpenChange = (open: boolean) => {
     if (!open) actions.close();
   };
   return (
     <>
-      <div className="border-border bg-surface fixed inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-2.5 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {/* Rendered on the server for every width, so the side panel never pops in after hydration. */}
+      <Card
+        role="region"
+        aria-label={labels.title}
+        className="shadow-e2 sticky top-20 flex flex-col gap-3.5 p-4.5 max-xl:hidden"
+      >
+        {panel.overlayOpen ? null : body}
+      </Card>
+      <div className="border-border bg-surface fixed inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-2.5 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] xl:hidden">
         <button
           type="button"
           onClick={() => {
@@ -54,9 +53,9 @@ export function OrderPanel({ symbol }: { symbol: string }) {
           {labels.sell}
         </button>
       </div>
-      {panel.mode === 'drawer' ? (
+      {panel.overlay === 'drawer' ? (
         <Drawer
-          open={panel.open}
+          open={panel.overlayOpen}
           onOpenChange={onOpenChange}
           title={labels.title}
           hideTitle
@@ -66,7 +65,7 @@ export function OrderPanel({ symbol }: { symbol: string }) {
           {body}
         </Drawer>
       ) : (
-        <Sheet open={panel.open} onOpenChange={onOpenChange} title={labels.title} hideTitle>
+        <Sheet open={panel.overlayOpen} onOpenChange={onOpenChange} title={labels.title} hideTitle>
           {body}
         </Sheet>
       )}

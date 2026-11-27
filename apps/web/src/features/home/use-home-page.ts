@@ -1,55 +1,27 @@
 import { useState } from 'react';
 
-import { type StockWithQuote } from '@sarwa/contracts';
 import {
-  type Bps,
-  changeBps,
-  changePct,
   direction,
+  heatmapTiles,
+  type MoversTab,
   POLICY,
+  topMovers,
   useAlerts,
   useEquityCurve,
   useNotifications,
   useOrders,
   usePortfolio,
   useStocks,
-  toTradeQuote,
   useTradingStatus,
 } from '@sarwa/core';
 
 import { notificationRows } from '../../components/layout/use-notification-center';
 import { useCopy } from '../../lib/i18n';
 
-export type MoversTab = 'gainers' | 'losers' | 'active';
+export type { MoversTab } from '@sarwa/core';
 export type HeatmapView = 'map' | 'list';
 
-const MOVERS = 5;
 const ACTIVITY = 4;
-
-export function topMovers(stocks: readonly StockWithQuote[], tab: MoversTab): StockWithQuote[] {
-  const sorted = [...stocks].sort((a, b) => {
-    if (tab === 'active') return b.quote.volume - a.quote.volume;
-    const diff = changePct(b.quote) - changePct(a.quote);
-    return tab === 'gainers' ? diff : -diff;
-  });
-  return sorted.slice(0, MOVERS);
-}
-
-export function heatmapTiles(stocks: readonly StockWithQuote[], formatPct: (move: Bps) => string) {
-  const totalCap = stocks.reduce((sum, stock) => sum + stock.marketCap, 0) || 1;
-  return [...stocks]
-    .sort((a, b) => b.marketCap - a.marketCap)
-    .map((stock) => {
-      const quote = toTradeQuote(stock.quote);
-      return {
-        key: stock.symbol,
-        label: stock.symbol,
-        change: changePct(stock.quote),
-        changeLabel: formatPct(changeBps(quote.prevCloseTicks, quote.lastTicks)),
-        weight: stock.marketCap / totalCap,
-      };
-    });
-}
 
 export function useHomePage() {
   const copy = useCopy();

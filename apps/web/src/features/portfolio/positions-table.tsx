@@ -20,6 +20,8 @@ import { type PositionRow, type PositionSortKey } from './use-portfolio-page';
 
 const TONE = { up: 'text-pos', down: 'text-neg', flat: 'text-fg-2' } as const;
 const PILL_VALUE = { up: 1, down: -1, flat: 0 } as const;
+// Below 768 px only what fits a phone stays: the stock, its value, the return and the actions.
+const SECONDARY = 'max-md:hidden';
 
 export function PositionsTable({
   rows,
@@ -51,11 +53,16 @@ export function PositionsTable({
   onBuy: (symbol: string) => void;
   onSell: (symbol: string) => void;
 }) {
-  const header = (key: PositionSortKey, label: string, align: 'start' | 'end' = 'end') => (
+  const header = (
+    key: PositionSortKey,
+    label: string,
+    { align = 'end', className }: { align?: 'start' | 'end'; className?: string } = {},
+  ) => (
     <SortHeader
       label={label}
       direction={sortDirection(key)}
       align={align}
+      className={className}
       onSort={() => {
         onSort(key);
       }}
@@ -63,18 +70,18 @@ export function PositionsTable({
   );
 
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <Table>
         <THead>
           <tr>
-            {header('symbol', columns.position, 'start')}
-            {header('qtyMicros', columns.shares)}
-            {header('averageCostTicks', columns.avgCost)}
-            {header('lastTicks', columns.last)}
+            {header('symbol', columns.position, { align: 'start' })}
+            {header('qtyMicros', columns.shares, { className: SECONDARY })}
+            {header('averageCostTicks', columns.avgCost, { className: SECONDARY })}
+            {header('lastTicks', columns.last, { className: SECONDARY })}
             {header('marketValueCents', columns.marketValue)}
-            {header('todayCents', columns.today)}
+            {header('todayCents', columns.today, { className: SECONDARY })}
             {header('totalReturnBps', columns.totalReturn)}
-            {header('weightBps', columns.weight)}
+            {header('weightBps', columns.weight, { className: SECONDARY })}
             <TH align="end">
               <span className="sr-only">{columns.actions}</span>
             </TH>
@@ -95,15 +102,22 @@ export function PositionsTable({
                   </span>
                 </Link>
               </TCell>
-              <TCell align="end">{row.shares}</TCell>
-              <TCell align="end" className="text-fg-2">
+              <TCell align="end" className={SECONDARY}>
+                {row.shares}
+              </TCell>
+              <TCell align="end" className={cn('text-fg-2', SECONDARY)}>
                 {row.avgCost}
               </TCell>
-              <TCell align="end">{row.last}</TCell>
+              <TCell align="end" className={SECONDARY}>
+                {row.last}
+              </TCell>
               <TCell align="end" className="font-semibold">
                 {row.marketValue}
               </TCell>
-              <TCell align="end" className={cn('font-semibold', TONE[row.todayDirection])}>
+              <TCell
+                align="end"
+                className={cn('font-semibold', TONE[row.todayDirection], SECONDARY)}
+              >
                 {row.today}
               </TCell>
               <TCell align="end">
@@ -113,7 +127,7 @@ export function PositionsTable({
                   size="sm"
                 />
               </TCell>
-              <TCell align="end" className="text-fg-2">
+              <TCell align="end" className={cn('text-fg-2', SECONDARY)}>
                 {row.weight}
               </TCell>
               <TCell align="end">

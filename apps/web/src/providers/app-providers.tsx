@@ -14,8 +14,8 @@ import {
   useSyncStocksOnChange,
   useTradingEvents,
 } from '@sarwa/core';
+import { usePageLifecycle } from '@sarwa/ui';
 
-import { usePageLifecycle } from '../lib/browser';
 import { createBrowserClient } from '../lib/client';
 import { useCopy } from '../lib/i18n';
 import { type LocalePreferences, PREFERENCE_COOKIES } from '../lib/locale-cookie';

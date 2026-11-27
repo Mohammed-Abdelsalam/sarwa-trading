@@ -15,7 +15,11 @@ const render = (ui: ReactElement, options?: Parameters<typeof providers>[0]) =>
   rtlRender(ui, { wrapper: providers(options).wrapper });
 
 jest.mock('../../../src/features/markets/use-markets-page');
-jest.mock('../../../src/features/markets/stock-preview', () => ({ StockPreview: () => null }));
+jest.mock('../../../src/features/markets/stock-preview', () => ({
+  StockPreview: ({ symbol, className }: { symbol: string; className?: string }) => (
+    <section aria-label={`${symbol} preview`} className={className} />
+  ),
+}));
 jest.mock('../../../src/components/trading/stock-row', () => ({
   StockListSkeleton: () => <div role="progressbar" aria-label="Loading stocks" />,
   StockRow: ({ stock, href, onKeyDown }: StockRowProps) => (
@@ -36,6 +40,7 @@ function viewModel(
     rows: [],
     watched: new Set<string>(),
     selected: undefined,
+    preview: undefined,
     twoPane: false,
     stale: false,
     isLoading: false,
@@ -58,6 +63,13 @@ function viewModel(
 }
 
 describe('MarketsPage', () => {
+  it('renders the preview pane for CSS to show from 1024 px, before the width is known', () => {
+    mockedHook.mockReturnValue(viewModel({ rows: [makeStock('AAPL')], preview: 'AAPL' }));
+    render(<MarketsPage />);
+
+    expect(screen.getByRole('region', { name: 'AAPL preview' })).toHaveClass('max-lg:hidden');
+  });
+
   it('offers to clear the search when nothing matches', async () => {
     const model = viewModel({
       filters: { query: 'zzz', sector: 'all', sectorLabel: 'All', sort: DEFAULT_SORT },
@@ -86,7 +98,7 @@ describe('MarketsPage', () => {
     mockedHook.mockReturnValue(model);
     render(<MarketsPage />);
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Technology' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Technology' }));
 
     expect(model.actions.setSector).toHaveBeenCalledWith(SECTOR_FILTERS[1]);
   });
@@ -97,7 +109,7 @@ describe('MarketsPage', () => {
 
     expect(screen.getByRole('heading', { name: 'الأسواق' })).toBeInTheDocument();
     expect(screen.getByText('٢ سهم · أسهم أمريكية · دولار أمريكي')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'الكل' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'الكل' })).toHaveAttribute('aria-pressed', 'true');
     expect(
       screen.getByRole('button', { name: /^الترتيب حسب ٪ التغيّر، تنازلي/ }),
     ).toBeInTheDocument();

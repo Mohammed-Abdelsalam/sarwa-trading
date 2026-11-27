@@ -36,7 +36,12 @@ export function PriceChart({
       {toolbar ? <div className="px-4 pb-3">{toolbar(chart.periodChange)}</div> : null}
 
       {chart.state === 'loading' ? (
-        <div aria-label={t.chart.loading} className="flex flex-col gap-2.5 px-4" style={{ height }}>
+        <div
+          role="status"
+          aria-label={t.chart.loading}
+          className="flex flex-col gap-2.5 px-4"
+          style={{ height }}
+        >
           <Skeleton className="flex-1 rounded-md" />
           <Skeleton className="h-2.5" />
         </div>
