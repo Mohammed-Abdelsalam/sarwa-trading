@@ -9,7 +9,7 @@ import {
 
 import { isNotFound } from '../api';
 import { axisCandles, chartBaseline, describeChart, withLiveQuote } from '../chart';
-import { filterAndSort, keyStats, type MarketFilter } from '../markets';
+import { filterAndSort, keyStats, type MarketFilter, rangePosition } from '../markets';
 import { useSarwa } from '../provider';
 import { queryKeys } from './keys';
 import { useLiveSymbols, useQuote } from './live';
@@ -83,6 +83,18 @@ export function useStockDetail(symbol: string) {
     stock: detail.data?.stock,
     quote,
     stats: detail.data && quote ? keyStats(detail.data, quote) : null,
+    week52:
+      detail.data && quote
+        ? {
+            low: detail.data.stats.week52Low,
+            high: detail.data.stats.week52High,
+            position: rangePosition(
+              quote.price,
+              detail.data.stats.week52Low,
+              detail.data.stats.week52High,
+            ),
+          }
+        : null,
     notFound,
     isError: detail.isError && !detail.data && !notFound,
     retry: () => void detail.refetch(),

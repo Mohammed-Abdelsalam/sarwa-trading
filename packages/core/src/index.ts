@@ -12,6 +12,8 @@ export {
 } from './api';
 export {
   axisCandles,
+  axisTicks,
+  candleGeometry,
   chartBaseline,
   chartGeometry,
   describeChart,
@@ -19,6 +21,7 @@ export {
   percentChange,
   resolvePeriod,
   withLiveQuote,
+  type CandleShape,
   type ChartGeometry,
   type ChartPoint,
 } from './chart';

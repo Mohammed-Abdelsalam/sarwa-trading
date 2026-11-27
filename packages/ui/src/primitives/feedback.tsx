@@ -69,6 +69,8 @@ export interface BannerProps extends ComponentProps<'div'> {
   icon?: ReactNode;
   action?: ReactNode;
   onDismiss?: () => void;
+  // Full-width strip under the web nav (W-Global) instead of the rounded card.
+  bar?: boolean;
 }
 
 export function Banner({
@@ -76,6 +78,7 @@ export function Banner({
   icon,
   action,
   onDismiss,
+  bar = false,
   className,
   children,
   ...props
@@ -84,8 +87,11 @@ export function Banner({
     <div
       role="status"
       className={cn(
-        'type-sm text-fg rounded-control-lg flex items-center gap-2.5 border py-2.5 pl-3.5 pr-2 font-medium',
+        'type-sm text-fg flex items-center gap-2.5 py-2.5 font-medium [&>svg]:size-4 [&>svg]:shrink-0',
         BANNER_TONE[tone],
+        bar
+          ? 'border-b border-l-0 border-r-0 border-t-0 px-6'
+          : 'rounded-control-lg border pl-3.5 pr-2',
         className,
       )}
       {...props}
@@ -141,6 +147,47 @@ export function StateView({
       {description ? <p className="type-sm text-fg-2 max-w-sm">{description}</p> : null}
       {action}
       {footnote ? <p className="type-caption text-fg-3">{footnote}</p> : null}
+    </div>
+  );
+}
+
+export interface ToastProps extends ComponentProps<'div'> {
+  icon?: ReactNode;
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  onDismiss?: () => void;
+}
+
+export function Toast({
+  icon,
+  title,
+  description,
+  action,
+  onDismiss,
+  className,
+  ...props
+}: ToastProps) {
+  return (
+    <div
+      role="status"
+      className={cn(
+        'border-border bg-surface-2 shadow-e2 w-90 flex max-w-full items-start gap-3 rounded-lg border py-3.5 pl-4 pr-3.5 [&>svg]:mt-0.5 [&>svg]:size-5 [&>svg]:shrink-0',
+        className,
+      )}
+      {...props}
+    >
+      {icon}
+      <div className="min-w-0 flex-1">
+        <p className="type-sm text-fg font-semibold">{title}</p>
+        {description ? <p className="type-sm text-fg-2">{description}</p> : null}
+      </div>
+      {action}
+      {onDismiss ? (
+        <IconButton label="Dismiss" size={32} onClick={onDismiss}>
+          <X aria-hidden className="size-4" />
+        </IconButton>
+      ) : null}
     </div>
   );
 }

@@ -44,6 +44,7 @@ function stock(symbol: string): StockWithQuote {
     exchange: 'NASDAQ',
     currency: 'USD',
     sparkline: [1, 2],
+    marketCap: 1_000_000_000,
     quote: {
       symbol,
       price: 10,

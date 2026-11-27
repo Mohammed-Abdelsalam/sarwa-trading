@@ -1,6 +1,15 @@
 import { type StockWithQuote } from '@sarwa/contracts';
 
-import { averageChangePct, filterAndSort, keyStats, nextSort, SORTS } from '../src/markets';
+import {
+  averageChangePct,
+  filterAndSort,
+  keyStats,
+  nextSort,
+  rangePosition,
+  similarStocks,
+  sortByColumn,
+  SORTS,
+} from '../src/markets';
 import { makeQuote } from './utils';
 
 function stock(
@@ -17,6 +26,7 @@ function stock(
     exchange: 'NASDAQ',
     currency: 'USD',
     sparkline: [1, 2],
+    marketCap: 1_000_000_000,
     quote: makeQuote({ symbol, price, prevClose }),
   };
 }
@@ -107,5 +117,30 @@ describe('keyStats', () => {
     expect(stats).toContainEqual({ label: 'P/E (TTM)', value: '—' });
     expect(stats).toContainEqual({ label: 'Market cap', value: '$3.5T' });
     expect(stats).toContainEqual({ label: 'Volume', value: '52.3M' });
+  });
+});
+
+describe('similarStocks', () => {
+  it('lists other stocks from the same sector', () => {
+    const list = [...stocks, stock('MSFT', 'Microsoft', 'tech', 400, 390)];
+    expect(similarStocks(list, 'AAPL').map((s) => s.symbol)).toEqual(['MSFT']);
+    expect(similarStocks(list, 'ZZZZ')).toEqual([]);
+  });
+});
+
+describe('rangePosition', () => {
+  it('places a value between low and high, clamped to the bar', () => {
+    expect(rangePosition(150, 100, 200)).toBe(0.5);
+    expect(rangePosition(250, 100, 200)).toBe(1);
+    expect(rangePosition(5, 5, 5)).toBe(0.5);
+  });
+});
+
+describe('sortByColumn', () => {
+  it('sorts by a new column first, then flips its direction', () => {
+    const byPrice = sortByColumn(null, 'price');
+    expect(byPrice).toMatchObject({ key: 'price', dir: -1 });
+    expect(sortByColumn(byPrice, 'price')).toMatchObject({ key: 'price', dir: 1 });
+    expect(sortByColumn(byPrice, 'name')).toMatchObject({ key: 'name', dir: 1 });
   });
 });

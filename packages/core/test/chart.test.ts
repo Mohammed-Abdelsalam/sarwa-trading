@@ -2,6 +2,8 @@ import { type Candle } from '@sarwa/contracts';
 
 import {
   axisCandles,
+  axisTicks,
+  candleGeometry,
   chartBaseline,
   chartGeometry,
   describeChart,
@@ -30,6 +32,8 @@ describe('chartGeometry', () => {
       area: '',
       points: [],
       referenceY: null,
+      min: 0,
+      max: 0,
     });
   });
 
@@ -132,5 +136,32 @@ describe('describeChart', () => {
 
   it('falls back to a plain label without data', () => {
     expect(describeChart('AAPL', '1W', [], null)).toBe('AAPL price chart, 1W');
+  });
+});
+
+describe('candleGeometry', () => {
+  const candles: Candle[] = [
+    { t: 1, o: 10, h: 12, l: 9, c: 11, v: 100 },
+    { t: 2, o: 11, h: 11.5, l: 8, c: 9, v: 50 },
+  ];
+
+  it('draws a body and wick per candle, coloured by direction', () => {
+    const { shapes, min, max } = candleGeometry(candles, 100, 40, 0);
+
+    expect([min, max]).toEqual([8, 12]);
+    expect(shapes.map((s) => s.up)).toEqual([true, false]);
+    expect(shapes[0]).toMatchObject({ x: 25, width: 30, wickTop: 0, volume: 1 });
+    expect(shapes[1]?.volume).toBe(0.5);
+  });
+
+  it('returns nothing for an empty series', () => {
+    expect(candleGeometry([], 100, 40).shapes).toEqual([]);
+  });
+});
+
+describe('axisTicks', () => {
+  it('spreads labels evenly from the top of the chart to the bottom', () => {
+    expect(axisTicks(100, 200)).toEqual([200, 150, 100]);
+    expect(axisTicks(100, 200, 1)).toEqual([200]);
   });
 });

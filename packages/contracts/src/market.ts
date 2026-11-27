@@ -34,6 +34,7 @@ export const QuoteSchema = z.object({
 export const StockWithQuoteSchema = StockSchema.extend({
   quote: QuoteSchema,
   sparkline: z.array(z.number().positive()),
+  marketCap: z.number().nonnegative(),
 });
 
 export const StockStatsSchema = z.object({

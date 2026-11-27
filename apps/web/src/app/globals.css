@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+@import '@sarwa/tokens/theme.css';
+
+/* @sarwa/ui ships source, so Tailwind must scan it for class names. */
+@source '../../../../packages/ui/src';
+
+/* next/font self-hosts the faces under generated names; point the theme's families at them. */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}

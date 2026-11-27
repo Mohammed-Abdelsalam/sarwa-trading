@@ -35,6 +35,7 @@ export function makeStock(
     exchange: 'NASDAQ',
     currency: 'USD',
     sparkline: [1, 2],
+    marketCap: 1_000_000_000,
     quote: makeQuote({ symbol, ...quote }),
     ...overrides,
   };

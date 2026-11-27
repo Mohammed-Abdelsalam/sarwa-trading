@@ -19,6 +19,7 @@ const apple: StockWithQuote = {
   exchange: 'NASDAQ',
   currency: 'USD',
   sparkline: [1, 2, 3],
+  marketCap: 1_000_000_000,
   quote: {
     symbol: 'AAPL',
     price: 231.48,
