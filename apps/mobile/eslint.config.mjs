@@ -1,4 +1,4 @@
-import { restrictedImports } from '@sarwa/eslint-config/base';
+import { designSystemSyntax, restrictedImports } from '@sarwa/eslint-config/base';
 import { jestConfig } from '@sarwa/eslint-config/jest';
 import reactNative from '@sarwa/eslint-config/react-native';
 
@@ -20,6 +20,12 @@ export default [
         ],
       }),
     },
+  },
+  {
+    name: 'sarwa/mobile/design-system',
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/components/ui/text.tsx'],
+    rules: { 'no-restricted-syntax': designSystemSyntax },
   },
   { languageOptions: { parserOptions: { tsconfigRootDir: import.meta.dirname } } },
 ];
