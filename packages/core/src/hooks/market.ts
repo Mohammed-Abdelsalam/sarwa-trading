@@ -8,7 +8,7 @@ import {
 } from '@sarwa/contracts';
 
 import { isNotFound } from '../api';
-import { axisCandles, chartBaseline, withLiveQuote } from '../chart';
+import { axisCandles, chartBaseline, describeChart, withLiveQuote } from '../chart';
 import { filterAndSort, keyStats, type MarketFilter } from '../markets';
 import { useSarwa } from '../provider';
 import { queryKeys } from './keys';
@@ -65,6 +65,7 @@ export function useChartSeries(symbol: string, period: Period) {
     showBaseline: period === '1D' && baseline !== null,
     rising: (candles.at(-1)?.c ?? 0) >= (baseline ?? 0),
     axisCandles: axisCandles(candles),
+    summary: describeChart(symbol, period, candles, baseline),
     state,
     retry: () => void query.refetch(),
   };

@@ -14,12 +14,14 @@ export function useAppNotices(): { notices: AppNotice[]; dismiss: (notice: AppNo
   const market = useMarketStatus();
   const banner = useAppConfig()?.banner;
   const [dismissed, setDismissed] = useState<string | null>(null);
+  const cachedAt = useQueryClient().getQueryState(queryKeys.stocks)?.dataUpdatedAt;
 
   return {
     notices: appNotices({
       connection,
       market,
       banner: banner?.message === dismissed ? null : banner,
+      cachedAt: cachedAt === 0 ? undefined : cachedAt,
     }),
     dismiss: (notice) => {
       setDismissed(notice.message);

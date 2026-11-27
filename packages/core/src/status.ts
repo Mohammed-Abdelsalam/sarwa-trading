@@ -1,21 +1,41 @@
 import { type Banner, type MarketStatus } from '@sarwa/contracts';
+import { type BannerTone } from '@sarwa/tokens';
 
+import { formatClock, formatMarketTime } from './format';
 import { type ConnectionState } from './store';
 
-export type LiveStatus = 'live' | 'reconnecting' | 'offline' | 'paused';
+export type LiveStatus = 'connecting' | 'live' | 'reconnecting' | 'offline' | 'paused';
+
+export const LIVE_STATUS_LABELS: Record<LiveStatus, string> = {
+  connecting: 'Connecting…',
+  live: 'Live',
+  reconnecting: 'Reconnecting…',
+  offline: 'Offline',
+  paused: 'Market paused',
+};
 
 export function liveStatus(connection: ConnectionState, market: MarketStatus | null): LiveStatus {
-  if (connection.status === 'offline') return 'offline';
-  if (connection.status !== 'open') return 'reconnecting';
-  return market?.state === 'paused' ? 'paused' : 'live';
+  switch (connection.status) {
+    case 'offline':
+      return 'offline';
+    case 'idle':
+    case 'connecting':
+      return 'connecting';
+    case 'reconnecting':
+      return 'reconnecting';
+    case 'open':
+      return market?.state === 'paused' ? 'paused' : 'live';
+  }
 }
 
 export type NoticeKind = 'offline' | 'reconnecting' | 'paused' | 'remote';
 
 export interface AppNotice {
   kind: NoticeKind;
-  tone: 'neutral' | 'warning' | 'info';
+  tone: BannerTone;
+  title?: string;
   message: string;
+  meta?: string;
   dismissible: boolean;
 }
 
@@ -26,10 +46,12 @@ export function appNotices({
   connection,
   market,
   banner,
+  cachedAt,
 }: {
   connection: ConnectionState;
   market: MarketStatus | null;
   banner: Banner | null | undefined;
+  cachedAt?: number | undefined;
 }): AppNotice[] {
   const notices: AppNotice[] = [];
   const status = liveStatus(connection, market);
@@ -38,30 +60,37 @@ export function appNotices({
     notices.push({
       kind: 'offline',
       tone: 'neutral',
-      message: "You're offline — showing cached prices.",
+      title: "You're offline",
+      message: cachedAt
+        ? `— showing cached prices from ${formatClock(cachedAt)}.`
+        : '— showing cached prices.',
       dismissible: false,
     });
   } else if (status === 'reconnecting') {
     const attempt = connection.status === 'reconnecting' ? connection.attempt : 0;
     notices.push({
       kind: 'reconnecting',
-      tone: 'warning',
-      message: `Reconnecting… Prices may be a few seconds behind.${attempt > 0 ? ` (try ${String(attempt)})` : ''}`,
+      tone: 'warn',
+      title: 'Reconnecting…',
+      message: 'Prices may be a few seconds behind.',
+      ...(attempt > 0 && { meta: `try ${String(attempt)}` }),
       dismissible: false,
     });
-  } else if (status === 'paused') {
+  } else if (status === 'paused' && market) {
     notices.push({
       kind: 'paused',
       tone: 'info',
-      message: 'Market paused — prices are frozen and will resume automatically.',
+      title: 'Market paused',
+      message: `— prices are frozen at ${formatMarketTime(market.since)} and will resume automatically.`,
       dismissible: false,
     });
   }
 
+  // Admin "info" messages render as the brand banner, as in the canvas (M-Global, A-Config preview).
   if (banner) {
     notices.push({
       kind: 'remote',
-      tone: banner.tone === 'warning' ? 'warning' : 'info',
+      tone: banner.tone === 'warning' ? 'warn' : 'brand',
       message: banner.message,
       dismissible: true,
     });

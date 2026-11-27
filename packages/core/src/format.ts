@@ -79,3 +79,67 @@ const CANDLE_TIME: Record<Period, Intl.DateTimeFormat> = {
 export function formatCandleTime(t: number, period: Period): string {
   return CANDLE_TIME[period].format(t);
 }
+
+const clock = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+const marketClock = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'America/New_York',
+});
+const dayMonth = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+
+const CANDLE_DATE: Record<Period, (t: number) => string> = {
+  '1D': (t) => `${dayMonth.format(t)} · ${clock.format(t)}`,
+  '1W': (t) =>
+    new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(
+      t,
+    ),
+  '1M': (t) =>
+    new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(t),
+  '1Y': (t) =>
+    new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(t),
+  ALL: (t) => new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(t),
+};
+
+export function formatCandleDate(t: number, period: Period): string {
+  return CANDLE_DATE[period](t);
+}
+
+export function formatClock(t: number): string {
+  return clock.format(t);
+}
+
+export function formatMarketTime(t: number): string {
+  return `${marketClock.format(t)} ET`;
+}
+
+const usdWhole = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+});
+
+// Lists drop cents from six-figure prices so the price column never truncates.
+export function formatListPrice(value: number): string {
+  return value >= 100_000 ? usdWhole.format(value) : usd.format(value);
+}
+
+const DIRECTION_SENTENCE: Record<Direction, string> = { up: 'Up', down: 'Down', flat: 'Unchanged' };
+
+export function formatStockLabel({
+  symbol,
+  name,
+  quote,
+  watched,
+}: {
+  symbol: string;
+  name: string;
+  quote: Pick<Quote, 'price' | 'prevClose'>;
+  watched?: boolean;
+}): string {
+  const pct = changePct(quote);
+  const dir = direction(pct);
+  const move = dir === 'flat' ? '' : ` ${decimal.format(Math.abs(pct))}%`;
+  const star = watched ? ' In watchlist.' : '';
+  return `${name}, ${symbol}. ${formatPrice(quote.price)}. ${DIRECTION_SENTENCE[dir]}${move} today.${star}`;
+}
