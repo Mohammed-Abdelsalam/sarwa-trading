@@ -8,34 +8,44 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { type LiveStatus } from '@sarwa/core';
+import { LIVE_STATUS_LABELS, type LiveStatus } from '@sarwa/core';
+import { type ColorRole } from '@sarwa/tokens';
 
-import { useColors } from '../../lib/theme';
+import { cx, useColors } from '../../lib/theme';
 import { Text } from '../ui/text';
 
-const LIVE_LABEL: Record<LiveStatus, string> = {
-  live: 'Live',
-  reconnecting: 'Reconnecting…',
-  offline: 'Offline',
-  paused: 'Market paused',
+const DOT_COLOR: Record<LiveStatus, ColorRole> = {
+  connecting: 'warn',
+  live: 'pos',
+  reconnecting: 'warn',
+  offline: 'fg-3',
+  paused: 'info',
 };
 
-export function ConnectionBadge({ status }: { status: LiveStatus }) {
+const PULSE_MS: Partial<Record<LiveStatus, number>> = {
+  live: 1000,
+  reconnecting: 500,
+  connecting: 500,
+};
+
+// The dot's shape differs per state (pulse, blink, ring, pause bar) so status reads without colour.
+export function ConnectionBadge({
+  status,
+  label = LIVE_STATUS_LABELS[status],
+}: {
+  status: LiveStatus;
+  label?: string;
+}) {
   const colors = useColors();
   const reducedMotion = useReducedMotion();
   const opacity = useSharedValue(1);
-  const color = {
-    live: colors.pos,
-    reconnecting: colors.warn,
-    offline: colors['fg-3'],
-    paused: colors.info,
-  }[status];
+  const color = colors[DOT_COLOR[status]];
 
   useEffect(() => {
-    const animate = !reducedMotion && (status === 'live' || status === 'reconnecting');
+    const duration = PULSE_MS[status];
     opacity.set(
-      animate
-        ? withRepeat(withTiming(0.3, { duration: status === 'live' ? 1000 : 500 }), -1, true)
+      !reducedMotion && duration
+        ? withRepeat(withTiming(0.3, { duration }), -1, true)
         : withTiming(1, { duration: 0 }),
     );
   }, [status, reducedMotion, opacity]);
@@ -45,20 +55,20 @@ export function ConnectionBadge({ status }: { status: LiveStatus }) {
   return (
     <View
       accessibilityRole="text"
-      accessibilityLabel={LIVE_LABEL[status]}
-      className="h-7 flex-row items-center gap-[7px] rounded-full border border-border bg-surface pl-[9px] pr-2.5"
+      accessibilityLabel={label}
+      className="h-7 flex-row items-center gap-conn-gap rounded-full border border-border bg-surface pl-conn-start pr-2.5"
     >
       <Animated.View
+        className={cx('h-2 w-2', status === 'paused' ? 'rounded-xs' : 'rounded-full')}
         style={[
-          { width: 8, height: 8, borderRadius: status === 'paused' ? 1 : 4 },
           status === 'offline'
             ? { borderWidth: 2, borderColor: color }
             : { backgroundColor: color },
           dotStyle,
         ]}
       />
-      <Text variant="caption" style={{ fontFamily: 'Inter_600SemiBold' }}>
-        {LIVE_LABEL[status]}
+      <Text variant="caption" weight={600}>
+        {label}
       </Text>
     </View>
   );

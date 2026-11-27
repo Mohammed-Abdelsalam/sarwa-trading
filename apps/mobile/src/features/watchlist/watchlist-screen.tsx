@@ -11,7 +11,7 @@ import { formatPct } from '@sarwa/core';
 
 import { AppBanners } from '../../components/layout/app-banners';
 import { ScreenHeader } from '../../components/layout/screen-header';
-import { ChangeText } from '../../components/trading/change';
+import { ChangePill } from '../../components/trading/change-pill';
 import { StockListSkeleton, StockRow } from '../../components/trading/stock-row';
 import { Button } from '../../components/ui/button';
 import { StateView } from '../../components/ui/state-view';
@@ -22,11 +22,14 @@ import { useWatchlistScreen } from './use-watchlist-screen';
 
 function SwipeToRemoveRow({
   stock,
+  stale,
   onRemove,
 }: {
   stock: StockWithQuote;
+  stale: boolean;
   onRemove: (symbol: string) => void;
 }) {
+  const colors = useColors();
   return (
     <ReanimatedSwipeable
       friction={2}
@@ -44,15 +47,15 @@ function SwipeToRemoveRow({
           }}
           className="w-24 items-center justify-center gap-1 bg-danger"
         >
-          <Trash2 size={20} color="#FFFFFF" />
-          <Text variant="caption" className="text-white">
+          <Trash2 size={20} color={colors['on-brand']} />
+          <Text variant="caption" weight={600} className="text-on-brand">
             Remove
           </Text>
         </Pressable>
       )}
     >
       <View className="border-b border-border bg-bg">
-        <StockRow stock={stock} />
+        <StockRow stock={stock} stale={stale} />
       </View>
     </ReanimatedSwipeable>
   );
@@ -69,7 +72,7 @@ function WatchlistSummary({ count, average }: { count: number; average: number |
           <Text variant="sm" className="text-fg-2">
             ·
           </Text>
-          <ChangeText value={average} label={formatPct(average)} />
+          <ChangePill value={average} label={formatPct(average)} variant="inline" />
           <Text variant="sm" className="text-fg-2">
             avg today
           </Text>
@@ -81,7 +84,7 @@ function WatchlistSummary({ count, average }: { count: number; average: number |
 
 export function WatchlistScreen() {
   const colors = useColors();
-  const { rows, average, isLoading, isError, retry, remove } = useWatchlistScreen();
+  const { rows, average, stale, isLoading, isError, retry, remove } = useWatchlistScreen();
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
@@ -96,7 +99,11 @@ export function WatchlistScreen() {
           tone="neg"
           title="Couldn't load your watchlist"
           description="We couldn't reach the price server. Check your connection and try again."
-          action={<Button label="Retry" variant="secondary" onPress={retry} />}
+          action={
+            <Button variant="secondary" onPress={retry}>
+              Retry
+            </Button>
+          }
         />
       ) : rows.length === 0 ? (
         <EmptyWatchlist
@@ -109,7 +116,7 @@ export function WatchlistScreen() {
           <WatchlistSummary count={rows.length} average={average} />
           <View className="border-t border-border">
             {rows.map((stock) => (
-              <SwipeToRemoveRow key={stock.symbol} stock={stock} onRemove={remove} />
+              <SwipeToRemoveRow key={stock.symbol} stock={stock} stale={stale} onRemove={remove} />
             ))}
           </View>
           <View className="flex-row items-center gap-2 px-5 py-4">

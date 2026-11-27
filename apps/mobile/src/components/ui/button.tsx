@@ -1,41 +1,49 @@
 import { type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, type PressableProps } from 'react-native';
 
+import { type ButtonSize, type ButtonVariant } from '@sarwa/tokens';
+
 import { cx } from '../../lib/theme';
 import { Text } from './text';
 
-const BUTTON_VARIANTS = {
+const VARIANT: Record<ButtonVariant, [container: string, label: string]> = {
   primary: ['bg-brand active:bg-brand-press', 'text-on-brand'],
   secondary: ['border border-border bg-surface-3 active:bg-border-strong', 'text-fg'],
   ghost: ['bg-transparent active:bg-surface-3', 'text-fg'],
-} as const;
+  danger: ['bg-danger active:bg-danger-press', 'text-on-brand'],
+};
+
+// Every size keeps the 44 pt touch target; sm only tightens radius and padding.
+const SIZE: Record<ButtonSize, string> = {
+  sm: 'h-11 rounded-control-sm px-3',
+  md: 'h-11 rounded-md px-4',
+  lg: 'h-12 rounded-control-lg px-5',
+};
 
 export function Button({
-  label,
+  children,
   variant = 'primary',
   size = 'md',
   loading = false,
   icon,
   className,
   ...props
-}: PressableProps & {
-  label: string;
-  variant?: keyof typeof BUTTON_VARIANTS;
-  size?: 'sm' | 'md' | 'lg';
+}: Omit<PressableProps, 'children'> & {
+  children: string;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
   icon?: ReactNode;
   className?: string;
 }) {
-  const [container, text] = BUTTON_VARIANTS[variant];
+  const [container, label] = VARIANT[variant];
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ busy: loading, disabled: props.disabled ?? false }}
       className={cx(
         'flex-row items-center justify-center gap-2',
-        size === 'sm' && 'h-11 rounded-[8px] px-3',
-        size === 'md' && 'h-11 rounded-md px-4',
-        size === 'lg' && 'h-12 rounded-[12px] px-5',
+        SIZE[size],
         container,
         props.disabled && 'opacity-40',
         className,
@@ -43,12 +51,8 @@ export function Button({
       {...props}
     >
       {loading ? <ActivityIndicator size="small" /> : icon}
-      <Text
-        variant="sm"
-        className={text}
-        style={{ fontFamily: 'Inter_600SemiBold', fontSize: size === 'lg' ? 15 : 14 }}
-      >
-        {label}
+      <Text variant={size === 'lg' ? 'button-lg' : 'button'} className={label}>
+        {children}
       </Text>
     </Pressable>
   );

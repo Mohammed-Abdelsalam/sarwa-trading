@@ -42,7 +42,7 @@ describe('StockDetailScreen', () => {
     mockedHook.mockReturnValue(viewModel({ stock: undefined, quote: undefined, notFound: true }));
     await render(<StockDetailScreen symbol="ZZZZ" />);
 
-    expect(screen.getByText('Stock not found')).toBeOnTheScreen();
+    expect(screen.getByText('This stock is no longer available')).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'Back to Markets' }));
     expect(router.navigate).toHaveBeenCalledWith('/');

@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Text } from '../../components/ui/text';
 import { useColors, useThemeName } from '../../lib/theme';
 
+// Illustration geometry copied from the canvas (M-Watchlist); the one place fixed pixel offsets are allowed.
 function EmptyWatchlistArt() {
   const colors = useColors();
   const shadow = { boxShadow: shadows[useThemeName()].e2 };
@@ -26,8 +27,8 @@ function EmptyWatchlistArt() {
         className="absolute left-3.5 top-[18px] h-24 w-[140px] gap-2.5 rounded-[18px] border border-border bg-surface p-4"
       >
         <View className="flex-row items-center gap-2">
-          <View className="h-6 w-6 rounded-[8px] bg-brand-subtle" />
-          <View className="h-2 w-14 rounded-[4px] bg-border-strong" />
+          <View className="h-6 w-6 rounded-control-sm bg-brand-subtle" />
+          <View className="h-2 w-14 rounded-xs bg-border-strong" />
         </View>
         <Svg width={108} height={34} viewBox="0 0 108 34">
           <Path
@@ -44,7 +45,7 @@ function EmptyWatchlistArt() {
         style={shadow}
         className="absolute right-0 top-0 h-[52px] w-[52px] items-center justify-center rounded-full bg-brand"
       >
-        <Star size={24} color="#FFFFFF" fill="#FFFFFF" />
+        <Star size={24} color={colors['on-brand']} fill={colors['on-brand']} />
       </View>
     </View>
   );
@@ -52,7 +53,7 @@ function EmptyWatchlistArt() {
 
 export function EmptyWatchlist({ onBrowse }: { onBrowse: () => void }) {
   return (
-    <View className="flex-1 items-center justify-center gap-4 px-10 pb-[60px]">
+    <View className="flex-1 items-center justify-center gap-4 px-10 pb-16">
       <EmptyWatchlistArt />
       <Text variant="h2" className="text-center">
         Your watchlist is empty
@@ -60,7 +61,9 @@ export function EmptyWatchlist({ onBrowse }: { onBrowse: () => void }) {
       <Text className="text-center text-fg-2">
         Tap the star on any stock to follow its live price here.
       </Text>
-      <Button label="Browse markets" size="lg" className="mt-2 min-w-[220px]" onPress={onBrowse} />
+      <Button size="lg" className="mt-2 min-w-state-action" onPress={onBrowse}>
+        Browse markets
+      </Button>
     </View>
   );
 }

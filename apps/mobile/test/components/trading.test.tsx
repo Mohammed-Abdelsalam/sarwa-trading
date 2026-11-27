@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 
-import { ChangePill } from '../../src/components/trading/change';
+import { ChangePill } from '../../src/components/trading/change-pill';
 import { ConnectionBadge } from '../../src/components/trading/connection-badge';
 import { PeriodTabs } from '../../src/components/trading/period-tabs';
 import { StarButton } from '../../src/components/trading/star-button';

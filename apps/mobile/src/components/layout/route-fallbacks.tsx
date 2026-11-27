@@ -19,7 +19,7 @@ export function ErrorFallback({ retry }: ErrorBoundaryProps) {
         tone="neg"
         title="Something went wrong"
         description="The app hit an unexpected error. Your watchlist is safe."
-        action={<Button label="Try again" onPress={() => void retry()} />}
+        action={<Button onPress={() => void retry()}>Try again</Button>}
       />
     </View>
   );
@@ -32,7 +32,11 @@ export function NotFoundScreen() {
         icon={SearchX}
         title="Page not found"
         description="This link doesn't lead anywhere in Mini Trading."
-        action={<Button label="Back to Markets" variant="secondary" onPress={backToMarkets} />}
+        action={
+          <Button variant="secondary" onPress={backToMarkets}>
+            Back to Markets
+          </Button>
+        }
       />
     </View>
   );

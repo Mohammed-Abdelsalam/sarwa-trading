@@ -10,19 +10,31 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { formatPrice } from '@sarwa/core';
-import { motion } from '@sarwa/tokens';
+import { motion, type PriceSize } from '@sarwa/tokens';
 
 import { useColors } from '../../lib/theme';
-import { Text } from '../ui/text';
+import { Text, type TextVariant } from '../ui/text';
 
 const FLASH_EASING = Easing.bezier(...motion.easing.standard);
 
+const VARIANT: Record<PriceSize, TextVariant> = {
+  display: 'display',
+  'display-web': 'display-web',
+  lg: 'num-lg',
+  md: 'num-md',
+  sm: 'num-sm',
+};
+
 export const PriceFlash = memo(function PriceFlash({
   price,
-  variant = 'num-md',
+  size = 'md',
+  format = formatPrice,
+  muted = false,
 }: {
   price: number;
-  variant?: 'display' | 'num-lg' | 'num-md';
+  size?: PriceSize;
+  format?: (price: number) => string;
+  muted?: boolean;
 }) {
   const colors = useColors();
   const reducedMotion = useReducedMotion();
@@ -47,7 +59,7 @@ export const PriceFlash = memo(function PriceFlash({
     const flash = up.get() === 1 ? colors['flash-up'] : colors['flash-down'];
     if (reducedMotion) {
       return {
-        borderBottomWidth: 2,
+        borderBottomWidth: motion.reduced.flashUnderlinePx,
         borderBottomColor:
           progress.get() > 0.01 ? (up.get() === 1 ? colors.pos : colors.neg) : 'transparent',
       };
@@ -56,10 +68,10 @@ export const PriceFlash = memo(function PriceFlash({
   });
 
   return (
-    <Animated.View
-      style={[{ borderRadius: 6, paddingHorizontal: 6, marginHorizontal: -6 }, flashStyle]}
-    >
-      <Text variant={variant}>{formatPrice(price)}</Text>
+    <Animated.View className="-mx-1.5 rounded-sm px-1.5" style={flashStyle}>
+      <Text variant={VARIANT[size]} className={muted ? 'text-fg-2' : undefined}>
+        {format(price)}
+      </Text>
     </Animated.View>
   );
 });

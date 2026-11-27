@@ -9,16 +9,18 @@ import { Text } from '../ui/text';
 export function PeriodTabs({
   value,
   onChange,
-  enabled,
+  enabled = PERIODS,
+  size = 'lg',
 }: {
   value: Period;
   onChange: (period: Period) => void;
-  enabled: readonly Period[];
+  enabled?: readonly Period[];
+  size?: 'md' | 'lg';
 }) {
   return (
     <View
       accessibilityRole="tablist"
-      className="flex-row gap-0.5 rounded-[11px] bg-surface-3 p-[3px]"
+      className="flex-row gap-0.5 rounded-seg bg-surface-3 p-seg-pad"
     >
       {PERIODS.map((period) => {
         const selected = period === value;
@@ -34,16 +36,13 @@ export function PeriodTabs({
               onChange(period);
             }}
             className={cx(
-              'h-[38px] flex-1 items-center justify-center rounded-[8px]',
+              'flex-1 items-center justify-center rounded-control-sm',
+              size === 'lg' ? 'h-seg-lg' : 'h-8',
               selected && 'bg-surface dark:bg-border-strong',
               disabled && 'opacity-40',
             )}
           >
-            <Text
-              variant="sm"
-              className={selected ? 'text-fg' : 'text-fg-2'}
-              style={{ fontFamily: 'Inter_600SemiBold' }}
-            >
+            <Text variant="sm" weight={600} className={selected ? 'text-fg' : 'text-fg-2'}>
               {period}
             </Text>
           </Pressable>

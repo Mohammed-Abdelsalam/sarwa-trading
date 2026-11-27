@@ -1,5 +1,5 @@
 import { vars } from 'nativewind';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, useWindowDimensions } from 'react-native';
 
 import { type ThemeColors, type ThemeName, themes, themeVariables } from '@sarwa/tokens';
 
@@ -18,6 +18,13 @@ export function useThemeVars() {
 
 export function useColors(): ThemeColors {
   return themes[useThemeName()];
+}
+
+// iOS accessibility sizes start around 1.6× (AX1); the canvas switches rows to two lines from there.
+const LARGE_TEXT_SCALE = 1.6;
+
+export function useLargeText(): boolean {
+  return useWindowDimensions().fontScale >= LARGE_TEXT_SCALE;
 }
 
 export function cx(...classes: (string | false | null | undefined)[]): string {

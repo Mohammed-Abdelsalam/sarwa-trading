@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { type Candle, type Period } from '@sarwa/contracts';
+import { type Period } from '@sarwa/contracts';
 import {
   resolvePeriod,
   useEnabledPeriods,
@@ -10,6 +10,8 @@ import {
   useToggleWatchlist,
 } from '@sarwa/core';
 
+import { type ScrubPoint } from './use-price-chart';
+
 export function useStockDetailScreen(symbol: string) {
   const { stock, quote, stats, notFound, isError, retry } = useStockDetail(symbol);
   const watched = useIsWatched(symbol);
@@ -17,7 +19,7 @@ export function useStockDetailScreen(symbol: string) {
   const status = useLiveStatus();
   const enabledPeriods = useEnabledPeriods();
   const [period, setPeriod] = useState<Period>('1D');
-  const [scrubbed, setScrubbed] = useState<Candle | null>(null);
+  const [scrubbed, setScrubbed] = useState<ScrubPoint | null>(null);
 
   return {
     stock,

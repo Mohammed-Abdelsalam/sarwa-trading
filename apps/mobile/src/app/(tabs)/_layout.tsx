@@ -1,7 +1,15 @@
 import { Tabs } from 'expo-router';
 import { ChartLine, Star } from 'lucide-react-native';
 
+import { componentTypography } from '@sarwa/tokens';
+
+import { fontFile } from '../../components/ui/text';
 import { useColors } from '../../lib/theme';
+
+const TAB_LABEL = {
+  fontFamily: fontFile('sans', componentTypography.tab.weight),
+  fontSize: componentTypography.tab.size,
+};
 
 export default function TabsLayout() {
   const colors = useColors();
@@ -12,7 +20,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors['brand-fg'],
         tabBarInactiveTintColor: colors['fg-3'],
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-        tabBarLabelStyle: { fontFamily: 'Inter_600SemiBold', fontSize: 11 },
+        tabBarLabelStyle: TAB_LABEL,
       }}
     >
       <Tabs.Screen

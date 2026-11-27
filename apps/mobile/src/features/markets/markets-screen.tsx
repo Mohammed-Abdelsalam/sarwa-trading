@@ -1,5 +1,5 @@
 import { FlashList, type ViewToken } from '@shopify/flash-list';
-import { AlertTriangle, Search } from 'lucide-react-native';
+import { RefreshCw, Search, WifiOff } from 'lucide-react-native';
 import { RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,7 +18,8 @@ const VIEWABILITY = { itemVisiblePercentThreshold: 10 };
 
 export function MarketsScreen() {
   const colors = useColors();
-  const { rows, watched, isLoading, isError, isRefreshing, filters, actions } = useMarketsScreen();
+  const { rows, watched, stale, isLoading, isError, isRefreshing, filters, actions } =
+    useMarketsScreen();
 
   const onViewableItemsChanged = ({
     viewableItems,
@@ -32,7 +33,11 @@ export function MarketsScreen() {
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
       <ScreenHeader title="Markets" />
       <AppBanners />
-      <SearchField value={filters.query} onChange={actions.setQuery} />
+      <SearchField
+        value={filters.query}
+        onChange={actions.setQuery}
+        disabled={filters.searchDisabled}
+      />
       <SectorChips value={filters.sector} onChange={actions.setSector} />
       <ListMeta count={rows.length} sort={filters.sort} onCycleSort={actions.cycleSort} />
 
@@ -40,11 +45,19 @@ export function MarketsScreen() {
         <StockListSkeleton rows={8} />
       ) : isError ? (
         <StateView
-          icon={AlertTriangle}
+          icon={WifiOff}
           tone="neg"
           title="Couldn't load markets"
           description="We couldn't reach the price server. Check your connection — we'll keep trying in the background."
-          action={<Button label="Retry" variant="secondary" onPress={actions.refresh} />}
+          action={
+            <Button
+              size="lg"
+              icon={<RefreshCw size={16} color={colors['on-brand']} />}
+              onPress={actions.refresh}
+            >
+              Retry
+            </Button>
+          }
         />
       ) : (
         <FlashList
@@ -56,6 +69,7 @@ export function MarketsScreen() {
               stock={item}
               watched={watched.has(item.symbol)}
               onToggleWatch={actions.toggleWatch}
+              stale={stale}
             />
           )}
           onViewableItemsChanged={onViewableItemsChanged}
@@ -65,16 +79,20 @@ export function MarketsScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={actions.refresh}
-              tintColor={colors['fg-3']}
+              tintColor={colors['brand-fg']}
+              title="Updating prices…"
+              titleColor={colors['fg-3']}
             />
           }
           ListEmptyComponent={
             <StateView
               icon={Search}
               title={`No matches for “${filters.searchedQuery}”`}
-              description="Try a ticker like AAPL or a company name like “Netflix”."
+              description={`Try a ticker like AAPL or a company name like “Netflix”. Sector filter: ${filters.sectorLabel}.`}
               action={
-                <Button label="Clear search" variant="secondary" onPress={actions.clearFilters} />
+                <Button variant="secondary" onPress={actions.clearFilters}>
+                  Clear search
+                </Button>
               }
             />
           }
