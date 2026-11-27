@@ -46,27 +46,28 @@ function setup({
 
 describe('StocksPage', () => {
   it('validates the add-stock form inline and summarises the errors', async () => {
+    const user = userEvent.setup({ delay: null });
     const { create } = setup();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add stock' }));
+    await user.click(screen.getByRole('button', { name: 'Add stock' }));
     const dialog = screen.getByRole('dialog', { name: 'Add stock' });
-    await userEvent.type(within(dialog).getByLabelText('Symbol'), 'aapl');
-    await userEvent.type(within(dialog).getByLabelText('Base price'), '-12');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Add stock' }));
+    await user.type(within(dialog).getByLabelText('Symbol'), 'aapl');
+    await user.type(within(dialog).getByLabelText('Base price'), '-12');
+    await user.click(within(dialog).getByRole('button', { name: 'Add stock' }));
 
     expect(within(dialog).getByText('Fix 5 fields to continue.')).toBeInTheDocument();
     expect(within(dialog).getByText('This symbol already exists')).toBeInTheDocument();
     expect(within(dialog).getByText('Must be > 0')).toBeInTheDocument();
     expect(create.mutate).not.toHaveBeenCalled();
 
-    await userEvent.clear(within(dialog).getByLabelText('Symbol'));
-    await userEvent.type(within(dialog).getByLabelText('Symbol'), 'nvda');
-    await userEvent.type(within(dialog).getByLabelText('Company name'), 'NVIDIA Corp.');
-    await userEvent.selectOptions(within(dialog).getByLabelText('Sector'), 'tech');
-    await userEvent.selectOptions(within(dialog).getByLabelText('Exchange'), 'NASDAQ');
-    await userEvent.clear(within(dialog).getByLabelText('Base price'));
-    await userEvent.type(within(dialog).getByLabelText('Base price'), '142.5');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Add stock' }));
+    await user.clear(within(dialog).getByLabelText('Symbol'));
+    await user.type(within(dialog).getByLabelText('Symbol'), 'nvda');
+    await user.type(within(dialog).getByLabelText('Company name'), 'NVIDIA Corp.');
+    await user.selectOptions(within(dialog).getByLabelText('Sector'), 'tech');
+    await user.selectOptions(within(dialog).getByLabelText('Exchange'), 'NASDAQ');
+    await user.clear(within(dialog).getByLabelText('Base price'));
+    await user.type(within(dialog).getByLabelText('Base price'), '142.5');
+    await user.click(within(dialog).getByRole('button', { name: 'Add stock' }));
 
     expect(create.mutate).toHaveBeenCalledWith(
       expect.objectContaining({ symbol: 'NVDA', basePrice: 142.5, volatility: 1, isEnabled: true }),
