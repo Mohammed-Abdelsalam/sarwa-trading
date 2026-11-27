@@ -1,3 +1,5 @@
+import { micros } from '@sarwa/domain';
+
 import { createFormatter, DEFAULT_DIGITS, getMessages, isRtl, LOCALES, plural } from '../src';
 
 describe('locales', () => {
@@ -24,7 +26,7 @@ describe('locales', () => {
     const f = createFormatter({ locale: 'ar', digits: 'latn' });
 
     expect(f.digits).toBe('latn');
-    expect(f.shares(42_000_000)).toBe('42');
+    expect(f.shares(micros(42_000_000))).toBe('42');
   });
 });
 
