@@ -1,11 +1,68 @@
 import {
+  type AuthSessionResponse,
+  type CustomerUser,
   type Order,
   type PortfolioResponse,
   type Quote,
   type StockWithQuote,
   type TradingStatus,
 } from '@sarwa/contracts';
-import { type ApiClient, createLiveStore, createRemovalQueue, type SarwaClient } from '@sarwa/core';
+import {
+  ApiError,
+  type ApiClient,
+  type ClientAuth,
+  createGateStore,
+  createIntentStorage,
+  createLiveStore,
+  createRemovalQueue,
+  createSessionStore,
+  type KeyValueStorage,
+  type SarwaClient,
+  type SessionStatus,
+  webCookieAuth,
+} from '@sarwa/core';
+
+export function memoryStorage(): KeyValueStorage {
+  const values = new Map<string, string>();
+  return {
+    getItem: (key) => Promise.resolve(values.get(key) ?? null),
+    setItem: (key, value) => {
+      values.set(key, value);
+      return Promise.resolve();
+    },
+  };
+}
+
+export function makeUser(overrides: Partial<CustomerUser> = {}): CustomerUser {
+  return {
+    id: 'u1',
+    email: 'sara.h@example.com',
+    name: 'Sara Hassan',
+    emailVerified: true,
+    createdAt: Date.UTC(2026, 9, 2, 12),
+    passwordChangedAt: null,
+    account: { id: 'a1', handle: 'ACC-7F2E9A' },
+    ...overrides,
+  };
+}
+
+// Customer accounts wired as on the web: a guest unless a user is given.
+export function testAuth({
+  status,
+  user = null,
+}: { status?: SessionStatus; user?: CustomerUser | null } = {}): ClientAuth {
+  return {
+    transport: webCookieAuth({ readCookie: () => null }),
+    session: createSessionStore({
+      status: status ?? (user ? 'authenticated' : 'guest'),
+      user,
+      suspension: null,
+      revokedReason: null,
+    }),
+    gate: createGateStore(),
+    intents: createIntentStorage(memoryStorage()),
+  };
+}
 
 export function makeQuote(overrides: Partial<Quote> = {}): Quote {
   return {
@@ -40,9 +97,9 @@ export function makeStock(symbol: string, overrides: Partial<StockWithQuote> = {
   };
 }
 
-export function createTestClient(api: Partial<ApiClient>): SarwaClient {
-  const values = new Map<string, string>();
+export function createTestClient(api: Partial<ApiClient>, auth?: ClientAuth): SarwaClient {
   return {
+    auth,
     api: api as ApiClient,
     store: createLiveStore(),
     market: {
@@ -52,13 +109,7 @@ export function createTestClient(api: Partial<ApiClient>): SarwaClient {
       subscribedSymbols: () => [],
       onTradingEvent: () => () => undefined,
     },
-    storage: {
-      getItem: (key) => Promise.resolve(values.get(key) ?? null),
-      setItem: (key, value) => {
-        values.set(key, value);
-        return Promise.resolve();
-      },
-    },
+    storage: memoryStorage(),
     removals: createRemovalQueue(),
     analytics: { track: jest.fn() },
     newId: () => 'test-idempotency-key',
@@ -150,4 +201,14 @@ export function makePortfolio(overrides: Partial<PortfolioResponse> = {}): Portf
     asOf: 0,
     ...overrides,
   };
+}
+
+// A problem+json error as the API client raises it; extra fields ride in the body.
+export function apiProblem(status: number, code: string, extra: object = {}): ApiError {
+  const problem = { type: 'about:blank', title: code, status, code, ...extra };
+  return new ApiError(problem as ConstructorParameters<typeof ApiError>[0], problem);
+}
+
+export function sessionResponse(overrides: Partial<AuthSessionResponse> = {}): AuthSessionResponse {
+  return { user: makeUser(), accessExpiresAt: 1, ...overrides };
 }

@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 
+import { PersonalPage } from '../../../features/gating/personal-page';
 import { OrdersPage } from '../../../features/orders/orders-page';
 import { personalMetadata } from '../../../lib/seo';
 
@@ -10,7 +11,9 @@ export default async function Page({ params }: PageProps<'/orders/[id]'>) {
   const { id } = await params;
   return (
     <Suspense>
-      <OrdersPage routeOrderId={decodeURIComponent(id)} />
+      <PersonalPage kind="orders">
+        <OrdersPage routeOrderId={decodeURIComponent(id)} />
+      </PersonalPage>
     </Suspense>
   );
 }

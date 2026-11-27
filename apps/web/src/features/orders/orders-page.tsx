@@ -131,8 +131,8 @@ export function OrdersPage({ routeOrderId }: { routeOrderId?: string }) {
             description={page.symbol || page.filter !== 'all' ? labels.emptyFiltered : undefined}
           />
         ) : (
-          <div className="relative overflow-x-auto">
-            <Table>
+          <>
+            <Table label={labels.title}>
               <THead>
                 <tr>
                   <TH className="ps-4">{labels.columns.order}</TH>
@@ -212,7 +212,7 @@ export function OrdersPage({ routeOrderId }: { routeOrderId?: string }) {
                 </Button>
               </div>
             ) : null}
-          </div>
+          </>
         )}
       </Card>
 

@@ -3,7 +3,7 @@ import { personalMetadata } from '../../lib/seo';
 
 export const generateMetadata = () => personalMetadata('watchlist');
 
-// The watchlist belongs to this browser's device id, so it is fetched on the client.
+// Guests star too, on a device account the browser identifies, so the list loads after hydration.
 export default function Page() {
   return <WatchlistPage />;
 }

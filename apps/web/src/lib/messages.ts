@@ -16,6 +16,7 @@ const en = {
   },
   list: { loadMore: 'Load more' },
   loading: 'Loading…',
+  gate: { modeA11y: 'Create an account or sign in' },
   palette: {
     label: 'Command palette',
     placeholder: 'Search stocks, actions or pages…',
@@ -116,6 +117,7 @@ const ar: AppMessages = {
   },
   list: { loadMore: 'تحميل المزيد' },
   loading: 'جارٍ التحميل…',
+  gate: { modeA11y: 'أنشئ حسابًا أو سجّل الدخول' },
   palette: {
     label: 'لوحة الأوامر',
     placeholder: 'ابحث عن سهم أو أمر أو صفحة…',

@@ -2,17 +2,34 @@ import { useId } from 'react';
 
 import { Button, Dialog, Field, Input, SegmentedControl, Select, StockAvatar } from '@sarwa/ui';
 
-import { type AlertCondition, type AlertRepeat, useAlertDialog } from './use-alert-dialog';
+import {
+  type AlertCondition,
+  type AlertRepeat,
+  type ResumedAlert,
+  useAlertDialog,
+  useResumedAlert,
+} from './use-alert-dialog';
 
 const CONDITIONS: readonly AlertCondition[] = ['price_above', 'price_below', 'move_today'];
-export function AlertDialog({
-  initialSymbol,
-  onClose,
-}: {
+interface AlertDialogProps {
   initialSymbol: string | null;
   onClose: () => void;
-}) {
-  const dialog = useAlertDialog({ initialSymbol, onClose });
+}
+
+// A resumed alert remounts the form so it opens with what the guest had chosen.
+export function AlertDialog(props: AlertDialogProps) {
+  const resumed = useResumedAlert();
+  return (
+    <AlertForm key={resumed ? JSON.stringify(resumed) : 'fresh'} {...props} resumed={resumed} />
+  );
+}
+
+function AlertForm({
+  initialSymbol,
+  onClose,
+  resumed,
+}: AlertDialogProps & { resumed: ResumedAlert | null }) {
+  const dialog = useAlertDialog({ initialSymbol, onClose, resumed });
   const { labels, actions } = dialog;
   const stockId = useId();
 

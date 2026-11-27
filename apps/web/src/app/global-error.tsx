@@ -7,14 +7,12 @@ import { useSyncExternalStore } from 'react';
 
 import { getMessages, isRtl, type Locale } from '@sarwa/core/server';
 import { Button, StateView } from '@sarwa/ui';
-
-import { readLocalePreferences } from '../lib/locale-cookie';
+import { readCookie, readLocalePreferences } from '@sarwa/ui/locale-cookie';
 
 const noSubscribe = () => () => undefined;
 
 function cookieLocale(): Locale {
-  const cookies = new URLSearchParams(document.cookie.replaceAll('; ', '&'));
-  return readLocalePreferences((name) => cookies.get(name) ?? undefined).locale;
+  return readLocalePreferences((name) => readCookie(name) ?? undefined).locale;
 }
 
 // Replaces the root layout when it fails, so it has no providers: the language comes from the cookie.

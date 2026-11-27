@@ -2,8 +2,9 @@ import { type Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
-import { marketPill, useLiveStatus, useTradingStatus } from '@sarwa/core';
+import { marketPill, useLiveStatus, useSession, useTradingStatus } from '@sarwa/core';
 
+import { useOpenGate } from '../../features/gating/auth-ui';
 import { isTyping, useModKey, useWindowKeyDown } from '../../lib/browser';
 import { useCopy } from '../../lib/i18n';
 import { useTheme } from '../../lib/theme';
@@ -37,6 +38,8 @@ export function useTopNav() {
   const mod = useModKey();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const pendingGo = useRef(0);
+  const { status } = useSession();
+  const openGate = useOpenGate();
 
   useWindowKeyDown((event) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -77,6 +80,16 @@ export function useTopNav() {
   return {
     links,
     live,
+    // Nothing account-shaped renders until the session is known, so neither set flashes.
+    account: status === 'authenticated' ? 'member' : status === 'loading' ? null : 'guest',
+    guest: {
+      onCreate: () => {
+        openGate({ kind: 'notifications' });
+      },
+      onSignIn: () => {
+        openGate({ kind: 'notifications' }, 'signIn');
+      },
+    },
     pill: marketPill(live, session, copy),
     palette: { open: paletteOpen, setOpen: setPaletteOpen, shortcut: `${mod} K` },
     labels: {

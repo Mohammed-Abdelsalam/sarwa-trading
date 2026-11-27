@@ -3,8 +3,8 @@ import { cookies } from 'next/headers';
 
 import { type Stock } from '@sarwa/contracts';
 import { getMessages } from '@sarwa/core/server';
+import { readLocalePreferences } from '@sarwa/ui/locale-cookie';
 
-import { readLocalePreferences } from './locale-cookie';
 import { appMessages } from './messages';
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';

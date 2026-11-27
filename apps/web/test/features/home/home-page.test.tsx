@@ -27,7 +27,10 @@ const stocks = [
 function model(overrides: Partial<ReturnType<typeof useHomePage>> = {}) {
   const tiles = heatmapTiles(stocks, (bps) => `${String(bps / 100)}%`);
   return {
+    mode: 'member' as const,
     isLoading: false,
+    guest: null,
+    checklist: null,
     banner: {
       title: 'Markets close early today',
       body: 'at 1:00 PM ET — open Day orders expire then.',

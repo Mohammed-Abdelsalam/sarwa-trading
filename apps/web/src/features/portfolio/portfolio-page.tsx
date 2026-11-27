@@ -158,6 +158,7 @@ export function PortfolioPage() {
           />
         ) : (
           <PositionsTable
+            label={labels.positions}
             rows={page.rows}
             columns={labels.columns}
             buyLabel={labels.buy}
