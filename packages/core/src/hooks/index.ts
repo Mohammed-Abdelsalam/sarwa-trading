@@ -9,6 +9,7 @@ export * from './order-ticket';
 export * from './orders';
 export * from './portfolio';
 export * from './preferences';
+export * from './time';
 export * from './trading-events';
 export * from './trading-status';
 export * from './watchlist';

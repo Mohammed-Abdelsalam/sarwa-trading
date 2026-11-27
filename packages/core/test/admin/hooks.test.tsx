@@ -1,7 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
+import { ErrorCode } from '@sarwa/contracts';
+
 import {
-  isConflict,
   useAdminStocks,
   useAdminUsers,
   useAuditLog,
@@ -19,6 +20,7 @@ import {
   useServerVersion,
   useUpdateConfig,
 } from '../../src/admin/market';
+import { isApiError } from '../../src/api';
 import { createTestClient, makeProblem, makeStock } from '../utils';
 import { createAdminWrapper, makeAdminStock, makeAdminUser, makeConfig } from './fixtures';
 
@@ -166,8 +168,8 @@ describe('catalog hooks', () => {
     const error = await result.current.remove.mutateAsync('AAPL').catch((e: unknown) => e);
 
     expect(createStock).toHaveBeenCalled();
-    expect(isConflict(error)).toBe(true);
-    expect(isConflict(new Error('x'))).toBe(false);
+    expect(isApiError(error, ErrorCode.Conflict)).toBe(true);
+    expect(isApiError(new Error('x'), ErrorCode.Conflict)).toBe(false);
   });
 
   it('skips the users list when not allowed and manages users otherwise', async () => {

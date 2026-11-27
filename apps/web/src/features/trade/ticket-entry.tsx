@@ -67,7 +67,7 @@ export function TicketEntry({ panel }: { panel: OrderPanelModel }) {
               inputSize="lg"
               inputMode="decimal"
               autoComplete="off"
-              prefix="$"
+              prefix={entry.currency}
               className="tabular-nums"
               value={entry.price?.value ?? ''}
               onChange={(event) => {
@@ -97,7 +97,7 @@ export function TicketEntry({ panel }: { panel: OrderPanelModel }) {
               inputMode="decimal"
               autoComplete="off"
               className="tabular-nums"
-              {...(entry.sizeMode === 'amount' ? { prefix: '$' } : {})}
+              {...(entry.sizeMode === 'amount' ? { prefix: entry.currency } : {})}
               value={entry.size.value}
               onChange={(event) => {
                 actions.setSize(event.target.value);

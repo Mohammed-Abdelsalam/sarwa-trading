@@ -3,8 +3,8 @@
 import { Check, CircleCheck, Megaphone, TriangleAlert, Wrench, X } from 'lucide-react';
 
 import { BannerToneSchema, PERIODS } from '@sarwa/contracts';
-import { marketTime, useI18n } from '@sarwa/core';
-import { CONFIG_APPLY_SECONDS, marketClock } from '@sarwa/core/admin';
+import { marketTime } from '@sarwa/core';
+import { CONFIG_APPLY_SECONDS, marketClock, useAdminI18n } from '@sarwa/core/admin';
 import {
   Badge,
   Button,
@@ -33,7 +33,7 @@ import { type ConfigPageModel, useConfigPage } from './use-config-page';
 const EARLY_CLOSE_AT = marketTime(marketClock(Date.now()).date, 13 * 60);
 
 function Preview({ page }: { page: ConfigPageModel }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   const copy = t.admin.config;
   const draft = page.draft;
   if (!draft) return null;
@@ -103,7 +103,7 @@ function Preview({ page }: { page: ConfigPageModel }) {
 }
 
 function SaveBar({ page }: { page: ConfigPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.config;
   const clean = page.changes === 0;
   const maintenance = page.draft?.maintenanceMode === true && !clean;
@@ -148,7 +148,7 @@ function SaveBar({ page }: { page: ConfigPageModel }) {
 
 export function ConfigPage() {
   const page = useConfigPage();
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.config;
   const draft = page.draft;
 

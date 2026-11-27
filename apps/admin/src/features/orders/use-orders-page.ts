@@ -1,17 +1,20 @@
-import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 import { type OrderStatus } from '@sarwa/core';
 import {
+  ORDER_STATUSES,
   orderNotionalCents,
   orderStatsBreakdown,
   useAdminOrderStats,
   useOrderStream,
 } from '@sarwa/core/admin';
 
+import { oneOf, setSearchParams } from '../../lib/search-params';
+
 export type StatusFilter = OrderStatus | 'all';
 
 export function useOrdersPage() {
-  const [status, setStatus] = useState<StatusFilter>('all');
+  const status = oneOf<StatusFilter>(useSearchParams().get('status'), ORDER_STATUSES, 'all');
   const stream = useOrderStream({ status: status === 'all' ? undefined : status });
   const stats = useAdminOrderStats();
   const data = stats.data;
@@ -27,7 +30,9 @@ export function useOrdersPage() {
     statsLoading: stats.isPending,
     ...orderStatsBreakdown(data),
     actions: {
-      setStatus,
+      setStatus: (next: StatusFilter) => {
+        setSearchParams({ status: next === 'all' ? null : next });
+      },
       togglePause: stream.togglePause,
       retry: () => {
         stream.retry();

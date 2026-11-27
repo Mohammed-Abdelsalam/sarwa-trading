@@ -1,9 +1,9 @@
-import { type Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { AlertsPage } from '../../features/alerts/alerts-page';
+import { personalMetadata } from '../../lib/seo';
 
-export const metadata: Metadata = { title: 'Alerts' };
+export const generateMetadata = () => personalMetadata('alerts');
 
 export default function Page() {
   return (

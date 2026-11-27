@@ -1,4 +1,4 @@
-import { designSystemSyntax, restrictedImports } from '@sarwa/eslint-config/base';
+import { appImportRules, designSystemSyntax } from '@sarwa/eslint-config/base';
 import { jestConfig } from '@sarwa/eslint-config/jest';
 import reactNative from '@sarwa/eslint-config/react-native';
 
@@ -9,18 +9,11 @@ export default [
   ...reactNative,
   ...jestConfig({ native: true }),
   { ignores: ['jest.setup.js', '.expo/**'] },
-  {
-    name: 'sarwa/mobile/view-only',
-    files: ['src/features/**/*.tsx', 'src/components/**/*.{ts,tsx}'],
-    rules: {
-      'no-restricted-imports': restrictedImports({
-        paths: [
-          { name: '@tanstack/react-query', message: VIEW_ONLY },
-          { name: '@sarwa/core', importNames: ['useSarwa'], message: VIEW_ONLY },
-        ],
-      }),
-    },
-  },
+  ...appImportRules({
+    customer: true,
+    viewOnly: ['src/features/**/*.tsx', 'src/components/**/*.{ts,tsx}'],
+    viewOnlyMessage: VIEW_ONLY,
+  }),
   {
     name: 'sarwa/mobile/design-system',
     files: ['src/**/*.{ts,tsx}'],

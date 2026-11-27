@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { ChevronLeft, Share2 } from 'lucide-react-native';
 import { View } from 'react-native';
 
@@ -8,6 +7,7 @@ import { ConnectionBadge } from '../../components/trading/connection-badge';
 import { StarButton } from '../../components/trading/star-button';
 import { IconButton } from '../../components/ui/icon-button';
 import { useCopy } from '../../lib/i18n';
+import { goBack } from '../../lib/navigation';
 
 export function TopBar({
   symbol,
@@ -31,9 +31,7 @@ export function TopBar({
         iconSize={24}
         size={44}
         flip={dir === 'rtl'}
-        onPress={() => {
-          router.back();
-        }}
+        onPress={goBack}
       />
       <ConnectionBadge status={status} />
       <View className="flex-row items-center">

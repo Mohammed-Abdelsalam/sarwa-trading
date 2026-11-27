@@ -1,5 +1,5 @@
 import { type Role } from '@sarwa/contracts';
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import { Badge, cn } from '@sarwa/ui';
 
 export function UserAvatar({ name, className }: { name: string; className?: string }) {
@@ -17,7 +17,7 @@ export function UserAvatar({ name, className }: { name: string; className?: stri
 }
 
 export function RoleBadge({ role, className }: { role: Role; className?: string }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   return (
     <Badge
       tone={role === 'ADMIN' ? 'brand' : 'outline'}

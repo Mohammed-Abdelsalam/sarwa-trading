@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react-native';
 import { useFonts } from 'expo-font';
-import { SplashScreen } from 'expo-router';
+import { SplashScreen, useSegments } from 'expo-router';
+
+import { useAppConfig } from '@sarwa/core';
 
 import RootLayout from '../../src/app/_layout';
 
@@ -19,6 +21,7 @@ jest.mock('expo-router', () => {
   return {
     SplashScreen: { preventAutoHideAsync: jest.fn(), hideAsync: jest.fn() },
     Stack,
+    useSegments: jest.fn(() => ['(tabs)']),
   };
 });
 jest.mock('../../src/providers/app-providers', () => ({
@@ -26,8 +29,12 @@ jest.mock('../../src/providers/app-providers', () => ({
 }));
 jest.mock('@sarwa/core', () => ({
   ...jest.requireActual<object>('@sarwa/core'),
-  useAppConfig: () => undefined,
+  useAppConfig: jest.fn(() => undefined),
 }));
+jest.mock('../../src/features/maintenance/maintenance-screen', () => {
+  const { Text: MockText } = jest.requireActual<{ Text: typeof Text }>('react-native');
+  return { MaintenanceScreen: () => <MockText>maintenance</MockText> };
+});
 jest.mock('../../src/lib/theme', () => ({ useColors: () => ({ bg: '#fff' }) }));
 
 describe('RootLayout', () => {
@@ -37,5 +44,29 @@ describe('RootLayout', () => {
 
     expect(screen.getByText('app')).toBeOnTheScreen();
     expect(SplashScreen.hideAsync).toHaveBeenCalled();
+  });
+
+  describe('in maintenance', () => {
+    beforeEach(() => {
+      jest.mocked(useFonts).mockReturnValue([true, null]);
+      jest
+        .mocked(useAppConfig)
+        .mockReturnValue({ maintenanceMode: true } as ReturnType<typeof useAppConfig>);
+    });
+
+    it('covers the app without unmounting its navigation', async () => {
+      await render(<RootLayout />);
+
+      expect(screen.getByText('maintenance')).toBeOnTheScreen();
+      expect(screen.getByText('app', { includeHiddenElements: true })).toBeOnTheScreen();
+    });
+
+    it('leaves the sign-in screens reachable', async () => {
+      jest.mocked(useSegments).mockReturnValue(['(auth)'] as never);
+      await render(<RootLayout />);
+
+      expect(screen.queryByText('maintenance')).not.toBeOnTheScreen();
+      expect(screen.getByText('app')).toBeOnTheScreen();
+    });
   });
 });

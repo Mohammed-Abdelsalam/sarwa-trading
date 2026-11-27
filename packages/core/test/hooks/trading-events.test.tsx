@@ -63,6 +63,23 @@ describe('useTradingEvents', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.account });
   });
 
+  it('refetches everything personal when an admin resets the account', () => {
+    const { queryClient, emit } = setup();
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+    emit({ name: 'account.reset', payload: { v: 1 } });
+
+    for (const queryKey of [
+      queryKeys.allOrders,
+      queryKeys.portfolio,
+      queryKeys.account,
+      queryKeys.notifications,
+      queryKeys.alerts,
+    ]) {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey });
+    }
+  });
+
   it('moves a filled order out of the open list and tracks the fill once', () => {
     const { client, queryClient, emit } = setup();
     queryClient.setQueryData(queryKeys.orders({ filter: 'open' }), {

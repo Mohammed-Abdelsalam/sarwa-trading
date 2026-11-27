@@ -4,7 +4,6 @@ import { useState } from 'react';
 
 import { type Order } from '@sarwa/contracts';
 import {
-  absolute,
   applyKeypadKey,
   bps,
   type KeypadKey,
@@ -12,16 +11,20 @@ import {
   micros,
   type QuickAmount,
   type SizeMode,
+  ticketEntryView,
+  ticketResultView,
+  ticketReviewView,
   useHalt,
   useLiveStatus,
   useOrderTicket,
   usePortfolio,
+  useStockIndex,
   useTradingStatus,
 } from '@sarwa/core';
 
 import { usePlainControls } from '../../lib/a11y';
-import { type Copy, localDigits, useCopy } from '../../lib/i18n';
-import { useStockIndex } from '../../lib/sectors';
+import { useCopy } from '../../lib/i18n';
+import { goBack } from '../../lib/navigation';
 import {
   amountDisplay,
   blockLabel,
@@ -30,18 +33,9 @@ import {
   marketClosedGate,
   quickChips,
   quoteLine,
-  type Ticket,
   upfrontBlocks,
 } from './ticket-entry-model';
-import {
-  quoteCountdown,
-  restingNote,
-  resultHeadline,
-  resultRows,
-  reviewHeadline,
-  reviewRows,
-  reviewSubline,
-} from './ticket-review-model';
+import { reviewRows, reviewSubline } from './ticket-review-model';
 
 type Side = Order['side'];
 type Focus = 'size' | 'price';
@@ -49,31 +43,9 @@ type Focus = 'size' | 'price';
 const MONEY_DECIMALS = 2;
 const SHARE_DECIMALS = 6;
 
-function priceField(ticket: Ticket, focus: Focus, symbol: string, copy: Copy) {
-  const { form, fieldErrors } = ticket;
-  if (form.type === 'market') return null;
-  const limit = form.type === 'limit';
-  const error = fieldErrors[limit ? 'limit' : 'stop'];
-  return {
-    label: limit ? copy.t.ticket.limitPrice : copy.t.ticket.stopPrice,
-    value: localDigits(limit ? form.limitText : form.stopText, copy.digits),
-    focused: focus === 'price',
-    error: error ? copy.rejection(error, symbol).explanation : undefined,
-    hint: priceHint(ticket, copy),
-  };
-}
-
-function priceHint({ form, distanceBps, collar }: Ticket, { t, f }: Copy): string | undefined {
-  if (distanceBps === null || distanceBps === 0) return undefined;
-  const pct = f.percent(absolute(distanceBps));
-  const distance = distanceBps < 0 ? t.ticket.belowLast({ pct }) : t.ticket.aboveLast({ pct });
-  if (!collar || form.type !== 'limit') return distance;
-  return `${distance} · ${t.ticket.collar({ min: f.price(collar.minTicks), max: f.price(collar.maxTicks) })}`;
-}
-
 export function useOrderTicketScreen(symbol: string, initialSide: Side) {
   const copy = useCopy();
-  const { t, f, rejection } = copy;
+  const { t, f } = copy;
   const ticket = useOrderTicket({ symbol, initialSide });
   const status = useTradingStatus().data;
   const halt = useHalt(symbol);
@@ -90,7 +62,8 @@ export function useOrderTicketScreen(symbol: string, initialSide: Side) {
   const closedGate = blocks.some((b) => b.code === 'MARKET_CLOSED')
     ? null
     : marketClosedGate(ticket, status, copy);
-  const sizeError = ticket.fieldErrors.size;
+  const shared = ticketEntryView(ticket, { symbol, status }, copy);
+  const review = ticketReviewView(ticket, symbol, copy);
   const order = ticket.result?.order ?? null;
   const position = portfolio.summary?.positions.find((p) => p.symbol === symbol) ?? null;
   const confirmLabel = buying ? t.ticket.buyTitle({ symbol }) : t.ticket.sellTitle({ symbol });
@@ -124,11 +97,15 @@ export function useOrderTicketScreen(symbol: string, initialSide: Side) {
       tif: form.tif,
       showTif: form.type !== 'market',
       sizeMode: form.sizeMode,
-      amount: amountDisplay(ticket, copy),
+      amount: amountDisplay(ticket, shared.size, copy),
       sizeFocused: focus === 'size',
-      sizeError: sizeError ? rejection(sizeError, symbol).explanation : undefined,
+      sizeError: shared.size.error,
       chips: quickChips(ticket, copy),
-      price: priceField(ticket, focus, symbol, copy),
+      price: shared.price && {
+        ...shared.price,
+        value: f.localDigits(shared.price.value),
+        focused: focus === 'price',
+      },
       gates: closedGate
         ? [closedGate, ...gates(blocks, ticket, halt, symbol, copy)]
         : gates(blocks, ticket, halt, symbol, copy),
@@ -149,12 +126,14 @@ export function useOrderTicketScreen(symbol: string, initialSide: Side) {
       },
     },
     review: {
-      headline: reviewHeadline(ticket, symbol, copy),
+      headline: review?.headline ?? '',
       subline: reviewSubline(ticket, copy),
-      rows: reviewRows(ticket, copy),
-      countdown: quoteCountdown(ticket, copy),
+      rows: review ? reviewRows(ticket, review, copy) : [],
+      countdown: review?.countdown
+        ? { label: review.countdown.label, fraction: review.countdown.fraction }
+        : null,
       note: t.paper.orderNote,
-      resting: restingNote(ticket, copy),
+      resting: review?.resting ?? null,
       large:
         ticket.needsLargeConfirm && estimate
           ? {
@@ -183,9 +162,13 @@ export function useOrderTicketScreen(symbol: string, initialSide: Side) {
     result:
       order && ticket.result
         ? {
-            ...resultHeadline(order, symbol, status?.session.opensAt ?? null, copy),
+            ...ticketResultView(
+              order,
+              ticket.result,
+              { symbol, opensAt: status?.session.opensAt ?? null },
+              copy,
+            ),
             status: order.status,
-            rows: resultRows(order, ticket.result, copy),
             position:
               position && order.filledMicros > 0
                 ? [
@@ -205,9 +188,7 @@ export function useOrderTicketScreen(symbol: string, initialSide: Side) {
           }
         : null,
     actions: {
-      close: () => {
-        router.back();
-      },
+      close: goBack,
       setSide: ticket.setSide,
       setType: (type: Order['type']) => {
         ticket.setType(type);

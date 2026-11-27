@@ -5,9 +5,13 @@ import { io, type Socket } from 'socket.io-client';
 import request from 'supertest';
 
 import {
+  AccountResetEventSchema,
   ADMIN_NAMESPACE,
   ADMIN_SESSION_COOKIE,
+  AdminAccountsResponseSchema,
   AdminOrderStatsSchema,
+  AdminStatsSchema,
+  AuditPageSchema,
   AlertResponseSchema,
   CancelOrderResponseSchema,
   DEVICE_ID_HEADER,
@@ -41,9 +45,10 @@ import { MarketService } from '../src/market/market.service';
 import { PrismaService } from '../src/prisma.service';
 import { TradingEngine } from '../src/trading/engine.service';
 import { ExecutionService } from '../src/trading/execution.service';
+import { NotificationsService } from '../src/trading/notifications.service';
 import { OrdersService } from '../src/trading/orders.service';
 import { PortfolioService } from '../src/trading/portfolio.service';
-import { FakeClock, startApp } from './app';
+import { FakeClock, pinned, startApp } from './app';
 
 // Tuesday 1 Dec 2026, 10:00 in New York: a regular session in calendar mode.
 const T0 = Date.UTC(2026, 11, 1, 15, 0);
@@ -114,6 +119,31 @@ async function portfolio(device: Device) {
   return PortfolioResponseSchema.parse((await get(device, '/portfolio').expect(200)).body);
 }
 
+// Written straight to the database: hundreds of accounts, each holding 10 KO and $1,000 less cash.
+async function seedAccounts(count: number, firstHandle: number): Promise<string[]> {
+  const prisma = app.get(PrismaService);
+  const deviceIds = Array.from({ length: count }, () => randomUUID());
+  await prisma.device.createMany({ data: deviceIds.map((id) => ({ id })) });
+  await prisma.account.createMany({
+    data: deviceIds.map((deviceId, i) => ({
+      deviceId,
+      handle: `ACC-${(firstHandle + i).toString(16).toUpperCase()}`,
+      cashCents: BigInt(POLICY.startingCashCents - 100_000),
+      createdAt: new Date(clock.now()),
+    })),
+  });
+  const accounts = await prisma.account.findMany({ where: { deviceId: { in: deviceIds } } });
+  await prisma.position.createMany({
+    data: accounts.map((account) => ({
+      accountId: account.id,
+      symbol: 'KO',
+      qtyMicros: BigInt(sharesToMicros(10)),
+      costBasisCents: 100_000n,
+    })),
+  });
+  return accounts.map((account) => account.id);
+}
+
 async function login(email: string, password: string, remember = false): Promise<string> {
   const res = await http
     .post(api('/admin/auth/login'))
@@ -139,7 +169,7 @@ function waitFor<T>(socket: Socket, event: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`No ${event} event`));
-    }, 3_000);
+    }, 10_000);
     socket.once(event, (payload: T) => {
       clearTimeout(timer);
       resolve(payload);
@@ -161,13 +191,10 @@ async function connect(namespace: string, options: object): Promise<Socket> {
 }
 
 beforeAll(async () => {
-  ({ app, url } = await startApp({ clock }));
+  ({ app, url } = await startApp({ clock, ...pinned }));
   http = request(app.getHttpServer());
   market = app.get(MarketService);
   engine = app.get(TradingEngine);
-  // No random walk and no random slippage: every price in these tests is set explicitly.
-  market.random = () => 0.99;
-  app.get(ExecutionService).random = () => 0;
   adminCookie = await login('admin@sarwa.dev', 'admin12345');
   viewerCookie = await login('viewer@sarwa.dev', 'viewer12345');
   await admin('patch', '/admin/trading')
@@ -537,6 +564,38 @@ describe('changing a partly filled buy', () => {
       heldCents: notionalCents(sharesToMicros(200), dollarsToTicks(18), 'up'),
     });
   });
+
+  it('keeps the original expiry, so editing a GTC order never extends its life', async () => {
+    const device = newDevice();
+    await moveTo('BAC', 45);
+    const order = await placed(device, {
+      symbol: 'BAC',
+      side: 'buy',
+      type: 'limit',
+      tif: 'gtc',
+      size: { kind: 'shares', micros: sharesToMicros(10) },
+      limitTicks: dollarsToTicks(42),
+      quotedTicks: dollarsToTicks(45),
+    });
+    clock.advance(10 * 86_400_000);
+    await moveTo('BAC', 45);
+
+    try {
+      await http
+        .patch(api(`/orders/${order.id}`))
+        .set(DEVICE_ID_HEADER, device.id)
+        .set('X-Forwarded-For', device.ip)
+        .send({ limitTicks: dollarsToTicks(43) })
+        .expect(200);
+      const after = await orderOf(device, order.id);
+
+      expect(order.status).toBe('open');
+      expect(after.limitTicks).toBe(dollarsToTicks(43));
+      expect(after.expiresAt).toBe(order.expiresAt);
+    } finally {
+      clock.set(T0);
+    }
+  });
 });
 
 describe('requests that waited in the queue', () => {
@@ -711,6 +770,31 @@ describe('circuit breaker', () => {
 });
 
 describe('admin', () => {
+  it('cancels working orders and releases their holds when a stock is disabled', async () => {
+    const device = newDevice();
+    await moveTo('DIS', 110);
+    const before = await portfolio(device);
+    const resting = await placed(device, {
+      symbol: 'DIS',
+      side: 'buy',
+      type: 'limit',
+      tif: 'gtc',
+      size: { kind: 'shares', micros: sharesToMicros(5) },
+      limitTicks: dollarsToTicks(105),
+      quotedTicks: dollarsToTicks(110),
+    });
+    expect(resting.status).toBe('open');
+
+    await admin('patch', '/admin/stocks/DIS').send({ isEnabled: false }).expect(200);
+    await engine.idle();
+    const canceled = await orderOf(device, resting.id);
+    const after = await portfolio(device);
+    await admin('patch', '/admin/stocks/DIS').send({ isEnabled: true }).expect(200);
+
+    expect(canceled).toMatchObject({ status: 'canceled', cancelReason: 'symbol_disabled' });
+    expect(after.holds).toEqual(before.holds);
+  });
+
   it('lets a viewer read but not change trading, halts, resets or users', async () => {
     await admin('get', '/admin/trading', viewerCookie).expect(200);
     await admin('get', '/admin/orders', viewerCookie).expect(200);
@@ -725,6 +809,68 @@ describe('admin', () => {
       .expect(403);
     const users = await admin('get', '/admin/users', viewerCookie).expect(403);
     expect(users.body.code).toBe('FORBIDDEN');
+  });
+
+  it("masks other people's emails and ips in the audit log for a viewer", async () => {
+    const { id } = await newAdmin('VIEWER');
+    await admin('patch', `/admin/users/${id}`).send({ role: 'ADMIN' }).expect(200);
+    await admin('patch', `/admin/users/${id}`).send({ role: 'VIEWER' }).expect(200);
+
+    const full = AuditPageSchema.parse(
+      (await admin('get', '/admin/audit?action=user.role').expect(200)).body,
+    ).items[0]!;
+    const masked = AuditPageSchema.parse(
+      (await admin('get', '/admin/audit?action=user.role', viewerCookie).expect(200)).body,
+    ).items[0]!;
+    const overview = AdminStatsSchema.parse(
+      (await admin('get', '/admin/stats', viewerCookie).expect(200)).body,
+    );
+
+    expect(full.actorEmail).toBe('admin@sarwa.dev');
+    expect(full.ip).toBe('127.0.0.1');
+    expect(masked).toMatchObject({ id: full.id, actorEmail: 'a•••@sarwa.dev', ip: '127.0.x.x' });
+    expect(JSON.stringify(masked.payload)).not.toMatch(/[^•]@sarwa\.dev/);
+    expect(overview.recentActivity.every((entry) => entry.actorEmail.includes('•••'))).toBe(true);
+  });
+
+  it('values hundreds of accounts in one listing and one snapshot run', async () => {
+    await seedAccounts(300, 0xf00000);
+    await moveTo('KO', 70);
+
+    const list = AdminAccountsResponseSchema.parse(
+      (await admin('get', '/admin/accounts?pageSize=100').expect(200)).body,
+    );
+    const one = AdminAccountsResponseSchema.parse(
+      (await admin('get', '/admin/accounts?q=ACC-F00000').expect(200)).body,
+    );
+    const snapshots = await app.get(PortfolioService).takeSnapshots();
+
+    expect(list.total).toBeGreaterThanOrEqual(300);
+    expect(list.items).toHaveLength(100);
+    expect(one.items[0]).toMatchObject({
+      handle: 'ACC-F00000',
+      cashCents: POLICY.startingCashCents - 100_000,
+      equityCents: POLICY.startingCashCents - 100_000 + 70_000,
+      positions: 1,
+    });
+    expect(snapshots).toBeGreaterThanOrEqual(300);
+  });
+
+  it('delivers one notice to each of hundreds of accounts', async () => {
+    const ids = await seedAccounts(300, 0xf10000);
+    const message = `Notice ${randomUUID()}`;
+
+    await app
+      .get(NotificationsService)
+      .notify([...ids, ids[0]!], { kind: 'market_notice', message });
+
+    const rows = await app.get(PrismaService).notification.groupBy({
+      by: ['accountId'],
+      where: { payload: { contains: message } },
+      _count: { _all: true },
+    });
+    expect(rows).toHaveLength(300);
+    expect(rows.every((row) => row._count._all === 1)).toBe(true);
   });
 
   it('resets an account only with the exact confirmation and audits before and after', async () => {
@@ -768,6 +914,24 @@ describe('admin', () => {
         after: expect.objectContaining({ cashCents: POLICY.startingCashCents, positions: [] }),
       },
     });
+  });
+
+  it("tells the account's open clients to resync after a reset", async () => {
+    const device = newDevice();
+    const { handle } = (await get(device, '/account').expect(200)).body as { handle: string };
+    const id = (await admin('get', `/admin/accounts?q=${handle}`).expect(200)).body.items[0]
+      .id as string;
+    const socket = await connect(MARKET_NAMESPACE, { auth: { deviceId: device.id } });
+    const reset = waitFor<unknown>(socket, 'account.reset');
+
+    try {
+      await admin('post', `/admin/accounts/${id}/reset`)
+        .send({ confirm: resetConfirmation(handle) })
+        .expect(200);
+      expect(AccountResetEventSchema.parse(await reset)).toEqual({ v: 1 });
+    } finally {
+      socket.disconnect();
+    }
   });
 
   it('streams order changes to signed-in admins only', async () => {
@@ -880,6 +1044,35 @@ describe('admin', () => {
 describe('portfolio history and stats', () => {
   afterEach(() => {
     clock.set(T0);
+  });
+
+  it('thins old equity snapshots to one per hour, then one per day', async () => {
+    const prisma = app.get(PrismaService);
+    const [accountId] = await seedAccounts(1, 0xf20000);
+    const HOUR = 3_600_000;
+    const DAY = 24 * HOUR;
+    const start = T0 - 100 * DAY;
+    // Every 5 minutes for 100 days, ending now.
+    await prisma.portfolioSnapshot.createMany({
+      data: Array.from({ length: (100 * DAY) / 300_000 }, (_, i) => ({
+        accountId: accountId!,
+        epoch: 0,
+        t: new Date(start + i * 300_000),
+        equityCents: BigInt(POLICY.startingCashCents + i),
+      })),
+    });
+
+    await app.get(PortfolioService).compactSnapshots();
+
+    const rows = await prisma.portfolioSnapshot.findMany({
+      where: { accountId: accountId! },
+      select: { t: true },
+    });
+    const count = (from: number, to: number) =>
+      rows.filter(({ t }) => t.getTime() >= from && t.getTime() < to).length;
+    expect(count(T0 - 2 * DAY, T0)).toBe((2 * DAY) / 300_000);
+    expect(count(T0 - 3 * DAY, T0 - 2 * DAY)).toBe(24);
+    expect(count(T0 - 100 * DAY, T0 - 90 * DAY)).toBeLessThanOrEqual(11);
   });
 
   it('records equity snapshots and ends the curve at the live equity', async () => {

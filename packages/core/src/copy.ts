@@ -1,9 +1,4 @@
-import {
-  type Alert,
-  type HaltDuration,
-  type NotificationPayload,
-  type TradingStatus,
-} from '@sarwa/contracts';
+import { type Alert, type NotificationPayload, type TradingStatus } from '@sarwa/contracts';
 import { bps, cents, micros, ticks } from '@sarwa/domain';
 import { createFormatter, type Digits, DIGITS, LOCALES } from '@sarwa/i18n';
 
@@ -147,18 +142,6 @@ export function marketPill(
         label: t.market.closed({ time: f.dateTime(session.opensAt) }),
         short: states.closed,
       };
-  }
-}
-
-export function haltDurationLabel(duration: HaltDuration, { t, f }: Copy): string {
-  switch (duration) {
-    case '5m':
-      return t.common.minutes(f.count(5));
-    case '15m':
-      return t.common.minutes(f.count(15));
-    case 'until_close':
-    case 'manual':
-      return t.admin.trading.durations[duration];
   }
 }
 

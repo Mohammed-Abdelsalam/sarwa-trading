@@ -8,6 +8,7 @@ import { TradingConfigModule } from '../trading-config/trading-config.module';
 import { AccountController, AlertsController, NotificationsController } from './account.controller';
 import { AccountsService } from './accounts.service';
 import { AdminAccountsService } from './admin-accounts.service';
+import { AdminOrdersService } from './admin-orders.service';
 import {
   AdminAccountsController,
   AdminOrdersController,
@@ -56,7 +57,9 @@ import { TradingGateway } from './trading.gateway';
     AlertsService,
     PortfolioService,
     AdminAccountsService,
+    AdminOrdersService,
     TradingEngine,
   ],
+  exports: [TradingEngine],
 })
 export class TradingModule {}

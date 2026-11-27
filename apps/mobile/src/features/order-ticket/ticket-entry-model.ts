@@ -5,15 +5,16 @@ import {
   centsToDollars,
   centsToText,
   type Rejection,
+  type Ticket,
   type TicketBlock,
+  ticketBlockCopy,
+  ticketMarketClosed,
+  ticketPriceLabel,
   toTradeQuote,
-  type useOrderTicket,
 } from '@sarwa/core';
 
 import { type CalloutTone } from '../../components/ui/callout';
-import { type Copy, localDigits } from '../../lib/i18n';
-
-export type Ticket = ReturnType<typeof useOrderTicket>;
+import { type Copy } from '../../lib/i18n';
 
 export interface Row {
   key: string;
@@ -32,8 +33,8 @@ export interface Gate {
 
 const HALT_CODES = new Set(['TRADING_DISABLED', 'MARKET_PAUSED', 'SYMBOL_HALTED']);
 
-export function blockLabel(block: TicketBlock, symbol: string, { rejection }: Copy): string {
-  return rejection(block, symbol).reason;
+export function blockLabel(block: TicketBlock, symbol: string, copy: Copy): string {
+  return ticketBlockCopy(block, symbol, copy).title;
 }
 
 // Gates that don't need a typed order show up front, before any amount is entered.
@@ -89,16 +90,8 @@ export function marketClosedGate(
   status: TradingStatus | undefined,
   copy: Copy,
 ): Gate | null {
-  const { t, f } = copy;
-  if (!status || status.session.isOpen || ticket.form.type !== 'market') return null;
-  if (!status.rules.queueWhenClosed) return null;
-  return {
-    key: 'closed',
-    tone: 'warn',
-    icon: 'clock',
-    title: t.ticket.marketClosedTitle,
-    body: t.ticket.marketClosedBody({ time: f.dateTime(status.session.opensAt) }),
-  };
+  const closed = ticketMarketClosed(ticket, status, copy);
+  return closed && { key: 'closed', tone: 'warn', icon: 'clock', ...closed };
 }
 
 export function quoteLine(ticket: Ticket, { t, f }: Copy) {
@@ -111,33 +104,28 @@ export function quoteLine(ticket: Ticket, { t, f }: Copy) {
   };
 }
 
-export function amountDisplay(ticket: Ticket, copy: Copy) {
-  const { t, digits } = copy;
-  const { form, estimate } = ticket;
-  const byAmount = form.sizeMode === 'amount';
-  const text = byAmount ? form.amountText : form.qtyText;
-  return {
-    prefix: byAmount ? '$' : '',
-    value: localDigits(text === '' ? '0' : text, digits),
-    suffix: byAmount ? '' : ` ${t.ticket.shares}`,
-    empty: text === '',
-    hint: estimate ? amountHint(ticket, estimate, copy) : '',
-  };
-}
-
-function amountHint(ticket: Ticket, estimate: NonNullable<Ticket['estimate']>, copy: Copy): string {
+export function amountDisplay(
+  ticket: Ticket,
+  size: { value: string; prefix: string; hint: string },
+  copy: Copy,
+) {
   const { t, f } = copy;
-  const { form } = ticket;
-  if (form.sizeMode === 'shares') return `≈ ${f.money(estimate.notionalCents)}`;
-  const params = { shares: f.shares(estimate.qtyMicros), price: f.price(estimate.priceTicks) };
-  if (form.type !== 'market') return `≈ ${params.shares} @ ${params.price}`;
-  return form.side === 'buy' ? t.ticket.sharesAtAsk(params) : t.ticket.sharesAtBid(params);
+  return {
+    prefix: size.prefix,
+    value: f.localDigits(size.value === '' ? '0' : size.value),
+    suffix: ticket.form.sizeMode === 'amount' ? '' : ` ${t.ticket.shares}`,
+    empty: size.value === '',
+    hint: size.hint,
+  };
 }
 
 export function quickChips(ticket: Ticket, { t, f }: Copy) {
   return ticket.quickAmounts.map((amount) => ({
     key: amount.key,
-    label: amount.key === 'max' ? t.ticket.max : `$${f.number(centsToDollars(amount.cents))}`,
+    label:
+      amount.key === 'max'
+        ? t.ticket.max
+        : `${f.currencyAffix()}${f.number(centsToDollars(amount.cents))}`,
     selected:
       ticket.form.sizeMode === 'amount' &&
       ticket.form.amountText !== '' &&
@@ -178,16 +166,12 @@ export function entryRows(ticket: Ticket, status: TradingStatus | undefined, cop
     ];
   }
   const buying = form.side === 'buy';
-  const priceLabel =
-    form.type === 'limit'
-      ? t.ticket.limitPrice
-      : form.type === 'stop'
-        ? t.ticket.stopPrice
-        : buying
-          ? t.ticket.estPriceAsk
-          : t.ticket.estPriceBid;
   const rows: Row[] = [
-    { key: 'price', label: priceLabel, value: f.price(estimate.priceTicks) },
+    {
+      key: 'price',
+      label: ticketPriceLabel(form.type, form.side, copy),
+      value: f.price(estimate.priceTicks),
+    },
     form.sizeMode === 'amount'
       ? { key: 'shares', label: t.ticket.estShares, value: f.shares(estimate.qtyMicros) }
       : {

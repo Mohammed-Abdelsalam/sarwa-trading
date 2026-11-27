@@ -7,6 +7,7 @@ import {
   candleIndexAt,
   chartBaseline,
   chartGeometry,
+  chartHead,
   describeChart,
   nearestPointIndex,
   ohlc,
@@ -17,6 +18,7 @@ import {
   resolvePeriod,
   scrubPoint,
   withLiveQuote,
+  withLastPoint,
 } from '../src/chart';
 import { localized } from './utils';
 
@@ -235,5 +237,27 @@ describe('ohlc', () => {
       { label: 'Low', value: '$9.00' },
       { label: 'Close', value: '$11.00' },
     ]);
+  });
+});
+
+describe('withLastPoint', () => {
+  const frame = { width: 120, height: 40, padding: 2 };
+  const history = [10, 14, 12, 11];
+
+  it('only moves the last point while it stays inside the range, matching a full layout', () => {
+    const head = chartHead(history, frame, 13);
+
+    expect(withLastPoint(head, [10, 14, 12, 13], frame, 13)).toEqual(
+      chartGeometry([10, 14, 12, 13], 120, 40, 2, 13),
+    );
+  });
+
+  it('lays everything out again once the tick leaves the range', () => {
+    const head = chartHead(history, frame);
+
+    expect(withLastPoint(head, [10, 14, 12, 20], frame)).toEqual(
+      chartGeometry([10, 14, 12, 20], 120, 40, 2),
+    );
+    expect(head?.points).toHaveLength(3);
   });
 });

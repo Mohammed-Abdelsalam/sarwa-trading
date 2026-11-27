@@ -1,6 +1,8 @@
 'use client';
 
 import { Download, FileText, Info, RefreshCw, TriangleAlert } from 'lucide-react';
+import { type Route } from 'next';
+import Link from 'next/link';
 
 import { type OrderFilter } from '@sarwa/contracts';
 import {
@@ -129,16 +131,18 @@ export function OrdersPage({ routeOrderId }: { routeOrderId?: string }) {
             description={page.symbol || page.filter !== 'all' ? labels.emptyFiltered : undefined}
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <Table>
               <THead>
                 <tr>
                   <TH className="ps-4">{labels.columns.order}</TH>
-                  <TH>{labels.columns.type}</TH>
+                  <TH className="max-md:hidden">{labels.columns.type}</TH>
                   <TH align="end">{labels.columns.qtyAmount}</TH>
                   <TH>{labels.columns.status}</TH>
-                  <TH>{labels.columns.detail}</TH>
-                  <TH align="end">{labels.columns.time}</TH>
+                  <TH className="max-md:hidden">{labels.columns.detail}</TH>
+                  <TH align="end" className="max-md:hidden">
+                    {labels.columns.time}
+                  </TH>
                   <TH align="end">
                     <span className="sr-only">{labels.columns.actions}</span>
                   </TH>
@@ -146,23 +150,19 @@ export function OrdersPage({ routeOrderId }: { routeOrderId?: string }) {
               </THead>
               <TBody>
                 {page.rows.map((row) => (
-                  <TRow
-                    key={row.id}
-                    interactive
-                    aria-selected={row.id === page.selected}
-                    onClick={() => {
-                      actions.select(row.id);
-                    }}
-                  >
+                  <TRow key={row.id} interactive className="relative">
                     <TCell className="ps-4">
-                      <button
-                        type="button"
-                        aria-label={labels.openA11y(row.id)}
+                      {/* Stretched over the row: the whole row opens the order as one link. */}
+                      <Link
+                        href={`/orders/${row.id}` as Route}
+                        aria-label={labels.openA11y(row.id, row.symbol)}
+                        aria-current={row.id === page.selected ? 'true' : undefined}
                         onClick={(event) => {
-                          event.stopPropagation();
+                          if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+                          event.preventDefault();
                           actions.select(row.id);
                         }}
-                        className="focus-visible:outline-focus flex cursor-pointer items-center gap-2.5 rounded-xs focus-visible:outline-2"
+                        className="focus-visible:after:outline-focus flex items-center gap-2.5 after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2"
                       >
                         <Badge
                           square
@@ -172,15 +172,17 @@ export function OrdersPage({ routeOrderId }: { routeOrderId?: string }) {
                           {row.sideLabel}
                         </Badge>
                         <b>{row.symbol}</b>
-                      </button>
+                      </Link>
                     </TCell>
-                    <TCell className="text-fg-2">{row.type}</TCell>
+                    <TCell className="text-fg-2 max-md:hidden">{row.type}</TCell>
                     <TCell align="end">{row.size}</TCell>
                     <TCell>
                       <StatusBadge status={row.status} label={row.statusLabel} />
                     </TCell>
-                    <TCell className="type-sm text-fg-3 max-w-52 truncate">{row.detail}</TCell>
-                    <TCell align="end" className="text-fg-2">
+                    <TCell className="type-sm text-fg-3 max-w-52 truncate max-md:hidden">
+                      {row.detail}
+                    </TCell>
+                    <TCell align="end" className="text-fg-2 max-md:hidden">
                       {row.time}
                     </TCell>
                     <TCell align="end">
@@ -190,8 +192,8 @@ export function OrdersPage({ routeOrderId }: { routeOrderId?: string }) {
                           variant="ghost"
                           aria-label={labels.cancelA11y(row.symbol)}
                           loading={row.cancelling}
-                          onClick={(event) => {
-                            event.stopPropagation();
+                          className="relative z-10"
+                          onClick={() => {
                             actions.cancel(row.id);
                           }}
                         >

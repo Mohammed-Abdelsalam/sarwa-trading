@@ -41,8 +41,31 @@ const STOCKS: [string, string, string, string, number, number, number | null, nu
   ['INTC', 'Intel Corp.', 'tech', 'NASDAQ', 23.47, 101.2e9, null, 1.0],
 ];
 
+// The demo passwords are public, so production must provide its own.
+function fromEnv(name: string, demoValue: string): string {
+  const value = process.env[name];
+  if (value) return value;
+  if (process.env.NODE_ENV === 'production') throw new Error(`Set ${name} to seed production`);
+  return demoValue;
+}
+
 // Idempotent: existing rows are kept, so admin edits survive restarts.
 async function main(): Promise<void> {
+  const admins = [
+    {
+      email: fromEnv('ADMIN_EMAIL', 'admin@sarwa.dev'),
+      password: fromEnv('ADMIN_PASSWORD', 'admin12345'),
+      name: 'Demo Admin',
+      role: 'ADMIN',
+    },
+    {
+      email: fromEnv('VIEWER_EMAIL', 'viewer@sarwa.dev'),
+      password: fromEnv('VIEWER_PASSWORD', 'viewer12345'),
+      name: 'Demo Viewer',
+      role: 'VIEWER',
+    },
+  ];
+
   for (const [
     symbol,
     name,
@@ -60,20 +83,6 @@ async function main(): Promise<void> {
     });
   }
 
-  const admins = [
-    {
-      email: process.env.ADMIN_EMAIL ?? 'admin@sarwa.dev',
-      password: process.env.ADMIN_PASSWORD ?? 'admin12345',
-      name: 'Demo Admin',
-      role: 'ADMIN',
-    },
-    {
-      email: process.env.VIEWER_EMAIL ?? 'viewer@sarwa.dev',
-      password: process.env.VIEWER_PASSWORD ?? 'viewer12345',
-      name: 'Demo Viewer',
-      role: 'VIEWER',
-    },
-  ];
   for (const { email, password, name, role } of admins) {
     await prisma.adminUser.upsert({
       where: { email },

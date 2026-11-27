@@ -1,8 +1,10 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { heatmapTiles, topMovers } from '@sarwa/core';
+
 import { HomePage } from '../../../src/features/home/home-page';
-import { heatmapTiles, topMovers, useHomePage } from '../../../src/features/home/use-home-page';
+import { useHomePage } from '../../../src/features/home/use-home-page';
 import { providers } from '../../copy';
 import { makeQuote, makeStock } from '../../fixtures';
 

@@ -236,3 +236,14 @@ describe('list and chart formats', () => {
     expect(ar.chartDate(t, '1D')).toBe('٢٥ نوفمبر · ٢:٤١ م');
   });
 });
+
+describe('typed input', () => {
+  it('gives the currency symbol a money field shows', () => {
+    expect(createFormatter({ locale: 'ar', digits: 'arab' }).currencyAffix()).toBe('$');
+  });
+
+  it('keeps typed text as is and only swaps its digits for the chosen style', () => {
+    expect(createFormatter({ locale: 'ar', digits: 'arab' }).localDigits('12.50')).toBe('١٢.٥٠');
+    expect(createFormatter({ locale: 'ar', digits: 'latn' }).localDigits('12.50')).toBe('12.50');
+  });
+});

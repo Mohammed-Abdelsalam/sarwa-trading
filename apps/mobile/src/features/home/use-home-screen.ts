@@ -1,41 +1,29 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 
-import { type StockWithQuote } from '@sarwa/contracts';
 import {
-  changePct,
   direction,
   marketPill,
+  type MoversTab,
+  topMovers,
   useAlerts,
   useLiveStatus,
   useLiveSymbols,
   useNotifications,
   useOrders,
   usePortfolio,
+  useNow,
+  useStockIndex,
   useTradingStatus,
 } from '@sarwa/core';
 
-import { useNow } from '../../lib/clock';
 import { type Copy, useCopy } from '../../lib/i18n';
-import { useStockIndex } from '../../lib/sectors';
 import { describeOrder } from '../orders/order-copy';
 import { useEquitySeries } from '../portfolio/use-portfolio-screen';
 
-export type MoverTab = 'gainers' | 'losers' | 'active';
+export type { MoversTab as MoverTab } from '@sarwa/core';
 
-const MOVERS = 5;
 const RECENT = 3;
-
-export function topMovers(stocks: readonly StockWithQuote[], tab: MoverTab): StockWithQuote[] {
-  const sorted = [...stocks].sort((a, b) =>
-    tab === 'active'
-      ? b.quote.volume - a.quote.volume
-      : tab === 'gainers'
-        ? changePct(b.quote) - changePct(a.quote)
-        : changePct(a.quote) - changePct(b.quote),
-  );
-  return sorted.slice(0, MOVERS);
-}
 
 function greeting({ t }: Copy, hour: number): string {
   if (hour < 12) return t.portfolio.goodMorning;
@@ -45,7 +33,7 @@ function greeting({ t }: Copy, hour: number): string {
 export function useHomeScreen() {
   const copy = useCopy();
   const { t, f } = copy;
-  const [moverTab, setMoverTab] = useState<MoverTab>('gainers');
+  const [moverTab, setMoverTab] = useState<MoversTab>('gainers');
   const portfolio = usePortfolio();
   const curve = useEquitySeries('1D');
   const notifications = useNotifications();

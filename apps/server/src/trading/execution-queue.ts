@@ -5,15 +5,19 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class ExecutionQueue {
   private tail: Promise<unknown> = Promise.resolve();
+  private pending = 0;
 
   run<T>(task: () => Promise<T>): Promise<T> {
-    const result = this.tail.then(task);
+    this.pending++;
+    const result = this.tail.then(task).finally(() => {
+      this.pending--;
+    });
     this.tail = result.catch(() => undefined);
     return result;
   }
 
-  // Resolves once everything queued so far has run.
-  idle(): Promise<void> {
-    return this.run(() => Promise.resolve());
+  // Resolves once the queue is empty, including follow-up work queued by the tasks it waited for.
+  async idle(): Promise<void> {
+    while (this.pending > 0) await this.tail;
   }
 }

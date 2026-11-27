@@ -24,5 +24,6 @@ export function readLocalePreferences(
 
 export function writePreferenceCookie(key: string, value: string): void {
   if (!Object.values<string>(PREFERENCE_COOKIES).includes(key)) return;
-  document.cookie = `${key}=${encodeURIComponent(value)}; path=/; max-age=${String(ONE_YEAR_SECONDS)}; samesite=lax`;
+  const secure = window.location.protocol === 'https:' ? '; secure' : '';
+  document.cookie = `${key}=${encodeURIComponent(value)}; path=/; max-age=${String(ONE_YEAR_SECONDS)}; samesite=lax${secure}`;
 }

@@ -1,36 +1,22 @@
-import {
-  createApiClient,
-  createDeviceIdGetter,
-  createLiveStore,
-  createMarketSocket,
-  createRemovalQueue,
-  noopAnalytics,
-  type KeyValueStorage,
-  type SarwaClient,
-} from '@sarwa/core';
+import { createSarwaClient, type KeyValueStorage, type SarwaClient } from '@sarwa/core';
+import { safeLocalStorage } from '@sarwa/ui';
 
 import { API_URL } from './api-url';
 import { writePreferenceCookie } from './locale-cookie';
 
+// Preferences are mirrored into a cookie so the server renders the chosen language first time.
 const browserStorage: KeyValueStorage = {
-  getItem: (key) => Promise.resolve(window.localStorage.getItem(key)),
-  setItem: (key, value) => {
-    window.localStorage.setItem(key, value);
+  getItem: (key) => safeLocalStorage.getItem(key),
+  setItem: async (key, value) => {
+    await safeLocalStorage.setItem(key, value);
     writePreferenceCookie(key, value);
-    return Promise.resolve();
   },
 };
 
 export function createBrowserClient(): SarwaClient {
-  const store = createLiveStore();
-  const getDeviceId = createDeviceIdGetter(browserStorage, () => crypto.randomUUID());
-  return {
-    store,
-    api: createApiClient({ baseUrl: API_URL, getDeviceId }),
-    market: createMarketSocket({ url: API_URL, store, getDeviceId }),
+  return createSarwaClient({
+    apiUrl: API_URL,
     storage: browserStorage,
-    removals: createRemovalQueue(),
-    analytics: noopAnalytics,
-    newId: () => crypto.randomUUID(),
-  };
+    randomUUID: () => crypto.randomUUID(),
+  });
 }

@@ -498,6 +498,8 @@ export const adminEn = {
   },
   activity: {
     'auth.login': 'signed in',
+    'auth.login_failed': 'failed to sign in',
+    'auth.logout': 'signed out',
     'market.pause': 'paused the market',
     'market.resume': 'resumed the market',
     'market.volatility': 'changed volatility',

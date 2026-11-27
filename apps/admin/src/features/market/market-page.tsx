@@ -3,7 +3,7 @@
 import { Activity, Pause, Play, Plug } from 'lucide-react';
 
 import { MARKET_VOLATILITY } from '@sarwa/contracts';
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import {
   Badge,
   Button,
@@ -31,11 +31,14 @@ import {
 const SCALE = [0.5, 1, 1.5, 2, 2.5, 3];
 
 function StatusCard({ page }: { page: MarketPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.market;
   const status = page.status;
   return (
-    <Card className="flex items-center justify-between gap-6 p-7" aria-labelledby="market-status">
+    <Card
+      className="flex flex-wrap items-center justify-between gap-6 p-5 md:p-7"
+      aria-labelledby="market-status"
+    >
       <div className="flex flex-col gap-2.5">
         <span id="market-status" className="type-overline text-fg-3">
           {copy.status}
@@ -87,11 +90,11 @@ function StatusCard({ page }: { page: MarketPageModel }) {
 }
 
 function VolatilityCard({ page }: { page: MarketPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.market;
   const label = f.multiplier(page.volatility);
   return (
-    <Card className="flex flex-col gap-3.5 px-7 py-6">
+    <Card className="flex flex-col gap-3.5 px-5 py-6 md:px-7">
       <div className="flex items-center justify-between">
         <h2 id="volatility-label" className="type-h3 text-fg">
           {copy.volatility}
@@ -127,7 +130,7 @@ function VolatilityCard({ page }: { page: MarketPageModel }) {
           </span>
         ))}
       </div>
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="type-sm text-fg-2">{copy.volatilityHint}</p>
         <div
           role="group"
@@ -155,10 +158,10 @@ function VolatilityCard({ page }: { page: MarketPageModel }) {
 }
 
 function DropCard({ page }: { page: MarketPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.market;
   return (
-    <Card className="border-neg/45 flex items-center justify-between gap-6 px-7 py-5.5">
+    <Card className="border-neg/45 flex flex-wrap items-center justify-between gap-6 px-5 py-5.5 md:px-7">
       <div className="flex items-start gap-3.5">
         <span
           aria-hidden
@@ -182,7 +185,7 @@ function DropCard({ page }: { page: MarketPageModel }) {
 
 export function MarketPage() {
   const page = useMarketPage();
-  const { f, t } = useI18n();
+  const { f, t } = useAdminI18n();
   const copy = t.admin.market;
 
   if (page.isError) {
@@ -220,7 +223,7 @@ export function MarketPage() {
         </Callout>
       ) : null}
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {page.isLoading ? (
             <Skeleton className="h-44 w-full rounded-lg" />
           ) : (

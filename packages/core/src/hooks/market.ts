@@ -4,17 +4,28 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   type Candle,
+  ErrorCode,
   type Period,
+  type Sector,
   type StockDetailResponse,
   type StockWithQuote,
 } from '@sarwa/contracts';
 
-import { isNotFound } from '../api';
-import { axisCandles, chartBaseline, describeChart, periodChange, withLiveQuote } from '../chart';
+import { isApiError } from '../api';
+import {
+  axisCandles,
+  chartBaseline,
+  type ChartFrame,
+  chartHead,
+  describeChart,
+  periodChange,
+  withLastPoint,
+  withLiveQuote,
+} from '../chart';
 import { filterAndSort, keyStats, type MarketFilter, rangePosition } from '../markets';
 import { useSarwa } from '../provider';
 import { useI18n } from './i18n';
@@ -59,18 +70,40 @@ export function useCandles(symbol: string, period: Period): UseQueryResult<Candl
 
 export type LoadState = 'loading' | 'error' | 'ready';
 
-export function useChartSeries(symbol: string, period: Period) {
+const NO_CANDLES: readonly Candle[] = [];
+
+// The history is laid out once per frame; each tick only moves the last point (see withLastPoint).
+export function useChartSeries(symbol: string, period: Period, frame: ChartFrame) {
   const i18n = useI18n();
   const query = useCandles(symbol, period);
   const quote = useQuote(symbol);
-  const candles = withLiveQuote(query.data ?? [], quote);
+  const history = query.data ?? NO_CANDLES;
+  const price = quote?.price;
+  const candles = useMemo(
+    () => withLiveQuote(history, price === undefined ? undefined : { price }),
+    [history, price],
+  );
   const baseline = chartBaseline(period, candles, quote);
+  const showBaseline = period === '1D' && baseline !== null;
+  const reference = showBaseline ? baseline : undefined;
+  const { width, height, padding } = frame;
+  const closes = useMemo(() => history.map((c) => c.c), [history]);
+  const head = useMemo(
+    () => chartHead(closes, { width, height, padding }, reference),
+    [closes, width, height, padding, reference],
+  );
+  const area = useMemo(() => {
+    const values =
+      price === undefined || closes.length === 0 ? closes : [...closes.slice(0, -1), price];
+    return withLastPoint(head, values, { width, height, padding }, reference);
+  }, [head, closes, price, width, height, padding, reference]);
   const state: LoadState = query.isPending ? 'loading' : query.isError ? 'error' : 'ready';
 
   return {
     candles,
     baseline,
-    showBaseline: period === '1D' && baseline !== null,
+    showBaseline,
+    area,
     rising: (candles.at(-1)?.c ?? 0) >= (baseline ?? 0),
     axisCandles: axisCandles(candles),
     summary: describeChart(i18n, symbol, period, candles, baseline),
@@ -87,7 +120,7 @@ export function useStockDetail(symbol: string) {
   useLiveSymbols([symbol]);
 
   const quote = liveQuote ?? detail.data?.quote;
-  const notFound = isNotFound(detail.error);
+  const notFound = isApiError(detail.error, ErrorCode.NotFound);
 
   return {
     stock: detail.data?.stock,
@@ -138,4 +171,22 @@ export function useRefreshStock(symbol: string) {
       }
     },
   };
+}
+
+// Sector and name lookups by symbol, built once per stock list.
+export function useStockIndex(): {
+  stocks: StockWithQuote[];
+  sectorOf: (symbol: string) => Sector | undefined;
+  nameOf: (symbol: string) => string | undefined;
+} {
+  const { data } = useStocks();
+  return useMemo(() => {
+    const stocks = data ?? [];
+    const bySymbol = new Map(stocks.map((stock) => [stock.symbol, stock]));
+    return {
+      stocks,
+      sectorOf: (symbol) => bySymbol.get(symbol)?.sector,
+      nameOf: (symbol) => bySymbol.get(symbol)?.name,
+    };
+  }, [data]);
 }

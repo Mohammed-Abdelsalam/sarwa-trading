@@ -25,9 +25,8 @@ import { dollarsToTicks } from '@sarwa/domain';
 
 import { MarketService } from '../src/market/market.service';
 import { TradingEngine } from '../src/trading/engine.service';
-import { ExecutionService } from '../src/trading/execution.service';
 import { TradingConfigService } from '../src/trading-config/trading-config.service';
-import { FakeClock, startApp } from './app';
+import { FakeClock, pinned, startApp } from './app';
 
 // Every device endpoint, called through the shared route table and parsed with the schema the
 // core API client parses it with, so a path or shape drift fails here before it reaches a client.
@@ -89,12 +88,10 @@ const limitBuy = (limitTicks: number, quotedTicks: number) => ({
 });
 
 beforeAll(async () => {
-  ({ app } = await startApp({ clock }));
+  ({ app } = await startApp({ clock, ...pinned }));
   http = request(app.getHttpServer());
   market = app.get(MarketService);
   engine = app.get(TradingEngine);
-  market.random = () => 0.99;
-  app.get(ExecutionService).random = () => 0;
   await app
     .get(TradingConfigService)
     .update({ circuitBreaker: { enabled: false } }, { email: 'test@sarwa.dev' });

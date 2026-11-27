@@ -1,4 +1,4 @@
-import { type LiveStatus } from '@sarwa/core';
+import { type LiveStatus } from '@sarwa/core/pure';
 
 import { cn } from '../lib/cn';
 

@@ -3,6 +3,7 @@ import { type StockWithQuote } from '@sarwa/contracts';
 import {
   averageChangePct,
   filterAndSort,
+  heatmapTiles,
   keyStats,
   nextSort,
   nextWatchlistSort,
@@ -14,9 +15,10 @@ import {
   sortLabel,
   SORTS,
   sortStocks,
+  topMovers,
   watchLabel,
 } from '../src/markets';
-import { localized, makeQuote } from './utils';
+import { localized, makeQuote, makeStock } from './utils';
 
 function stock(
   symbol: string,
@@ -201,5 +203,28 @@ describe('nextWatchlistSort', () => {
     while (seen.at(-1) !== null) seen.push(nextWatchlistSort(seen.at(-1) ?? null));
 
     expect(seen).toEqual([...SORTS, null]);
+  });
+});
+
+describe('movers and heatmap', () => {
+  const stock = (symbol: string, price: number, volume: number, marketCap: number) =>
+    makeStock(symbol, { marketCap, quote: makeQuote({ symbol, price, prevClose: 100, volume }) });
+  const stocks = [stock('A', 110, 1, 300), stock('B', 90, 3, 100), stock('C', 100, 2, 600)];
+  const symbols = (list: readonly StockWithQuote[]) => list.map((s) => s.symbol);
+
+  it('ranks gainers, losers and the most active', () => {
+    expect(symbols(topMovers(stocks, 'gainers'))).toEqual(['A', 'C', 'B']);
+    expect(symbols(topMovers(stocks, 'losers'))).toEqual(['B', 'C', 'A']);
+    expect(symbols(topMovers(stocks, 'active', 2))).toEqual(['B', 'C']);
+  });
+
+  it('sizes heatmap tiles by market cap, biggest first', () => {
+    const tiles = heatmapTiles(stocks, (move) => String(move));
+
+    expect(tiles.map((tile) => [tile.key, tile.weight, tile.changeLabel])).toEqual([
+      ['C', 0.6, '0'],
+      ['A', 0.3, '1000'],
+      ['B', 0.1, '-1000'],
+    ]);
   });
 });

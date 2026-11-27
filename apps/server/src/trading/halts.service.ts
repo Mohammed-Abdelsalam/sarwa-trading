@@ -1,11 +1,22 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { type Halt as HaltRow } from '@prisma/client';
 import { Subject } from 'rxjs';
 
-import { type Halt } from '@sarwa/contracts';
+import { type CreateHalt, type Halt, type HaltDuration, type HaltImpact } from '@sarwa/contracts';
+import { marketSession } from '@sarwa/domain';
 
+import { type Actor, AuditService } from '../admin/audit.service';
 import { Clock } from '../common/clock';
+import { MarketService } from '../market/market.service';
 import { PrismaService, type Tx } from '../prisma.service';
+import { TradingConfigService } from '../trading-config/trading-config.service';
 import { CircuitBreaker } from './circuit-breaker';
 import { ExecutionQueue } from './execution-queue';
 import { toHalt, WORKING_STATUSES } from './mappers';
@@ -19,6 +30,10 @@ export interface NewHalt {
   resumesAt: number | null;
   createdBy: string | null;
 }
+
+const MINUTE_MS = 60_000;
+// A timed halt that runs out is resumed by the system, not by whoever created it.
+const SYSTEM: Actor = { email: 'system' };
 
 interface ActiveHalt {
   row: HaltRow;
@@ -40,6 +55,9 @@ export class HaltsService implements OnModuleInit, OnModuleDestroy {
     private readonly gateway: TradingGateway,
     private readonly notifications: NotificationsService,
     private readonly breaker: CircuitBreaker,
+    private readonly audit: AuditService,
+    private readonly market: MarketService,
+    private readonly config: TradingConfigService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -84,13 +102,64 @@ export class HaltsService implements OnModuleInit, OnModuleDestroy {
     return halt;
   }
 
-  async resume(symbol: string, audit?: (tx: Tx, halt: Halt) => Promise<void>): Promise<boolean> {
+  adminHalt(input: CreateHalt, actor: Actor): Promise<Halt> {
+    if (!this.market.quoteOf(input.symbol)) {
+      throw new NotFoundException(`Unknown symbol ${input.symbol}`);
+    }
+    return this.queue.run(async () => {
+      if (this.isHalted(input.symbol)) {
+        throw new ConflictException(`${input.symbol} is already halted`);
+      }
+      const halt = await this.halt(
+        {
+          symbol: input.symbol,
+          source: 'admin',
+          message: input.message,
+          resumesAt: this.resumesAt(input.duration),
+          createdBy: actor.email,
+        },
+        (tx, created) =>
+          this.audit.log(
+            {
+              actorEmail: actor.email,
+              action: 'halt.create',
+              entity: `Halt · ${input.symbol}`,
+              payload: { before: null, after: { ...created, notify: input.notify } },
+              ip: actor.ip,
+            },
+            tx,
+          ),
+      );
+      if (input.notify) await this.notifyAffected(halt);
+      return halt;
+    });
+  }
+
+  adminResume(symbol: string, actor: Actor): Promise<void> {
+    return this.queue.run(async () => {
+      if (!(await this.resume(symbol, actor))) {
+        throw new NotFoundException(`${symbol} is not halted`);
+      }
+    });
+  }
+
+  // Runs inside the execution queue; the audit row commits with the end of the halt.
+  async resume(symbol: string, actor: Actor): Promise<boolean> {
     const current = this.active.get(symbol);
     if (!current) return false;
     const now = this.clock.now();
     await this.prisma.$transaction(async (tx) => {
       await tx.halt.update({ where: { id: current.row.id }, data: { endedAt: new Date(now) } });
-      await audit?.(tx, toHalt(current.row));
+      await this.audit.log(
+        {
+          actorEmail: actor.email,
+          action: 'halt.resume',
+          entity: `Halt · ${symbol}`,
+          payload: { before: toHalt(current.row), after: null },
+          ip: actor.ip,
+        },
+        tx,
+      );
     });
     clearTimeout(current.timer);
     this.active.delete(symbol);
@@ -121,14 +190,33 @@ export class HaltsService implements OnModuleInit, OnModuleDestroy {
     return { accountIds: [...accountIds], openOrders: orders.length };
   }
 
+  async impact(symbol: string): Promise<HaltImpact> {
+    const { accountIds, openOrders } = await this.affectedAccounts(symbol);
+    return { symbol, openOrders, holdersAndWatchers: accountIds.length };
+  }
+
   async notifyAffected(halt: Halt): Promise<void> {
     const { accountIds } = await this.affectedAccounts(halt.symbol);
-    await this.notifications.notify(accountIds, {
+    this.notifications.enqueue(accountIds, {
       kind: 'symbol_halted',
       symbol: halt.symbol,
       message: halt.message,
       resumesAt: halt.resumesAt,
     });
+  }
+
+  private resumesAt(duration: HaltDuration): number | null {
+    const now = this.clock.now();
+    switch (duration) {
+      case '5m':
+        return now + 5 * MINUTE_MS;
+      case '15m':
+        return now + 15 * MINUTE_MS;
+      case 'until_close':
+        return marketSession(now, this.config.get().sessionMode).closesAt;
+      case 'manual':
+        return null;
+    }
   }
 
   private track(row: HaltRow): void {
@@ -139,7 +227,7 @@ export class HaltsService implements OnModuleInit, OnModuleDestroy {
         : setTimeout(
             () => {
               this.queue
-                .run(() => this.resume(row.symbol))
+                .run(() => this.resume(row.symbol, SYSTEM))
                 .catch((error: unknown) => {
                   this.logger.error(`Auto-resume of ${row.symbol} failed: ${String(error)}`);
                 });

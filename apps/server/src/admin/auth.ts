@@ -18,6 +18,13 @@ import { type Actor } from './audit.service';
 
 export const SESSION_TTL_SECONDS = 8 * 60 * 60;
 export const REMEMBER_TTL_SECONDS = 7 * 24 * 60 * 60;
+// Customer tokens will share the signing secret, so admin tokens name their audience.
+export const ADMIN_AUDIENCE = 'admin';
+
+export interface AdminToken {
+  sub: string;
+  ver: number;
+}
 
 export interface AdminRequest extends Request {
   admin?: AdminUserRow;
@@ -51,15 +58,17 @@ export class AdminSessions {
   async verify(token: string | undefined): Promise<AdminUserRow> {
     if (!token) throw new UnauthorizedException('Sign in required');
 
-    let adminId: string;
+    let claims: AdminToken;
     try {
-      adminId = (await this.jwt.verifyAsync<{ sub: string }>(token)).sub;
+      claims = await this.jwt.verifyAsync<AdminToken>(token, { audience: ADMIN_AUDIENCE });
     } catch {
       throw new UnauthorizedException('Session expired, sign in again');
     }
 
-    const admin = await this.prisma.adminUser.findUnique({ where: { id: adminId } });
+    const admin = await this.prisma.adminUser.findUnique({ where: { id: claims.sub } });
     if (admin?.status !== 'active') throw new UnauthorizedException('Account disabled');
+    if (admin.tokenVersion !== claims.ver)
+      throw new UnauthorizedException('Signed out, sign in again');
     return admin;
   }
 }

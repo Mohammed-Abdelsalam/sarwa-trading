@@ -1,0 +1,41 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.trading.example.com",
+        "EXPO_PUBLIC_WEB_URL": "https://trading.example.com"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.trading.example.com",
+        "EXPO_PUBLIC_WEB_URL": "https://trading.example.com"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.trading.example.com",
+        "EXPO_PUBLIC_WEB_URL": "https://trading.example.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

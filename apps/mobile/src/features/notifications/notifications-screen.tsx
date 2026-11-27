@@ -1,3 +1,4 @@
+import { FlashList } from '@shopify/flash-list';
 import {
   AlertTriangle,
   Bell,
@@ -8,7 +9,7 @@ import {
   Megaphone,
   Pause,
 } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, SectionList, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { type ColorRole } from '@sarwa/tokens';
@@ -76,7 +77,7 @@ function NotificationRow({ line, onPress }: { line: NotificationLine; onPress: (
 export function NotificationsScreen() {
   const { t } = useCopy();
   const colors = useColors();
-  const { groups, unreadCount, isLoading, isError, isLoadingMore, actions } =
+  const { items, unreadCount, isLoading, isError, isLoadingMore, actions } =
     useNotificationsScreen();
 
   return (
@@ -101,38 +102,41 @@ export function NotificationsScreen() {
         <Loading />
       ) : isError ? (
         <LoadError onRetry={actions.retry} />
-      ) : groups.length === 0 ? (
+      ) : items.length === 0 ? (
         <Empty icon={BellOff} title={t.notifications.empty} />
       ) : (
-        <SectionList
+        <FlashList
           testID="notifications-list"
-          sections={groups.map((group) => ({ ...group, data: group.items }))}
-          keyExtractor={(line) => line.id}
-          renderSectionHeader={({ section }) => (
-            <Text
-              variant="overline"
-              accessibilityRole="header"
-              className="bg-bg px-4 pb-1.5 pt-3.5 text-fg-3"
-            >
-              {section.title}
-            </Text>
-          )}
-          renderItem={({ item }) => (
-            <NotificationRow
-              line={item}
-              onPress={() => {
-                actions.open(item);
-              }}
-            />
-          )}
+          data={items}
+          keyExtractor={(item) => item.key}
+          getItemType={(item) => item.type}
+          renderItem={({ item }) =>
+            item.type === 'header' ? (
+              <Text
+                variant="overline"
+                accessibilityRole="header"
+                className="bg-bg px-4 pb-1.5 pt-3.5 text-fg-3"
+              >
+                {item.title}
+              </Text>
+            ) : (
+              <NotificationRow
+                line={item.line}
+                onPress={() => {
+                  actions.open(item.line);
+                }}
+              />
+            )
+          }
           ListFooterComponent={
-            isLoadingMore ? (
-              <ActivityIndicator className="py-4" color={colors['brand-fg']} />
-            ) : undefined
+            <View className="pb-10">
+              {isLoadingMore ? (
+                <ActivityIndicator className="py-4" color={colors['brand-fg']} />
+              ) : null}
+            </View>
           }
           onEndReached={actions.loadMore}
           onEndReachedThreshold={0.5}
-          contentContainerClassName="pb-10"
         />
       )}
     </SafeAreaView>

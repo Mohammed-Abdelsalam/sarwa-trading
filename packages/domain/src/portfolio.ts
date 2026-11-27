@@ -65,13 +65,47 @@ export function sellableMicros(position: Position | null, holds: readonly Hold[]
   return micros(Math.max(0, position.qtyMicros - reserved));
 }
 
+export interface TodayActivity {
+  qtyAtOpenMicros: Micros;
+  boughtCents: Cents;
+  soldCents: Cents;
+}
+
+// Database rows carry the side as a plain string and the amounts as bigints.
+export interface DayFill {
+  symbol: string;
+  side: string;
+  qtyMicros: number | bigint;
+  notionalCents: number | bigint;
+}
+
+// The shares held at the last close are worked back from today's fills; null when nothing traded.
+export function todayActivity(
+  fills: readonly DayFill[],
+  position: Pick<Position, 'symbol' | 'qtyMicros'>,
+): TodayActivity | null {
+  const own = fills.filter((fill) => fill.symbol === position.symbol);
+  if (own.length === 0) return null;
+  const sum = (side: Side, field: 'qtyMicros' | 'notionalCents') =>
+    own
+      .filter((fill) => fill.side === side)
+      .reduce((total, fill) => total + Number(fill[field]), 0);
+  return {
+    qtyAtOpenMicros: micros(
+      position.qtyMicros - sum('buy', 'qtyMicros') + sum('sell', 'qtyMicros'),
+    ),
+    boughtCents: cents(sum('buy', 'notionalCents')),
+    soldCents: cents(sum('sell', 'notionalCents')),
+  };
+}
+
 export interface PositionInput {
   position: Position;
   sector: string;
   lastTicks: Ticks;
   prevCloseTicks: Ticks;
   // Shares held at the last close and today's flows; omitted when nothing traded today.
-  today?: { qtyAtOpenMicros: Micros; boughtCents: Cents; soldCents: Cents };
+  today?: TodayActivity;
 }
 
 export interface PortfolioInput {

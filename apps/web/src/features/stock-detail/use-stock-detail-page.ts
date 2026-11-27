@@ -21,6 +21,21 @@ import {
 import { replaceSearchParam, useSearchParam } from '../../lib/browser';
 import { useCopy } from '../../lib/i18n';
 
+// The header buttons are a client island inside the server-rendered heading.
+export function useStockActions(symbol: string) {
+  const { t } = useCopy();
+  const { watched, toggle } = useWatchToggle(symbol);
+  return {
+    watched,
+    toggleWatch: toggle,
+    labels: {
+      alert: t.stock.alert,
+      watch: watched ? t.stock.watching : t.stock.watch,
+      watchA11y: watchLabel(t, symbol, watched),
+    },
+  };
+}
+
 // Period and chart type live in the URL (?period=1M&type=candle) so a view can be shared (W-Detail).
 export function useStockDetailPage(symbol: string) {
   const { t, f } = useCopy();
@@ -42,7 +57,6 @@ export function useStockDetailPage(symbol: string) {
     ...detail,
     watched,
     live: status === 'live',
-    sectorLabel,
     similar: similarStocks(stocks.data ?? [], symbol),
     chart: { period, type, enabledPeriods },
     quoteLine:
@@ -75,10 +89,6 @@ export function useStockDetailPage(symbol: string) {
         }
       : null,
     labels: {
-      alert: t.stock.alert,
-      watch: watched ? t.stock.watching : t.stock.watch,
-      watchA11y: watchLabel(t, symbol, watched),
-      markets: t.markets.title,
       similar: sectorLabel ? t.stock.moreIn({ sector: sectorLabel }) : t.stock.moreInSector,
       loadError: t.stock.loadError({ symbol }),
       loadErrorBody: t.common.loadErrorBody,

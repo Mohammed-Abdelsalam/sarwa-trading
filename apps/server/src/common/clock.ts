@@ -8,6 +8,17 @@ export class Clock {
   }
 }
 
+// Runs the simulator's ticks; tests that set every price themselves swap in one that never fires.
+@Injectable()
+export class Ticker {
+  every(ms: number, task: () => void): () => void {
+    const timer = setInterval(task, ms);
+    return () => {
+      clearInterval(timer);
+    };
+  }
+}
+
 @Global()
-@Module({ providers: [Clock], exports: [Clock] })
+@Module({ providers: [Clock, Ticker], exports: [Clock, Ticker] })
 export class ClockModule {}

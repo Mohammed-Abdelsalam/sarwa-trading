@@ -1,6 +1,5 @@
 import { type AlertIssueCopy, type Count, type RejectionCopy } from '../copy';
 import { plural } from '../locale';
-import { adminAr } from './admin-ar';
 import { type Messages } from './en';
 
 const minutes = ({ count, n }: Count) =>
@@ -329,6 +328,18 @@ export const ar = {
     tradingDisclosure: 'تداول تجريبي · أسعار محاكاة · ليست نصيحة استثمارية',
     orderNote:
       'أمر تجريبي على أسعار محاكاة. قد تُنفَّذ أوامر السوق بسعر يختلف قليلًا عن السعر المعروض.',
+    virtualStart: 'الرصيد الافتراضي الأولي',
+  },
+  notFound: {
+    metaTitle: 'غير موجودة',
+    title: 'الصفحة غير موجودة',
+    body: 'هذا الرابط لا يؤدي إلى أي مكان في Mini Trading.',
+    back: 'العودة إلى الأسواق',
+  },
+  errorPage: {
+    title: 'حدث خطأ ما',
+    body: 'حدث خطأ غير متوقع. قائمة المفضلة لديك آمنة.',
+    retry: 'حاول مجددًا',
   },
   market: {
     open: ({ time }) => `مفتوحة · تُغلق ${time}`,
@@ -512,12 +523,18 @@ export const ar = {
     filledLine: ({ shares, price }) => `نُفّذ ${shares} @ ${price}`,
     filledAtPrice: ({ price }) => `نُفّذ @ ${price}`,
     working: ({ shares }) => `قيد التنفيذ · متبقٍ ${shares}`,
+    workingAmount: ({ amount }) => `قيد التنفيذ · متبقٍ ${amount}`,
+    reservedCash: ({ amount }) => `حُجز ${amount}`,
     expiresAtClose: ({ time }) => `ينتهي عند إغلاق اليوم · ${time}`,
     earlyCloseNote: '(إغلاق مبكر)',
     triggersAbove: ({ price }) => `يُفعَّل إذا ≥ ${price}`,
     triggersBelow: ({ price }) => `يُفعَّل إذا ≤ ${price}`,
     lastAway: ({ price, pct }) => `آخر سعر ${price} · يبعد ${pct}`,
-    canceledByYou: 'ألغيته أنت',
+    canceledBy: {
+      user: 'ألغيته أنت',
+      admin_reset: 'أُلغي · أُعيد ضبط الحساب',
+      symbol_disabled: 'أُلغي · السهم لم يعد متداولًا',
+    },
     expiredAtClose: 'انتهى عند الإغلاق',
     proceedsSoFar: 'العائد حتى الآن',
     costSoFar: 'التكلفة حتى الآن',
@@ -605,6 +622,7 @@ export const ar = {
     aboveCurrent: ({ pct }) => `${pct} أعلى من السعر الحالي`,
     belowCurrent: ({ pct }) => `${pct} أدنى من السعر الحالي`,
     away: ({ price, pct }) => `الآن ${price} · يبعد ${pct}`,
+    todayMove: ({ pct }) => `اليوم ${pct}`,
     triggeredAt: ({ time, price }) => `فُعِّل ${time} عند ${price}`,
     repeat: 'التكرار',
     repeats: {
@@ -665,7 +683,6 @@ export const ar = {
     marketClosesEarly: 'تُغلق الأسواق مبكرًا اليوم',
     marketClosesEarlyBody: ({ time }) => `تنتهي الجلسة العادية الساعة ${time}.`,
   },
-  admin: adminAr,
   rejections,
   alertIssues,
 } satisfies Messages;

@@ -1,9 +1,14 @@
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 
-import { cents, micros, useOrderTicket, usePortfolio, useTradingStatus } from '@sarwa/core';
+import {
+  type Ticket,
+  ticketResultView,
+  useOrderTicket,
+  usePortfolio,
+  useTradingStatus,
+} from '@sarwa/core';
 import { breakpoints } from '@sarwa/tokens';
-import { type EstimateRow } from '@sarwa/ui';
 
 import {
   isTyping,
@@ -14,9 +19,8 @@ import {
   useWindowKeyDown,
 } from '../../lib/browser';
 import { type Copy, useCopy } from '../../lib/i18n';
-import { entryView, reviewView, type Ticket } from './ticket-copy';
+import { entryView, reviewView } from './ticket-copy';
 
-export type PanelMode = 'panel' | 'drawer' | 'sheet';
 type Side = 'buy' | 'sell';
 type Session = ReturnType<typeof useTradingStatus>['data'];
 type Summary = ReturnType<typeof usePortfolio>['summary'];
@@ -36,78 +40,21 @@ export function resultView(
   const result = ticket.result;
   if (!result) return null;
   const { order } = result;
-  const buying = order.side === 'buy';
-
-  if (order.status === 'filled') {
-    const position = summary?.positions.find((p) => p.symbol === symbol);
-    const rows: EstimateRow[] = [
-      {
-        label: t.ticket.avgFillPrice,
-        value: result.avgFillTicks === null ? '—' : f.price(result.avgFillTicks),
-      },
-      {
-        label: t.ticket.vsQuote,
-        value: t.ticket.slippage({
-          amount: f.money(result.slippageCents ?? cents(0), { signed: true }),
-        }),
-      },
-      {
-        label: t.ticket.filledAt,
-        value: f.time(order.closedAt ?? order.updatedAt, { seconds: true }),
-      },
-      { label: t.ticket.orderId, value: order.id },
-    ];
-    return {
-      tone: 'pos' as const,
-      title: t.ticket.filledTitle,
-      body: (buying ? t.ticket.youBought : t.ticket.youSold)({
-        shares: f.shares(micros(order.filledMicros)),
-        symbol,
-        amount: f.money(cents(order.filledNotionalCents)),
-      }),
-      rows,
-      position: position
-        ? [
-            {
-              label: t.ticket.newPosition,
-              value: t.ticket.quantityShares({ shares: f.shares(position.qtyMicros) }),
-            },
-            { label: t.ticket.avgCost, value: f.price(position.averageCostTicks) },
-            { label: t.ticket.weight, value: f.percent(position.weightBps) },
-          ]
-        : [],
-    };
-  }
-  if (order.status === 'queued') {
-    return {
-      tone: 'brand' as const,
-      title: t.ticket.queuedTitle,
-      body: t.ticket.queuedBody({ time: f.dateTime(session?.session.opensAt ?? order.createdAt) }),
-      rows: [{ label: t.ticket.orderId, value: order.id }],
-      position: [],
-    };
-  }
-  if (order.status === 'rejected') {
-    return {
-      tone: 'neg' as const,
-      title: t.notifications.orderRejected,
-      body: order.rejection ? copy.rejection(order.rejection, symbol).explanation : '',
-      rows: [{ label: t.ticket.orderId, value: order.id }],
-      position: [],
-    };
-  }
+  const opensAt = session?.session.opensAt ?? null;
+  const position =
+    order.filledMicros > 0 ? summary?.positions.find((p) => p.symbol === symbol) : undefined;
   return {
-    tone: 'info' as const,
-    title:
-      order.status === 'open' || order.status === 'partially_filled'
-        ? t.ticket.placedTitle
-        : t.orderStatus[order.status],
-    body: t.ticket.placedBody,
-    rows: [
-      { label: t.orders.columns.status, value: t.orderStatus[order.status] },
-      { label: t.ticket.orderId, value: order.id },
-    ],
-    position: [],
+    ...ticketResultView(order, result, { symbol, opensAt }, copy),
+    position: position
+      ? [
+          {
+            label: t.ticket.newPosition,
+            value: t.ticket.quantityShares({ shares: f.shares(position.qtyMicros) }),
+          },
+          { label: t.ticket.avgCost, value: f.price(position.averageCostTicks) },
+          { label: t.ticket.weight, value: f.percent(position.weightBps) },
+        ]
+      : [],
   };
 }
 
@@ -117,14 +64,15 @@ export function useOrderPanel(symbol: string) {
   const { t, m } = copy;
   const router = useRouter();
   const trade = parseSide(useSearchParam('trade'));
+  // CSS lays out the side panel and the trade bar; these only decide how the ticket behaves.
   const wide = useMediaQuery(`(min-width: ${String(breakpoints.xl)}px)`);
   const tablet = useMediaQuery(`(min-width: ${String(breakpoints.md)}px)`);
-  const mode: PanelMode = wide ? 'panel' : tablet ? 'drawer' : 'sheet';
   const ticket = useOrderTicket({ symbol, initialSide: trade ?? 'buy' });
   const status = useTradingStatus().data;
   const { summary } = usePortfolio();
   const mod = useModKey();
-  const open = mode === 'panel' || trade !== null;
+  const overlayOpen = !wide && trade !== null;
+  const open = wide || overlayOpen;
 
   const openTicket = (side: Side) => {
     replaceSearchParam('trade', side);
@@ -158,10 +106,11 @@ export function useOrderPanel(symbol: string) {
   });
 
   return {
-    mode,
+    overlay: tablet ? ('drawer' as const) : ('sheet' as const),
+    overlayOpen,
     open,
     step: ticket.step,
-    entry: entryView(ticket, symbol, status?.session, copy),
+    entry: entryView(ticket, symbol, status, copy),
     review: ticket.step === 'review' ? reviewView(ticket, { symbol, mod }, copy) : null,
     result: resultView(ticket, symbol, status, summary, copy),
     labels: {
@@ -211,7 +160,7 @@ export function useOrderPanel(symbol: string) {
       },
       done: () => {
         ticket.reset();
-        if (mode !== 'panel') replaceSearchParam('trade', null);
+        if (!wide) replaceSearchParam('trade', null);
       },
     },
   };

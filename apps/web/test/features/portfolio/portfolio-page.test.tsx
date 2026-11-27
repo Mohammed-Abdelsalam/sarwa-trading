@@ -1,8 +1,9 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { downloadCsv } from '@sarwa/ui';
+
 import { PortfolioPage } from '../../../src/features/portfolio/portfolio-page';
-import { downloadCsv } from '../../../src/lib/csv';
 import { providers } from '../../copy';
 import { makePortfolio, makeQuote, makeStock } from '../../fixtures';
 
@@ -11,8 +12,8 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push, replace: jest.fn() }),
 }));
-jest.mock('../../../src/lib/csv', () => ({
-  ...jest.requireActual<object>('../../../src/lib/csv'),
+jest.mock('@sarwa/ui', () => ({
+  ...jest.requireActual<object>('@sarwa/ui'),
   downloadCsv: jest.fn(),
 }));
 

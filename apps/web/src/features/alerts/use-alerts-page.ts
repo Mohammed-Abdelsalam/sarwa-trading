@@ -2,11 +2,9 @@ import { useState } from 'react';
 
 import { type Alert, type StockWithQuote } from '@sarwa/contracts';
 import {
-  absolute,
+  alertDetail,
   alertRuleText,
-  changeBps,
-  ticks,
-  toTradeQuote,
+  alertState,
   useAlerts,
   useDeleteAlert,
   useStocks,
@@ -16,40 +14,16 @@ import {
 import { replaceSearchParam, useNotificationPermission, useSearchParam } from '../../lib/browser';
 import { type Copy, useCopy } from '../../lib/i18n';
 
-export type AlertState = 'active' | 'paused' | 'triggered';
-
-export function alertState(alert: Alert): AlertState {
-  if (!alert.enabled) return 'paused';
-  return !alert.armed && alert.lastFiredAt !== null ? 'triggered' : 'active';
-}
-
 export function alertRow(alert: Alert, stock: StockWithQuote | undefined, copy: Copy) {
-  const { t, f, m } = copy;
+  const { t } = copy;
   const state = alertState(alert);
-  const quote = stock ? toTradeQuote(stock.quote) : null;
-  let distance = '';
-  if (state === 'triggered' && alert.lastFiredAt !== null) {
-    distance = t.alerts.triggeredAt({
-      time: f.time(alert.lastFiredAt),
-      price: alert.thresholdTicks === null ? '—' : f.price(ticks(alert.thresholdTicks)),
-    });
-  } else if (alert.condition === 'move_today' && quote) {
-    distance = m.alerts.todayMove({
-      pct: f.percent(changeBps(quote.prevCloseTicks, quote.lastTicks), { signed: true }),
-    });
-  } else if (quote && alert.thresholdTicks !== null) {
-    distance = t.alerts.away({
-      price: f.price(quote.lastTicks),
-      pct: f.percent(absolute(changeBps(quote.lastTicks, alert.thresholdTicks))),
-    });
-  }
   return {
     id: alert.id,
     symbol: alert.symbol,
     sector: stock?.sector ?? 'tech',
     enabled: alert.enabled,
     condition: alertRuleText(alert, copy),
-    distance,
+    distance: alertDetail(alert, stock?.quote, copy),
     repeat: alert.repeat === 'every' ? t.alerts.recurring : t.alerts.repeats.once,
     state,
     stateLabel: t.alerts.states[state],

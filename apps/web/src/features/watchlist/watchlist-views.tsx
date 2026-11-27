@@ -1,7 +1,6 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Star } from 'lucide-react';
 import { type Route } from 'next';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 import { type StockWithQuote } from '@sarwa/contracts';
 import {
@@ -78,7 +77,6 @@ function TableRow({
   stale: boolean;
   onRemove: (symbol: string) => void;
 }) {
-  const router = useRouter();
   const { t, f } = useI18n();
   const quote = useQuote(stock.symbol) ?? stock.quote;
   const pct = changePct(quote);
@@ -86,18 +84,13 @@ function TableRow({
   const href = `/stocks/${stock.symbol}` as Route;
 
   return (
-    <tr
-      tabIndex={0}
-      className="hover:bg-surface-3 focus-visible:bg-surface-3 focus-visible:outline-focus cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 [&>td]:h-13 [&>td]:px-3"
-      onClick={() => {
-        router.push(href);
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' && event.target === event.currentTarget) router.push(href);
-      }}
-    >
+    <tr className="hover:bg-surface-3 has-focus-visible:bg-surface-3 relative [&>td]:h-13 [&>td]:px-3">
       <td className="ps-5!">
-        <Link href={href} tabIndex={-1} className="flex items-center gap-3">
+        {/* Stretched over the row: one tab stop and one link name per stock, no clickable tr. */}
+        <Link
+          href={href}
+          className="focus-visible:after:outline-focus flex items-center gap-3 after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2"
+        >
           <StockAvatar symbol={stock.symbol} sector={stock.sector} />
           <span>
             <span className="type-symbol block">{stock.symbol}</span>
@@ -108,16 +101,18 @@ function TableRow({
       <td className="text-end">
         <PriceFlash price={quote.price} format={(price) => formatPrice(f, price)} muted={stale} />
       </td>
-      <td className={cn('text-end font-semibold tabular-nums', COLOR[direction(delta)])}>
+      <td
+        className={cn('text-end font-semibold tabular-nums max-md:hidden', COLOR[direction(delta)])}
+      >
         {formatChange(f, delta)}
       </td>
       <td className="text-end">
         <ChangePill value={pct} label={formatPct(f, pct)} size="sm" />
       </td>
-      <td>
+      <td className="max-md:hidden">
         <Sparkline values={stock.sparkline} direction={direction(pct)} width={96} height={28} />
       </td>
-      <td>
+      <td className="max-md:hidden">
         <div className="type-caption text-fg-3 flex items-center gap-2 tabular-nums">
           <span>{formatPrice(f, quote.dayLow)}</span>
           <span className="bg-surface-3 relative h-1 w-20 rounded-full">
@@ -131,12 +126,15 @@ function TableRow({
           <span>{formatPrice(f, quote.dayHigh)}</span>
         </div>
       </td>
-      <td className="text-fg-2 text-end tabular-nums">{formatMarketCap(f, stock.marketCap)}</td>
+      <td className="text-fg-2 text-end tabular-nums max-md:hidden">
+        {formatMarketCap(f, stock.marketCap)}
+      </td>
       <td className="text-end">
         <StarButton
           label={watchLabel(t, stock.symbol, true)}
           watched
           size={36}
+          className="relative z-10"
           onToggle={() => {
             onRemove(stock.symbol);
           }}
@@ -161,7 +159,7 @@ export function WatchlistTable({
 }) {
   const columns = useI18n().t.watchlist.columns;
   return (
-    <div className="border-border bg-surface overflow-x-auto rounded-lg border">
+    <div className="border-border bg-surface relative overflow-x-auto rounded-lg border">
       <table className="type-sm [&_td]:border-border w-full border-separate border-spacing-0 [&_td]:border-b [&_tr:last-child_td]:border-b-0">
         <thead className="type-caption text-fg-3 [&_th]:border-border [&_th]:h-10 [&_th]:border-b [&_th]:font-semibold">
           <tr>
@@ -173,7 +171,7 @@ export function WatchlistTable({
               onSort={onSort}
               align="end"
             />
-            <th scope="col" className="px-3 text-end">
+            <th scope="col" className="px-3 text-end max-md:hidden">
               {columns.change}
             </th>
             <SortHeader
@@ -183,13 +181,13 @@ export function WatchlistTable({
               onSort={onSort}
               align="end"
             />
-            <th scope="col" className="px-3 text-start">
+            <th scope="col" className="px-3 text-start max-md:hidden">
               {columns.today}
             </th>
-            <th scope="col" className="px-3 text-start">
+            <th scope="col" className="px-3 text-start max-md:hidden">
               {columns.dayRange}
             </th>
-            <th scope="col" className="px-3 text-end">
+            <th scope="col" className="px-3 text-end max-md:hidden">
               {columns.marketCap}
             </th>
             <th scope="col">

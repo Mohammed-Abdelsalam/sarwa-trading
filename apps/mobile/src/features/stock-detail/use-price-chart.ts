@@ -7,7 +7,6 @@ import { type Period } from '@sarwa/contracts';
 import {
   candleGeometry,
   candleIndexAt,
-  chartGeometry,
   type ChartType,
   nearestPointIndex,
   type ScrubPoint,
@@ -34,17 +33,11 @@ export function usePriceChart({
   height: number;
   onScrub: (point: ScrubPoint | null) => void;
 }) {
-  const series = useChartSeries(symbol, period);
+  const series = useChartSeries(symbol, period, { width, height, padding: PADDING });
   const activeIndex = useSharedValue(NONE);
   const count = series.candles.length;
 
-  const area = chartGeometry(
-    series.candles.map((c) => c.c),
-    width,
-    height,
-    PADDING,
-    series.showBaseline ? (series.baseline ?? undefined) : undefined,
-  );
+  const { area } = series;
   const candles = candleGeometry(series.candles, width, height, PADDING);
   // The crosshair rides the line in area mode and each candle's close in candle mode.
   const points =

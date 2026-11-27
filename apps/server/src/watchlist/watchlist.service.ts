@@ -1,16 +1,12 @@
-import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { type WatchlistResponse } from '@sarwa/contracts';
 
-import { AppConfigService } from '../app-config/app-config.service';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class WatchlistService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly appConfig: AppConfigService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(deviceId: string): Promise<WatchlistResponse> {
     await this.touchDevice(deviceId);
@@ -23,7 +19,6 @@ export class WatchlistService {
   }
 
   async add(deviceId: string, symbol: string): Promise<void> {
-    this.assertWritable();
     const stock = await this.prisma.stock.findUnique({
       where: { symbol },
       select: { isEnabled: true },
@@ -38,14 +33,7 @@ export class WatchlistService {
   }
 
   async remove(deviceId: string, symbol: string): Promise<void> {
-    this.assertWritable();
     await this.prisma.watchlistItem.deleteMany({ where: { deviceId, symbol } });
-  }
-
-  private assertWritable(): void {
-    if (this.appConfig.get().maintenanceMode) {
-      throw new ServiceUnavailableException('Watchlists are read-only during maintenance');
-    }
   }
 
   private async touchDevice(id: string): Promise<void> {

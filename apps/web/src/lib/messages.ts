@@ -15,6 +15,7 @@ const en = {
     skip: 'Skip to content',
   },
   list: { loadMore: 'Load more' },
+  loading: 'Loading…',
   palette: {
     label: 'Command palette',
     placeholder: 'Search stocks, actions or pages…',
@@ -61,7 +62,7 @@ const en = {
     emptyFiltered: 'No orders match these filters.',
     loadError: "Couldn't load your orders",
     cancelA11y: ({ symbol }: Sym) => `Cancel ${symbol} order`,
-    openA11y: ({ id }: { id: string }) => `Open order ${id}`,
+    openA11y: ({ id, symbol }: Sym & { id: string }) => `Open ${symbol} order ${id}`,
     newPrice: 'New price',
     newQuantity: 'New quantity (shares)',
     saveChanges: 'Save changes',
@@ -75,7 +76,6 @@ const en = {
     enable: 'Resume alert',
     disable: 'Pause alert',
     delete: 'Delete alert',
-    todayMove: ({ pct }: { pct: string }) => `Today ${pct}`,
     loadError: "Couldn't load your alerts",
     createError: "Couldn't create the alert. Try again.",
     targetInvalid: 'Enter a valid number.',
@@ -89,16 +89,17 @@ const en = {
     account: 'Paper account',
     accountId: 'Account ID',
   },
-  errorPage: {
-    title: 'Something went wrong',
-    body: 'The page hit an unexpected error. Your watchlist is safe.',
-    retry: 'Try again',
-  },
-  notFound: {
-    metaTitle: 'Not found',
-    title: 'Page not found',
-    body: "This link doesn't lead anywhere in Mini Trading.",
-    back: 'Back to Markets',
+  seo: {
+    siteName: 'Mini Trading',
+    description:
+      'Practice trading US stocks with $100,000 in virtual cash: live prices, charts, a watchlist and price alerts.',
+    marketsDescription:
+      'Browse US stocks by sector, sort by movers and open any company for its chart and key statistics.',
+    stockTitle: ({ symbol, name }: Sym & { name: string }) => `${name} (${symbol})`,
+    stockDescription: ({ symbol, name, sector }: Sym & { name: string; sector: string }) =>
+      `${name} (${symbol}) stock in ${sector}: live chart, key statistics and paper trading on Mini Trading.`,
+    stockUnavailable: ({ symbol }: Sym) => `${symbol} unavailable`,
+    stockEntity: ({ symbol }: Sym) => `${symbol} stock`,
   },
 };
 
@@ -114,6 +115,7 @@ const ar: AppMessages = {
     skip: 'انتقل إلى المحتوى',
   },
   list: { loadMore: 'تحميل المزيد' },
+  loading: 'جارٍ التحميل…',
   palette: {
     label: 'لوحة الأوامر',
     placeholder: 'ابحث عن سهم أو أمر أو صفحة…',
@@ -160,7 +162,7 @@ const ar: AppMessages = {
     emptyFiltered: 'لا أوامر تطابق هذه المرشحات.',
     loadError: 'تعذّر تحميل أوامرك',
     cancelA11y: ({ symbol }) => `إلغاء أمر ${symbol}`,
-    openA11y: ({ id }) => `فتح الأمر ${id}`,
+    openA11y: ({ id, symbol }) => `فتح أمر ${symbol} ${id}`,
     newPrice: 'السعر الجديد',
     newQuantity: 'الكمية الجديدة (أسهم)',
     saveChanges: 'حفظ التغييرات',
@@ -174,7 +176,6 @@ const ar: AppMessages = {
     enable: 'استئناف التنبيه',
     disable: 'إيقاف التنبيه مؤقتًا',
     delete: 'حذف التنبيه',
-    todayMove: ({ pct }) => `اليوم ${pct}`,
     loadError: 'تعذّر تحميل تنبيهاتك',
     createError: 'تعذّر إنشاء التنبيه. حاول مجددًا.',
     targetInvalid: 'أدخل رقمًا صحيحًا.',
@@ -188,16 +189,17 @@ const ar: AppMessages = {
     account: 'الحساب التجريبي',
     accountId: 'رقم الحساب',
   },
-  errorPage: {
-    title: 'حدث خطأ ما',
-    body: 'واجهت الصفحة خطأً غير متوقع. قائمة المفضلة لديك آمنة.',
-    retry: 'حاول مجددًا',
-  },
-  notFound: {
-    metaTitle: 'غير موجودة',
-    title: 'الصفحة غير موجودة',
-    body: 'هذا الرابط لا يؤدي إلى أي مكان في Mini Trading.',
-    back: 'العودة إلى الأسواق',
+  seo: {
+    siteName: 'Mini Trading',
+    description:
+      'تدرّب على تداول الأسهم الأمريكية بـ 100,000 دولار افتراضية: أسعار مباشرة ورسوم بيانية وقائمة مفضلة وتنبيهات أسعار.',
+    marketsDescription:
+      'تصفّح الأسهم الأمريكية حسب القطاع، ورتّبها حسب الأكثر حركة، وافتح أي شركة لترى رسمها البياني وأهم إحصاءاتها.',
+    stockTitle: ({ symbol, name }) => `${name} (${symbol})`,
+    stockDescription: ({ symbol, name, sector }) =>
+      `سهم ${name} (${symbol}) في قطاع ${sector}: رسم بياني مباشر وإحصاءات رئيسية وتداول تجريبي على Mini Trading.`,
+    stockUnavailable: ({ symbol }) => `${symbol} غير متاح`,
+    stockEntity: ({ symbol }) => `سهم ${symbol}`,
   },
 };
 

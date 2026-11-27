@@ -7,7 +7,6 @@ import {
   Headers,
   HttpCode,
   Injectable,
-  Param,
   Patch,
   type PipeTransform,
   Post,
@@ -18,7 +17,6 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { type Account as AccountRow } from '@prisma/client';
 import { type Response } from 'express';
-import { z } from 'zod';
 
 import {
   type CancelOrderResponse,
@@ -36,6 +34,7 @@ import {
 } from '@sarwa/contracts';
 
 import { DeviceId, WritableGuard } from '../common/device';
+import { IdParam } from '../common/params';
 import { ValidationException, ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AccountsService } from './accounts.service';
 import { OrdersService } from './orders.service';
@@ -51,8 +50,6 @@ export class AccountPipe implements PipeTransform<string, Promise<AccountRow>> {
 }
 
 export const DeviceAccount = () => DeviceId(AccountPipe);
-
-const IdParam = () => Param('id', new ZodValidationPipe(z.string().min(1).max(64)));
 
 function idempotencyKey(value: string | undefined): string {
   const parsed = IdempotencyKeySchema.safeParse(value);

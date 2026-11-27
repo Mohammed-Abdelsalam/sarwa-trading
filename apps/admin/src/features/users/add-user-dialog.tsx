@@ -1,14 +1,13 @@
 import { CircleCheck, Eye, UserPlus, Shield } from 'lucide-react';
 
 import { RoleSchema } from '@sarwa/contracts';
-import { useI18n } from '@sarwa/core';
-import { PASSWORD_MIN_LENGTH } from '@sarwa/core/admin';
+import { PASSWORD_MIN_LENGTH, useAdminI18n } from '@sarwa/core/admin';
 import { Button, Callout, cn, Dialog, Field, Input } from '@sarwa/ui';
 
 import { type UsersPageModel } from './use-users-page';
 
 export function AddUserDialog({ add }: { add: UsersPageModel['add'] }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.users;
   const errorText = (key: 'email' | 'name' | 'password') => {
     const code = add.errors[key];

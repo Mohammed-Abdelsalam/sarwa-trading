@@ -1,8 +1,7 @@
-import { useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
-import { StockDetailScreen } from '../../features/stock-detail/stock-detail-screen';
-
-export default function StockRoute() {
-  const { symbol } = useLocalSearchParams<{ symbol: string }>();
-  return <StockDetailScreen symbol={symbol.toUpperCase()} />;
+// Old links and the search screen still use /stock; they land on the canonical /stocks route.
+export default function LegacyStockRoute() {
+  const { symbol } = useLocalSearchParams<{ symbol?: string }>();
+  return <Redirect href={{ pathname: '/stocks/[symbol]', params: { symbol: symbol ?? '' } }} />;
 }

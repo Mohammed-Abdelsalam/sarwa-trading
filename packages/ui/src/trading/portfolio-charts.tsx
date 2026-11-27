@@ -1,7 +1,8 @@
-import { DIRECTION_ARROW, direction as toDirection } from '@sarwa/core';
+import { DIRECTION_ARROW, direction as toDirection } from '@sarwa/core/pure';
 import { type Sector } from '@sarwa/tokens';
 
 import { cn } from '../lib/cn';
+import { type LinkComponent, PlainLink } from '../primitives/navigation';
 
 export type AllocationColor = Sector | 'cash' | 'brand' | 'info' | 'warn' | 'pos' | 'neg';
 
@@ -91,36 +92,57 @@ export function Heatmap({
   label,
   fullScale = 3.5,
   largeAt = 0.1,
+  tileHref,
+  link: Link = PlainLink,
   className,
 }: {
   tiles: readonly HeatmapTile[];
   label: string;
   fullScale?: number;
   largeAt?: number;
+  tileHref?: (key: string) => string;
+  link?: LinkComponent;
   className?: string;
 }) {
   return (
     <ul
       aria-label={label}
-      className={cn('grid grid-flow-dense auto-rows-[4rem] grid-cols-6 gap-1', className)}
+      className={cn(
+        'grid grid-flow-dense auto-rows-[4rem] grid-cols-3 gap-1 sm:grid-cols-4 md:grid-cols-6',
+        className,
+      )}
     >
       {tiles.map((tile) => {
         const dir = toDirection(tile.change);
         const level = Math.min(3, Math.floor((Math.abs(tile.change) / fullScale) * 4));
-        return (
-          <li
-            key={tile.key}
-            className={cn(
-              'text-fg flex min-w-0 flex-col justify-between rounded-md px-2.5 py-2',
-              HEAT_LEVELS[dir][level],
-              tile.weight >= largeAt && 'col-span-2 row-span-2',
-            )}
-          >
+        const body = (
+          <>
             <span className="type-sm truncate font-bold">{tile.label}</span>
             <span className="text-xs leading-none font-semibold tabular-nums">
               <span aria-hidden>{DIRECTION_ARROW[dir]} </span>
               {tile.changeLabel}
             </span>
+          </>
+        );
+        return (
+          <li
+            key={tile.key}
+            className={cn(
+              'text-fg relative flex min-w-0 flex-col justify-between rounded-md px-2.5 py-2',
+              HEAT_LEVELS[dir][level],
+              tile.weight >= largeAt && 'col-span-2 row-span-2',
+            )}
+          >
+            {tileHref ? (
+              <Link
+                href={tileHref(tile.key)}
+                className="focus-visible:after:outline-focus flex min-h-0 flex-1 flex-col justify-between after:absolute after:inset-0 after:rounded-md focus-visible:outline-none focus-visible:after:outline-2"
+              >
+                {body}
+              </Link>
+            ) : (
+              body
+            )}
           </li>
         );
       })}

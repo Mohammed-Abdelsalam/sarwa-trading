@@ -6,6 +6,7 @@ import { useRefreshAppConfig } from '@sarwa/core';
 
 import { Button } from '../../components/ui/button';
 import { Text } from '../../components/ui/text';
+import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
 
 const RETRY_MS = 30_000;
@@ -33,29 +34,26 @@ function MaintenanceArt() {
 export function MaintenanceScreen() {
   const colors = useColors();
   const checkAgain = useRefreshAppConfig({ every: RETRY_MS });
+  const { m, f } = useCopy();
 
   return (
     <SafeAreaView className="flex-1 bg-bg">
       <View className="flex-1 items-center justify-center gap-4 px-9 pb-20">
         <MaintenanceArt />
         <Text variant="h1" className="text-center">
-          {"We'll be right back"}
+          {m.maintenance.title}
         </Text>
-        <Text className="text-center text-fg-2">
-          {
-            "Mini Trading is getting a scheduled upgrade. Your watchlist is saved and live prices return as soon as we're done."
-          }
-        </Text>
+        <Text className="text-center text-fg-2">{m.maintenance.body}</Text>
         <View className="mt-3 w-full gap-2">
           <Button
             size="lg"
             icon={<RefreshCw size={16} color={colors['on-brand']} />}
             onPress={checkAgain}
           >
-            Check again
+            {m.maintenance.checkAgain}
           </Button>
           <Text variant="caption" className="text-center text-fg-3">
-            {"We'll also retry automatically every 30 s."}
+            {m.maintenance.autoRetry({ seconds: f.number(RETRY_MS / 1000) })}
           </Text>
         </View>
       </View>

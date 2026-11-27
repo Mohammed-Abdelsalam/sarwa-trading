@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { type Direction } from '@sarwa/core';
+import { type Direction } from '@sarwa/core/pure';
 import { type PriceSize } from '@sarwa/tokens';
 
 import { cn } from '../lib/cn';

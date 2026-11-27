@@ -10,6 +10,7 @@ import {
 } from '@sarwa/domain';
 
 import { Clock } from '../../src/common/clock';
+import { SlippageRandom } from '../../src/common/random';
 import { ExecutionService } from '../../src/trading/execution.service';
 
 const T0 = Date.UTC(2026, 11, 1, 15, 0);
@@ -17,17 +18,17 @@ const T0 = Date.UTC(2026, 11, 1, 15, 0);
 function service() {
   const prisma = { $transaction: jest.fn().mockResolvedValue(null), order: { update: jest.fn() } };
   const config = { get: () => ({ rules: DEFAULT_EXECUTION_RULES }) };
+  const noSlippage = new SlippageRandom();
+  jest.spyOn(noSlippage, 'next').mockReturnValue(0);
   const execution = new ExecutionService(
     prisma as never,
     new Clock(),
+    noSlippage,
     config as never,
     {} as never,
     {} as never,
     {} as never,
-    {} as never,
-    {} as never,
   );
-  execution.random = () => 0;
   return { execution, prisma };
 }
 

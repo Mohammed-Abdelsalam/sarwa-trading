@@ -10,6 +10,7 @@ import {
 import {
   applyFill,
   bps,
+  buyingPowerCents,
   cents,
   closeOrder,
   type FillResult,
@@ -28,9 +29,9 @@ import {
   type WorkingOrder,
 } from '@sarwa/domain';
 
-import { AdminGateway } from '../admin/admin.gateway';
 import { Clock } from '../common/clock';
-import { type Random } from '../market/simulator';
+import { EventBus } from '../common/events';
+import { SlippageRandom } from '../common/random';
 import { PrismaService, type Tx } from '../prisma.service';
 import { TradingConfigService } from '../trading-config/trading-config.service';
 import { AccountsService } from './accounts.service';
@@ -39,14 +40,13 @@ import {
   type OrderWithFills,
   positionData,
   toOrder,
+  toHold,
   toPosition,
   toWorkingOrder,
   WORKING_STATUSES,
   workingOrderData,
 } from './mappers';
-import { NotificationsService } from './notifications.service';
 import { OrderBook } from './order-book';
-import { TradingGateway } from './trading.gateway';
 
 type ClosedStatus = 'canceled' | 'expired' | 'rejected';
 
@@ -54,17 +54,14 @@ type ClosedStatus = 'canceled' | 'expired' | 'rejected';
 // position, the order and the fill row, computed by the domain's applyFill.
 @Injectable()
 export class ExecutionService {
-  random: Random = Math.random;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly clock: Clock,
+    private readonly random: SlippageRandom,
     private readonly config: TradingConfigService,
     private readonly book: OrderBook,
     private readonly accounts: AccountsService,
-    private readonly notifications: NotificationsService,
-    private readonly gateway: TradingGateway,
-    private readonly adminGateway: AdminGateway,
+    private readonly events: EventBus,
   ) {}
 
   // The caller has checked that the session is open, the market running and the symbol not halted.
@@ -84,7 +81,7 @@ export class ExecutionService {
     }
 
     const slippageBps = bps(
-      Math.floor(this.random() * (this.config.get().rules.maxSlippageBps + 1)),
+      Math.floor(this.random.next() * (this.config.get().rules.maxSlippageBps + 1)),
     );
     const price =
       order.type === 'limit'
@@ -120,19 +117,14 @@ export class ExecutionService {
   async publish(row: OrderWithFills, notice?: NotificationPayload['kind']): Promise<Order> {
     this.book.sync(row);
     const order = toOrder(row);
-    const { deviceId, handle } = await this.accounts.ref(row.accountId);
-    this.gateway.orderUpdated(deviceId, order);
-    this.adminGateway.order({ ...order, accountHandle: handle, latencyMs: row.latencyMs });
-    if (notice) await this.notifications.notify([row.accountId], orderNotice(notice, order));
-    return order;
-  }
-
-  async reservedCents(accountId: string, tx: Tx = this.prisma): Promise<number> {
-    const { _sum } = await tx.order.aggregate({
-      _sum: { heldCents: true },
-      where: { accountId, side: 'buy', status: { in: [...WORKING_STATUSES] } },
+    this.events.publish({
+      type: 'order.changed',
+      account: await this.accounts.ref(row.accountId),
+      order,
+      latencyMs: row.latencyMs,
+      ...(notice && { notice }),
     });
-    return Number(_sum.heldCents ?? 0n);
+    return order;
   }
 
   private async fill(orderId: string, wantedMicros: Micros, priceTicks: Ticks): Promise<Micros> {
@@ -165,8 +157,15 @@ export class ExecutionService {
       }
       // A stop or a queued order can gap past its hold: it may only spend cash no other order holds.
       if (row.side === 'buy') {
-        const otherHolds = (await this.reservedCents(row.accountId, tx)) - working.heldCents;
-        const availableCents = cashCents - otherHolds;
+        const others = await tx.order.findMany({
+          where: {
+            accountId: row.accountId,
+            id: { not: row.id },
+            side: 'buy',
+            status: { in: [...WORKING_STATUSES] },
+          },
+        });
+        const availableCents = buyingPowerCents(cashCents, others.map(toHold));
         const requiredCents = fillNotionalCents(working, { qtyMicros, priceTicks });
         if (requiredCents > availableCents) {
           const rejection: RejectionWire = {
@@ -242,20 +241,4 @@ export class ExecutionService {
 // A queued order becomes open the moment it can execute.
 function activate(order: WorkingOrder): WorkingOrder {
   return order.status === 'queued' ? { ...order, status: 'open' } : order;
-}
-
-function orderNotice(kind: NotificationPayload['kind'], order: Order): NotificationPayload {
-  const base = { orderId: order.id, symbol: order.symbol, side: order.side };
-  if (kind === 'order_rejected' && order.rejection) {
-    return { kind, ...base, rejection: order.rejection };
-  }
-  const last = order.fills.at(-1);
-  const partial = kind === 'order_partially_filled' && last;
-  return {
-    kind: kind as 'order_filled' | 'order_partially_filled' | 'order_expired' | 'order_canceled',
-    ...base,
-    qtyMicros: partial ? last.qtyMicros : order.filledMicros,
-    priceTicks: partial ? last.priceTicks : order.avgFillTicks,
-    notionalCents: partial ? last.notionalCents : order.filledNotionalCents,
-  };
 }

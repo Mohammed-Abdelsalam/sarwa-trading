@@ -1,5 +1,5 @@
 import { type ComponentProps } from 'react';
-import { Text as NativeText, type TextStyle } from 'react-native';
+import { Text as NativeText, Platform, type TextStyle } from 'react-native';
 
 import {
   colorNames,
@@ -27,8 +27,22 @@ const FONT_FILES: Record<FontFamily, Partial<Record<FontWeight, string>>> = {
   mono: { 400: 'Inter_400Regular' },
 };
 
+// Android names an embedded font after its file, iOS after its PostScript name.
+const IOS_NAMES: Record<string, string> = {
+  Inter_400Regular: 'Inter-Regular',
+  Inter_500Medium: 'Inter-Medium',
+  Inter_600SemiBold: 'Inter-SemiBold',
+  Inter_700Bold: 'Inter-Bold',
+  Manrope_700Bold: 'Manrope-Bold',
+  Manrope_800ExtraBold: 'Manrope-ExtraBold',
+};
+
+export function fontName(file: string): string {
+  return Platform.OS === 'ios' ? (IOS_NAMES[file] ?? file) : file;
+}
+
 export function fontFile(family: FontFamily, weight: FontWeight): string {
-  return FONT_FILES[family][weight] ?? FONT_FILES[family][400] ?? 'Inter_400Regular';
+  return fontName(FONT_FILES[family][weight] ?? FONT_FILES[family][400] ?? 'Inter_400Regular');
 }
 
 export type TextVariant = TypographyToken | ComponentTypographyToken;

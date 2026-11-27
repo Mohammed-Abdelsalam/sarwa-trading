@@ -1,18 +1,14 @@
 import { SearchX } from 'lucide-react';
 import { type Metadata } from 'next';
-import { cookies } from 'next/headers';
 import Link from 'next/link';
 
 import { buttonVariants, StateView } from '@sarwa/ui';
 
-import { readLocalePreferences } from '../lib/locale-cookie';
-import { appMessages } from '../lib/messages';
+import { serverCopy } from '../lib/seo';
 
 // A Server Component, so the copy follows the language cookie the root layout also reads.
 async function notFoundCopy() {
-  const cookieStore = await cookies();
-  const { locale } = readLocalePreferences((name) => cookieStore.get(name)?.value);
-  return appMessages[locale].notFound;
+  return (await serverCopy()).t.notFound;
 }
 
 export async function generateMetadata(): Promise<Metadata> {

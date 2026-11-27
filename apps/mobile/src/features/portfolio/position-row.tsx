@@ -74,7 +74,7 @@ export function PositionRow({ position }: { position: PositionModel }) {
           openTicket(symbol, event.nativeEvent.actionName === 'sell' ? 'sell' : 'buy');
         }}
         onPress={() => {
-          router.push({ pathname: '/stock/[symbol]', params: { symbol } });
+          router.push({ pathname: '/stocks/[symbol]', params: { symbol } });
         }}
         className="min-h-16 flex-row items-center gap-3 border-b border-border bg-bg px-4 py-2.5 active:bg-surface-3"
       >

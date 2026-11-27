@@ -5,7 +5,9 @@ import { type Quote } from '@sarwa/contracts';
 import { changeBps, dollarsToTicks } from '@sarwa/domain';
 
 import { MarketService } from '../src/market/market.service';
-import { FakeClock, startApp } from './app';
+import { PrismaService } from '../src/prisma.service';
+import { ExecutionQueue } from '../src/trading/execution-queue';
+import { FakeClock, pinned, startApp } from './app';
 
 // Tuesday 1 Dec 2026, 10:00 in New York.
 const T0 = Date.UTC(2026, 11, 1, 15, 0);
@@ -16,9 +18,8 @@ let app: INestApplication;
 let market: MarketService;
 
 async function boot(): Promise<void> {
-  ({ app } = await startApp({ clock }));
+  ({ app } = await startApp({ clock, random: pinned.random, ticker: pinned.ticker }));
   market = app.get(MarketService);
-  market.random = () => 0.99;
 }
 
 async function restart(): Promise<void> {
@@ -82,5 +83,46 @@ describe('restart', () => {
     market.tick();
 
     expect(market.quoteOf('NFLX')).toMatchObject({ price: 830, prevClose: 830, open: 830 });
+  });
+
+  it('resumes a halt that ran out while the server was down and audits it as the system', async () => {
+    const halt = await app.get(PrismaService).halt.create({
+      data: {
+        symbol: 'ORCL',
+        source: 'admin',
+        message: 'News pending',
+        since: new Date(clock.now() - 60_000),
+        resumesAt: new Date(clock.now() - 1),
+        createdBy: 'admin@sarwa.dev',
+      },
+    });
+
+    await restart();
+    // The overdue resume is scheduled with a zero-delay timer at boot.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await app.get(ExecutionQueue).idle();
+
+    const prisma = app.get(PrismaService);
+    const row = await prisma.halt.findUniqueOrThrow({ where: { id: halt.id } });
+    const audit = await prisma.auditLog.findFirst({
+      where: { action: 'halt.resume', entity: 'Halt · ORCL' },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(row.endedAt).not.toBeNull();
+    expect(audit).toMatchObject({ actorEmail: 'system', ip: null });
+    expect(JSON.parse(audit!.payload)).toMatchObject({ before: { symbol: 'ORCL' }, after: null });
+  });
+
+  it('finishes queued order work before shutting down', async () => {
+    let finished = false;
+    void app.get(ExecutionQueue).run(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      finished = true;
+    });
+
+    await app.close();
+
+    expect(finished).toBe(true);
+    await boot();
   });
 });

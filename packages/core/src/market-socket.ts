@@ -2,6 +2,7 @@ import { io, type Socket } from 'socket.io-client';
 import { type z } from 'zod';
 
 import {
+  AccountResetEventSchema,
   AlertTriggeredEventSchema,
   AppConfigSchema,
   type ClientToServerEvents,
@@ -14,10 +15,12 @@ import {
   QuotesEventSchema,
   type ServerToClientEvents,
   type SocketAuth,
+  SocketEvent,
   StocksChangedEventSchema,
   SymbolHaltedEventSchema,
   SymbolResumedEventSchema,
   type TradingServerToClientEvents,
+  TradingSocketEvent,
   TradingStatusEventSchema,
 } from '@sarwa/contracts';
 
@@ -120,7 +123,7 @@ export function createMarketSocket({
     for (let i = 0; i < symbols.length; i += MAX_SUBSCRIBE_SYMBOLS) {
       const chunk = symbols.slice(i, i + MAX_SUBSCRIBE_SYMBOLS);
       for (const symbol of chunk) subscribed.add(symbol);
-      socket.emit('subscribe', { symbols: chunk }, (ack) => {
+      socket.emit(SocketEvent.Subscribe, { symbols: chunk }, (ack) => {
         if (ack.ok) store.getState().applyQuotes(ack.quotes);
         else if (connection === connections) for (const symbol of chunk) subscribed.delete(symbol);
       });
@@ -134,7 +137,7 @@ export function createMarketSocket({
     const removed = [...subscribed].filter((symbol) => !refCounts.has(symbol));
     if (removed.length > 0) {
       for (const symbol of removed) subscribed.delete(symbol);
-      socket.emit('unsubscribe', { symbols: removed });
+      socket.emit(SocketEvent.Unsubscribe, { symbols: removed });
     }
     subscribe(wanted.filter((symbol) => !subscribed.has(symbol)));
   };
@@ -167,59 +170,46 @@ export function createMarketSocket({
   socket.io.on('reconnect_attempt', (attempt) => {
     setConnection({ status: 'reconnecting', attempt });
   });
-  socket.on('quotes', (payload) => {
+  socket.on(SocketEvent.Quotes, (payload) => {
     const parsed = QuotesEventSchema.safeParse(payload);
     if (!parsed.success) return;
     for (const quote of parsed.data) buffer.set(quote.symbol, quote);
   });
-  socket.on('market:status', (payload) => {
+  socket.on(SocketEvent.MarketStatus, (payload) => {
     const parsed = MarketStatusSchema.safeParse(payload);
     if (parsed.success) store.getState().setMarketStatus(parsed.data);
   });
-  socket.on('config:updated', (payload) => {
+  socket.on(SocketEvent.ConfigUpdated, (payload) => {
     const parsed = AppConfigSchema.safeParse(payload);
     if (parsed.success) store.getState().setAppConfig(parsed.data);
   });
-  socket.on('stocks:changed', (payload) => {
+  socket.on(SocketEvent.StocksChanged, (payload) => {
     const parsed = StocksChangedEventSchema.safeParse(payload);
     if (parsed.success) store.getState().setStocksChangedAt(parsed.data.at);
   });
 
   // Each event is checked against its v1 schema; a shape this client doesn't know is dropped.
-  const relay =
-    <T>(schema: z.ZodType<T>, toEvent: (payload: T) => TradingEvent) =>
-    (payload: unknown) => {
+  const relay = <Name extends TradingEvent['name']>(
+    name: Name,
+    schema: z.ZodType<Extract<TradingEvent, { name: Name }>['payload']>,
+  ) => {
+    const forward = (payload: unknown) => {
       const parsed = schema.safeParse(payload);
       if (!parsed.success) return;
-      const event = toEvent(parsed.data);
+      const event = { name, payload: parsed.data } as TradingEvent;
       tradingListeners.forEach((listener) => {
         listener(event);
       });
     };
-  socket.on(
-    'order.updated',
-    relay(OrderUpdatedEventSchema, (payload) => ({ name: 'order.updated', payload })),
-  );
-  socket.on(
-    'alert.triggered',
-    relay(AlertTriggeredEventSchema, (payload) => ({ name: 'alert.triggered', payload })),
-  );
-  socket.on(
-    'notification',
-    relay(NotificationEventSchema, (payload) => ({ name: 'notification', payload })),
-  );
-  socket.on(
-    'symbol.halted',
-    relay(SymbolHaltedEventSchema, (payload) => ({ name: 'symbol.halted', payload })),
-  );
-  socket.on(
-    'symbol.resumed',
-    relay(SymbolResumedEventSchema, (payload) => ({ name: 'symbol.resumed', payload })),
-  );
-  socket.on(
-    'trading.status',
-    relay(TradingStatusEventSchema, (payload) => ({ name: 'trading.status', payload })),
-  );
+    socket.on(name, forward as never);
+  };
+  relay(TradingSocketEvent.OrderUpdated, OrderUpdatedEventSchema);
+  relay(TradingSocketEvent.AlertTriggered, AlertTriggeredEventSchema);
+  relay(TradingSocketEvent.Notification, NotificationEventSchema);
+  relay(TradingSocketEvent.SymbolHalted, SymbolHaltedEventSchema);
+  relay(TradingSocketEvent.SymbolResumed, SymbolResumedEventSchema);
+  relay(TradingSocketEvent.TradingStatus, TradingStatusEventSchema);
+  relay(TradingSocketEvent.AccountReset, AccountResetEventSchema);
 
   return {
     connect() {

@@ -38,7 +38,7 @@ export function TopNav() {
         className="flex h-16 items-center gap-2 ps-4 pe-3 md:gap-4 md:px-6"
       >
         <Link href="/" className={cn('rounded-sm', focusRing)}>
-          <Logo className="max-md:[&>span:last-child]:sr-only" />
+          <Logo className="max-xl:[&>span:last-child]:sr-only" />
         </Link>
         <div className="ms-2 hidden items-stretch gap-5.5 self-stretch md:flex">
           {sectionLinks('')}
@@ -56,7 +56,7 @@ export function TopNav() {
           )}
         >
           <Search aria-hidden className="size-4 shrink-0" />
-          <span className="flex-1 text-start">{labels.search}</span>
+          <span className="flex-1 truncate text-start">{labels.search}</span>
           <Kbd>{palette.shortcut}</Kbd>
         </button>
         <IconButton
@@ -68,16 +68,17 @@ export function TopNav() {
         >
           <Search aria-hidden className="size-5" />
         </IconButton>
-        <span data-live={nav.live} className="max-sm:hidden">
-          <MarketStatusPill state={nav.pill.state} label={nav.pill.label} />
+        <span data-live={nav.live}>
+          <MarketStatusPill state={nav.pill.state} label={nav.pill.label} compact />
         </span>
         <NotificationCenter />
         <AccountMenu />
       </nav>
+      {/* The fade at the inline end hints that more sections scroll into view. */}
       <div
         role="navigation"
         aria-label={labels.sections}
-        className="flex gap-1 overflow-x-auto px-3 md:hidden"
+        className="flex gap-1 overflow-x-auto [mask-image:linear-gradient(to_right,black_85%,transparent)] ps-3 pe-10 md:hidden rtl:[mask-image:linear-gradient(to_left,black_85%,transparent)]"
       >
         {sectionLinks('h-10 px-3')}
       </div>

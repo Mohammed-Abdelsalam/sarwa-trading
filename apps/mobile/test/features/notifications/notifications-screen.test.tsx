@@ -32,9 +32,11 @@ const expired: NotificationLine = {
 
 function viewModel(overrides: Partial<Vm> = {}): Vm {
   return {
-    groups: [
-      { key: 'today', title: 'Today', items: [filled] },
-      { key: 'earlier', title: 'Earlier', items: [expired] },
+    items: [
+      { type: 'header', key: 'today', title: 'Today' },
+      { type: 'row', key: filled.id, line: filled },
+      { type: 'header', key: 'earlier', title: 'Earlier' },
+      { type: 'row', key: expired.id, line: expired },
     ],
     unreadCount: 1,
     isLoading: false,
@@ -74,7 +76,7 @@ describe('NotificationsScreen', () => {
   });
 
   it('hides Mark all read and says so when everything is read', async () => {
-    mockedHook.mockReturnValue(viewModel({ groups: [], unreadCount: 0 }));
+    mockedHook.mockReturnValue(viewModel({ items: [], unreadCount: 0 }));
     await renderScreen(<NotificationsScreen />);
 
     expect(screen.getByText("You're all caught up.")).toBeOnTheScreen();

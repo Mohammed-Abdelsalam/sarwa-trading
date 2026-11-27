@@ -1,10 +1,16 @@
 import { useState } from 'react';
 
 import { type EquityPeriod, EquityPeriodSchema, type Sector } from '@sarwa/contracts';
-import { type Cents, direction, type Direction, useEquityCurve, usePortfolio } from '@sarwa/core';
+import {
+  type Cents,
+  direction,
+  type Direction,
+  useEquityCurve,
+  usePortfolio,
+  useStockIndex,
+} from '@sarwa/core';
 
 import { useCopy } from '../../lib/i18n';
-import { useStockIndex } from '../../lib/sectors';
 
 export interface SignedValue {
   label: string;

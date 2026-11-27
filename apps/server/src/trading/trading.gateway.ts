@@ -2,16 +2,14 @@ import { type OnGatewayConnection, WebSocketGateway, WebSocketServer } from '@ne
 import { type Namespace, type Socket } from 'socket.io';
 
 import {
-  type Alert,
   type Halt,
   MARKET_NAMESPACE,
   type Notification,
-  type Order,
   SocketAuthSchema,
   type TradingServerToClientEvents,
-  type TradingStatus,
 } from '@sarwa/contracts';
 
+import { EventBus } from '../common/events';
 import { env } from '../env';
 
 const deviceRoom = (deviceId: string): string => `dev:${deviceId}`;
@@ -21,21 +19,28 @@ const deviceRoom = (deviceId: string): string => `dev:${deviceId}`;
 export class TradingGateway implements OnGatewayConnection {
   @WebSocketServer() private readonly server!: Namespace<object, TradingServerToClientEvents>;
 
+  constructor(events: EventBus) {
+    events.on('order.changed').subscribe(({ account, order }) => {
+      this.toDevice(account.deviceId).emit('order.updated', { v: 1, order });
+    });
+    events.on('alert.fired').subscribe(({ account, alert, lastTicks }) => {
+      this.toDevice(account.deviceId).emit('alert.triggered', { v: 1, alert, lastTicks });
+    });
+    events.on('account.reset').subscribe(({ account }) => {
+      this.toDevice(account.deviceId).emit('account.reset', { v: 1 });
+    });
+    events.on('trading.changed').subscribe(({ status }) => {
+      this.server.emit('trading.status', { v: 1, status });
+    });
+  }
+
   handleConnection(socket: Socket): void {
     const auth = SocketAuthSchema.safeParse(socket.handshake.auth);
     if (auth.success) void socket.join(deviceRoom(auth.data.deviceId));
   }
 
-  orderUpdated(deviceId: string, order: Order): void {
-    this.server.to(deviceRoom(deviceId)).emit('order.updated', { v: 1, order });
-  }
-
-  alertTriggered(deviceId: string, alert: Alert, lastTicks: number): void {
-    this.server.to(deviceRoom(deviceId)).emit('alert.triggered', { v: 1, alert, lastTicks });
-  }
-
   notification(deviceId: string, notification: Notification): void {
-    this.server.to(deviceRoom(deviceId)).emit('notification', { v: 1, notification });
+    this.toDevice(deviceId).emit('notification', { v: 1, notification });
   }
 
   symbolHalted(halt: Halt): void {
@@ -46,7 +51,7 @@ export class TradingGateway implements OnGatewayConnection {
     this.server.emit('symbol.resumed', { v: 1, symbol, at });
   }
 
-  tradingStatus(status: TradingStatus): void {
-    this.server.emit('trading.status', { v: 1, status });
+  private toDevice(deviceId: string) {
+    return this.server.to(deviceRoom(deviceId));
   }
 }

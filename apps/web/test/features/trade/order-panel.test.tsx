@@ -14,15 +14,19 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/stocks/AAPL',
 }));
 
-beforeAll(() => {
-  // ≥1280 px: the ticket is the sticky side panel.
+function mockWidth(matches: (query: string) => boolean) {
   window.matchMedia = (query: string) =>
     ({
-      matches: true,
+      matches: matches(query),
       media: query,
       addEventListener: () => undefined,
       removeEventListener: () => undefined,
     }) as unknown as MediaQueryList;
+}
+
+// ≥1280 px unless a block says otherwise: the ticket is the sticky side panel.
+beforeEach(() => {
+  mockWidth(() => true);
 });
 
 function renderPanel({
@@ -200,22 +204,10 @@ describe('OrderPanel · review', () => {
 });
 
 describe('OrderPanel · drawer', () => {
-  const desktop = window.matchMedia;
-
   beforeEach(() => {
     window.history.replaceState(null, '', '/stocks/AAPL?trade=buy');
     // 768–1279 px: the ticket is a drawer that can be closed.
-    window.matchMedia = (query: string) =>
-      ({
-        matches: !query.includes('1280'),
-        media: query,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-      }) as unknown as MediaQueryList;
-  });
-
-  afterEach(() => {
-    window.matchMedia = desktop;
+    mockWidth((query) => !query.includes('1280'));
   });
 
   it('does not place with Ctrl+Enter once closed, and reopens on entry', async () => {
@@ -234,5 +226,27 @@ describe('OrderPanel · drawer', () => {
     expect(
       within(drawer()).queryByRole('heading', { name: 'Review order' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('OrderPanel · layout', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/stocks/AAPL');
+    // What the server and a phone see: no media query matches.
+    mockWidth(() => false);
+  });
+
+  it('renders the side panel for CSS to show from 1280 px, and moves the ticket into the sheet', async () => {
+    renderPanel();
+    expect(ticket()).toHaveClass('max-xl:hidden');
+    await ready();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sell' }));
+
+    const sheet = screen.getByRole('dialog', { name: 'Order ticket' });
+    expect(within(sheet).getByRole('textbox', { name: 'Quantity' })).toBeInTheDocument();
+    // The modal sheet hides everything behind it from assistive tech, the panel included.
+    const panel = screen.getByRole('region', { name: 'Order ticket', hidden: true });
+    expect(within(panel).queryByRole('textbox', { hidden: true })).not.toBeInTheDocument();
   });
 });

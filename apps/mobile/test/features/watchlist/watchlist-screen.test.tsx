@@ -23,14 +23,18 @@ jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => ({
   SwipeDirection: { LEFT: 'left', RIGHT: 'right' },
   default: ({
     children,
+    renderLeftActions,
     renderRightActions,
   }: {
     children: React.ReactNode;
-    renderRightActions: () => React.ReactNode;
+    renderLeftActions?: () => React.ReactNode;
+    renderRightActions?: () => React.ReactNode;
   }) => (
     <>
+      {renderLeftActions ? <MockText>left-action</MockText> : null}
       {children}
-      {renderRightActions()}
+      {renderLeftActions?.()}
+      {renderRightActions?.()}
     </>
   ),
 }));
@@ -123,6 +127,20 @@ describe('WatchlistScreen', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: 'Remove AAPL from watchlist' }));
     expect(model.actions.remove).toHaveBeenCalledWith('AAPL');
+  });
+
+  it('mirrors the swipe in Arabic so the action stays on the trailing edge', async () => {
+    mockedHook.mockReturnValue(viewModel({ rows: [stock('AAPL')] }));
+    await renderScreen(<WatchlistScreen />, { locale: 'ar' });
+
+    expect(screen.getByText('left-action')).toBeOnTheScreen();
+  });
+
+  it('keeps the swipe action on the right in English', async () => {
+    mockedHook.mockReturnValue(viewModel({ rows: [stock('AAPL')] }));
+    await renderScreen(<WatchlistScreen />);
+
+    expect(screen.queryByText('left-action')).not.toBeOnTheScreen();
   });
 
   it('offers undo in a snackbar while the removal is pending, even on an empty list', async () => {

@@ -2,36 +2,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { randomUUID } from 'expo-crypto';
 
-import {
-  createApiClient,
-  createDeviceIdGetter,
-  createLiveStore,
-  createMarketSocket,
-  createRemovalQueue,
-  noopAnalytics,
-  type SarwaClient,
-} from '@sarwa/core';
+import { createSarwaClient, type SarwaClient } from '@sarwa/core';
 
-// Expo Go on a phone can't reach "localhost", so reuse the dev machine's LAN IP from the bundler URL.
-function resolveApiUrl(): string {
-  const configured = process.env.EXPO_PUBLIC_API_URL;
-  if (configured) return configured;
-  const hostUri: string | undefined = Constants.expoConfig?.hostUri;
-  const host = hostUri?.split(':')[0] ?? 'localhost';
-  return `http://${host}:4000`;
-}
+import { resolveApiUrl } from './api-url';
+import { createSecureStorage } from './secure-storage';
 
-export const API_URL = resolveApiUrl();
+export const API_URL = resolveApiUrl({
+  configured: process.env.EXPO_PUBLIC_API_URL,
+  hostUri: Constants.expoConfig?.hostUri,
+  dev: __DEV__,
+});
 
-const store = createLiveStore();
-const getDeviceId = createDeviceIdGetter(AsyncStorage, randomUUID);
-
-export const client: SarwaClient = {
-  store,
-  api: createApiClient({ baseUrl: API_URL, getDeviceId }),
-  market: createMarketSocket({ url: API_URL, store, getDeviceId }),
+export const client: SarwaClient = createSarwaClient({
+  apiUrl: API_URL,
   storage: AsyncStorage,
-  removals: createRemovalQueue(),
-  analytics: noopAnalytics,
-  newId: randomUUID,
-};
+  // The device id is the account's only credential until sign-in exists, so it lives in the keychain.
+  identityStorage: createSecureStorage(AsyncStorage),
+  randomUUID,
+});

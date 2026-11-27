@@ -358,8 +358,15 @@ describe('market socket trading events', () => {
     });
     fake.emit('symbol.halted', { v: 1, halt });
     fake.emit('symbol.resumed', { v: 1, symbol: 'AAPL', at: 2 });
+    fake.emit('account.reset', { v: 1 });
 
-    expect(names).toEqual(['alert.triggered', 'notification', 'symbol.halted', 'symbol.resumed']);
+    expect(names).toEqual([
+      'alert.triggered',
+      'notification',
+      'symbol.halted',
+      'symbol.resumed',
+      'account.reset',
+    ]);
   });
 
   it('stops calling a listener once it unsubscribes', () => {

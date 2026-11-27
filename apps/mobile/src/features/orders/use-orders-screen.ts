@@ -1,11 +1,9 @@
 import { useState } from 'react';
 
 import { type OrderFilter } from '@sarwa/contracts';
-import { useOrderPages, useOrders } from '@sarwa/core';
+import { useNow, useOrderPages, useOrders, useStockIndex } from '@sarwa/core';
 
-import { useNow } from '../../lib/clock';
 import { useCopy } from '../../lib/i18n';
-import { useStockIndex } from '../../lib/sectors';
 import { describeOrder } from './order-copy';
 
 export function useOrdersScreen() {

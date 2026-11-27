@@ -24,6 +24,37 @@ export function restrictedImports({ patterns = [], paths = [] } = {}) {
   return ['error', { paths, patterns: [...boundaryPatterns, ...patterns] }];
 }
 
+const ADMIN_ONLY = "@sarwa/core/admin is the dashboard's; customer apps never import it.";
+const VIEW_MODEL =
+  'A view-model reads data through @sarwa/core hooks, never React Query or the client directly.';
+
+// Every app's import guards. `viewOnly` lists the render-only files; use-*.ts are the view-models.
+export function appImportRules({ customer, viewOnly, viewOnlyMessage }) {
+  const app = customer ? [{ name: '@sarwa/core/admin', message: ADMIN_ONLY }] : [];
+  const dataLayer = (message) => [
+    ...app,
+    { name: '@tanstack/react-query', message },
+    { name: '@sarwa/core', importNames: ['useSarwa'], message },
+  ];
+  return [
+    {
+      name: 'sarwa/app/boundaries',
+      files: ['src/**/*.{ts,tsx}'],
+      rules: { 'no-restricted-imports': restrictedImports({ paths: app }) },
+    },
+    {
+      name: 'sarwa/app/view-only',
+      files: viewOnly,
+      rules: { 'no-restricted-imports': restrictedImports({ paths: dataLayer(viewOnlyMessage) }) },
+    },
+    {
+      name: 'sarwa/app/view-models',
+      files: ['src/**/use-*.ts'],
+      rules: { 'no-restricted-imports': restrictedImports({ paths: dataLayer(VIEW_MODEL) }) },
+    },
+  ];
+}
+
 // Components take colours and fonts from @sarwa/tokens, never as raw strings.
 export const designSystemSyntax = [
   'error',

@@ -1,5 +1,6 @@
 import { FlashList, type ViewToken } from '@shopify/flash-list';
 import { RefreshCw, Search, WifiOff } from 'lucide-react-native';
+import { useCallback } from 'react';
 import { RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -23,13 +24,14 @@ export function MarketsScreen() {
   const { rows, watched, stale, isLoading, isError, isRefreshing, filters, actions } =
     useMarketsScreen();
 
-  const onViewableItemsChanged = ({
-    viewableItems,
-  }: {
-    viewableItems: ViewToken<StockWithQuote>[];
-  }) => {
-    actions.setVisibleSymbols(viewableItems.map((token) => token.item.symbol));
-  };
+  const { setVisibleSymbols } = actions;
+  // FlashList keeps the first viewability callback, so it has to stay the same function.
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken<StockWithQuote>[] }) => {
+      setVisibleSymbols(viewableItems.map((token) => token.item.symbol));
+    },
+    [setVisibleSymbols],
+  );
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">

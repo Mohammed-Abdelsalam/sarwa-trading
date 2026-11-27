@@ -96,14 +96,14 @@ export function AlertsPage() {
         ) : page.rows.length === 0 ? (
           <StateView icon={<Bell />} title={labels.empty} />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <Table>
               <THead>
                 <tr>
                   <TH className="ps-4">{labels.columns.symbol}</TH>
                   <TH>{labels.columns.condition}</TH>
-                  <TH>{labels.columns.distance}</TH>
-                  <TH>{labels.columns.repeat}</TH>
+                  <TH className="max-md:hidden">{labels.columns.distance}</TH>
+                  <TH className="max-md:hidden">{labels.columns.repeat}</TH>
                   <TH>{labels.columns.status}</TH>
                   <TH align="end">
                     <span className="sr-only">{labels.actions}</span>
@@ -120,8 +120,8 @@ export function AlertsPage() {
                       </span>
                     </TCell>
                     <TCell>{row.condition}</TCell>
-                    <TCell className="text-fg-3">{row.distance}</TCell>
-                    <TCell className="text-fg-2">{row.repeat}</TCell>
+                    <TCell className="text-fg-3 max-md:hidden">{row.distance}</TCell>
+                    <TCell className="text-fg-2 max-md:hidden">{row.repeat}</TCell>
                     <TCell>
                       <StatusBadge status={row.state} label={row.stateLabel} />
                     </TCell>

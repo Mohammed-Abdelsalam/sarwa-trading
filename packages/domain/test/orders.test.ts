@@ -5,11 +5,14 @@ import {
   isMarketable,
   isTerminal,
   needsLargeOrderConfirm,
+  orderRealizedCents,
   ORDER_STATUSES,
   ORDER_TYPES,
   type OrderContext,
   type OrderDraft,
   REJECTION_CODES,
+  remainingAmountCents,
+  remainingQtyMicros,
   SIDES,
   slippageBps,
   TERMINAL_STATUSES,
@@ -525,5 +528,32 @@ describe('zero prices', () => {
       field: 'limit',
       lastTicks: ctx().quote.lastTicks,
     });
+  });
+});
+
+describe('order progress', () => {
+  const progress = { qtyMicros: null, amountCents: null, filledMicros: 0, filledNotionalCents: 0 };
+
+  it('counts the shares still working and never goes below zero', () => {
+    expect(remainingQtyMicros({ ...progress, qtyMicros: 5, filledMicros: 2 })).toBe(3);
+    expect(remainingQtyMicros({ ...progress, qtyMicros: 5, filledMicros: 7 })).toBe(0);
+    expect(remainingQtyMicros(progress)).toBeNull();
+  });
+
+  it('counts the dollars still working on an amount order', () => {
+    expect(
+      remainingAmountCents({ ...progress, amountCents: 1_000, filledNotionalCents: 400 }),
+    ).toBe(600);
+    expect(
+      remainingAmountCents({ ...progress, amountCents: 1_000, filledNotionalCents: 1_200 }),
+    ).toBe(0);
+    expect(remainingAmountCents(progress)).toBeNull();
+  });
+
+  it('sums the realized P&L of every fill', () => {
+    expect(orderRealizedCents({ fills: [{ realizedCents: 250 }, { realizedCents: -100 }] })).toBe(
+      150,
+    );
+    expect(orderRealizedCents({ fills: [] })).toBe(0);
   });
 });

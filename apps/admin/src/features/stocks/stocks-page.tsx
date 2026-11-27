@@ -3,13 +3,13 @@
 import { Database, Ellipsis, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 
 import { EXCHANGES, type Exchange, type Sector, SECTORS } from '@sarwa/contracts';
-import { useI18n } from '@sarwa/core';
-import { dollarsToCents } from '@sarwa/core/admin';
+import { dollarsToCents, useAdminI18n } from '@sarwa/core/admin';
 import {
   Badge,
   Button,
   Callout,
   Card,
+  cn,
   Dialog,
   IconButton,
   Input,
@@ -41,13 +41,16 @@ import { LoadError, PageHeader, TableSkeleton } from '../../components/common/st
 import { StockDialog } from './stock-dialog';
 import { type StockSortKey, type StocksPageModel, useStocksPage } from './use-stocks-page';
 
+const narrow = 'max-md:hidden';
+
 function StocksTable({ page }: { page: StocksPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.stocks;
-  const sortable = (key: StockSortKey, align: 'start' | 'end' = 'start') => (
+  const sortable = (key: StockSortKey, align: 'start' | 'end' = 'start', className?: string) => (
     <SortHeader
       label={copy.columns[key]}
       align={align}
+      className={className}
       direction={page.sort.key === key ? page.sort.direction : 'none'}
       onSort={() => {
         page.actions.sortBy(key);
@@ -56,17 +59,21 @@ function StocksTable({ page }: { page: StocksPageModel }) {
   );
 
   return (
-    <Table>
+    <Table label={copy.title}>
       <THead>
         <TRow>
           {sortable('symbol')}
-          {sortable('name')}
+          {sortable('name', 'start', narrow)}
           {sortable('sector')}
-          {sortable('exchange')}
+          {sortable('exchange', 'start', narrow)}
           {sortable('basePrice', 'end')}
-          {sortable('volatility', 'end')}
-          <TH align="end">{copy.columns.marketCap}</TH>
-          <TH align="end">{copy.columns.pe}</TH>
+          {sortable('volatility', 'end', narrow)}
+          <TH align="end" className={narrow}>
+            {copy.columns.marketCap}
+          </TH>
+          <TH align="end" className={narrow}>
+            {copy.columns.pe}
+          </TH>
           <TH>{copy.columns.enabled}</TH>
           <TH align="end">
             <span className="sr-only">{copy.columns.actions}</span>
@@ -82,23 +89,23 @@ function StocksTable({ page }: { page: StocksPageModel }) {
                 <b>{stock.symbol}</b>
               </span>
             </TCell>
-            <TCell className="text-fg-2 max-w-55 truncate">{stock.name}</TCell>
+            <TCell className={cn('text-fg-2 max-w-55 truncate', narrow)}>{stock.name}</TCell>
             <TCell>
               <Badge>{t.sectors[stock.sector]}</Badge>
             </TCell>
-            <TCell className="text-fg-2">{stock.exchange}</TCell>
+            <TCell className={cn('text-fg-2', narrow)}>{stock.exchange}</TCell>
             <TCell align="end" className="font-semibold">
               {f.money(dollarsToCents(stock.basePrice))}
             </TCell>
-            <TCell align="end">
+            <TCell align="end" className={narrow}>
               <Badge tone={stock.volatility >= 2 ? 'warn' : 'neutral'}>
                 {f.multiplier(stock.volatility)}
               </Badge>
             </TCell>
-            <TCell align="end" className="text-fg-2">
+            <TCell align="end" className={cn('text-fg-2', narrow)}>
               {f.money(dollarsToCents(stock.marketCap), { compact: true })}
             </TCell>
-            <TCell align="end" className="text-fg-2">
+            <TCell align="end" className={cn('text-fg-2', narrow)}>
               {stock.peRatio === null ? '—' : f.number(stock.peRatio)}
             </TCell>
             <TCell>
@@ -154,7 +161,7 @@ function StocksTable({ page }: { page: StocksPageModel }) {
 }
 
 function DeleteDialog({ page }: { page: StocksPageModel }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   const copy = t.admin.stocks;
   const symbol = page.deletion.symbol ?? '';
   const conflict = page.deletion.conflict;
@@ -196,7 +203,7 @@ function DeleteDialog({ page }: { page: StocksPageModel }) {
 
 export function StocksPage() {
   const page = useStocksPage();
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.stocks;
   const addButton = (label: string) => (
     <GuardedButton
@@ -252,17 +259,19 @@ export function StocksPage() {
         {addButton(copy.add)}
       </PageHeader>
       <div className="flex flex-wrap items-center gap-3">
-        <Input
-          type="search"
-          icon={<Search />}
-          className="w-85"
-          aria-label={copy.searchLabel}
-          placeholder={copy.search}
-          value={page.search}
-          onChange={(event) => {
-            page.actions.search(event.target.value);
-          }}
-        />
+        <div className="w-85 max-sm:w-full">
+          <Input
+            type="search"
+            icon={<Search />}
+            className="w-full"
+            aria-label={copy.searchLabel}
+            placeholder={copy.search}
+            value={page.search}
+            onChange={(event) => {
+              page.actions.search(event.target.value);
+            }}
+          />
+        </div>
         <Select
           aria-label={copy.columns.sector}
           className="w-45"

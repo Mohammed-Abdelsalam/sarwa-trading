@@ -4,7 +4,6 @@ import {
   Delete,
   Get,
   HttpCode,
-  Param,
   Patch,
   Post,
   Query,
@@ -34,6 +33,7 @@ import {
 } from '@sarwa/contracts';
 
 import { WritableGuard } from '../common/device';
+import { IdParam } from '../common/params';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AlertsService } from './alerts.service';
 import { toAccount } from './mappers';
@@ -41,8 +41,6 @@ import { NotificationsService } from './notifications.service';
 import { DeviceAccount } from './orders.controller';
 import { PortfolioService } from './portfolio.service';
 import { StatusService } from './status.service';
-
-const IdParam = () => Param('id', new ZodValidationPipe(z.string().min(1).max(64)));
 
 @Controller()
 export class AccountController {

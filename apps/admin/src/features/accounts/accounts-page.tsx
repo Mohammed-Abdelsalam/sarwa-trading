@@ -2,7 +2,8 @@
 
 import { RotateCcw, Search, ShieldCheck } from 'lucide-react';
 
-import { bps, cents, useI18n } from '@sarwa/core';
+import { bps, cents } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import {
   Button,
   Callout,
@@ -32,10 +33,11 @@ import {
   useAccountsPage,
 } from './use-accounts-page';
 
+const narrow = 'max-md:hidden';
 const tone = (cents: number) => (cents > 0 ? 'text-pos' : cents < 0 ? 'text-neg' : 'text-fg-2');
 
 function AccountsTable({ page }: { page: AccountsPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const columns = t.admin.accountColumns;
   const sortHeader = (key: AccountSort, label: string, align: 'start' | 'end' = 'end') => (
     <SortHeader
@@ -62,16 +64,22 @@ function AccountsTable({ page }: { page: AccountsPageModel }) {
     );
   }
   return (
-    <Table>
+    <Table label={t.admin.accounts}>
       <THead>
         <TRow>
           <TH className="ps-4">{t.admin.accountList.account}</TH>
           {sortHeader('equity', columns.equity)}
-          <TH align="end">{columns.cash}</TH>
+          <TH align="end" className={narrow}>
+            {columns.cash}
+          </TH>
           <TH align="end">{columns.today}</TH>
           {sortHeader('allTime', columns.allTime)}
-          <TH align="end">{columns.positions}</TH>
-          <TH align="end">{columns.openOrders}</TH>
+          <TH align="end" className={narrow}>
+            {columns.positions}
+          </TH>
+          <TH align="end" className={narrow}>
+            {columns.openOrders}
+          </TH>
           {sortHeader('lastTrade', columns.lastTrade, 'start')}
           <TH align="end">
             <span className="sr-only">{t.common.view}</span>
@@ -102,7 +110,7 @@ function AccountsTable({ page }: { page: AccountsPageModel }) {
             <TCell align="end" className="font-semibold">
               {f.money(cents(account.equityCents))}
             </TCell>
-            <TCell align="end" className="text-fg-2">
+            <TCell align="end" className={cn('text-fg-2', narrow)}>
               {f.money(cents(account.cashCents))}
             </TCell>
             <TCell align="end" className={cn('font-semibold', tone(account.todayCents))}>
@@ -115,8 +123,12 @@ function AccountsTable({ page }: { page: AccountsPageModel }) {
                 label={`${f.money(cents(account.allTimeCents), { signed: true })} · ${f.percent(bps(account.allTimeBps), { signed: true })}`}
               />
             </TCell>
-            <TCell align="end">{f.number(account.positions)}</TCell>
-            <TCell align="end">{f.number(account.openOrders)}</TCell>
+            <TCell align="end" className={narrow}>
+              {f.number(account.positions)}
+            </TCell>
+            <TCell align="end" className={narrow}>
+              {f.number(account.openOrders)}
+            </TCell>
             <TCell className="text-fg-2">
               {account.lastTradeAt === null
                 ? t.admin.states.never
@@ -142,7 +154,7 @@ function AccountsTable({ page }: { page: AccountsPageModel }) {
 }
 
 function AccountDrawer({ page }: { page: AccountsPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const account = page.viewing;
   const columns = t.admin.accountColumns;
   return (
@@ -202,7 +214,7 @@ function AccountDrawer({ page }: { page: AccountsPageModel }) {
 
 export function AccountsPage() {
   const page = useAccountsPage();
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
 
   return (
     <>
@@ -213,17 +225,19 @@ export function AccountsPage() {
           start: f.money(page.startingCashCents),
         })}
       >
-        <Input
-          type="search"
-          icon={<Search />}
-          className="w-75"
-          aria-label={t.admin.accountList.searchLabel}
-          placeholder={t.admin.searchAccounts}
-          value={page.search}
-          onChange={(event) => {
-            page.actions.search(event.target.value);
-          }}
-        />
+        <div className="w-75 max-sm:w-full">
+          <Input
+            type="search"
+            icon={<Search />}
+            className="w-full"
+            aria-label={t.admin.accountList.searchLabel}
+            placeholder={t.admin.searchAccounts}
+            value={page.search}
+            onChange={(event) => {
+              page.actions.search(event.target.value);
+            }}
+          />
+        </div>
       </PageHeader>
       {page.resetDone ? (
         <Callout tone="info" role="status">

@@ -1,5 +1,5 @@
 {
-  "extends": "@sarwa/tsconfig/library.json",
+  "extends": "@sarwa/tsconfig/pure.json",
   "compilerOptions": {
     "rootDir": "."
   },

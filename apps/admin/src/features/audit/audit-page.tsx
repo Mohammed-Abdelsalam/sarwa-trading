@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, Copy, FileText, Funnel, User } from 'lucide-
 import { Fragment } from 'react';
 
 import { AUDIT_ACTIONS, type AuditAction } from '@sarwa/contracts';
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import { type BadgeTone } from '@sarwa/tokens';
 import {
   Badge,
@@ -29,16 +29,17 @@ import { type ActionFilter, type AuditPageModel, useAuditPage } from './use-audi
 function actionTone(action: AuditAction): BadgeTone {
   if (action === 'connections.drop' || action.endsWith('.delete') || action === 'account.reset')
     return 'neg';
-  if (action === 'market.pause' || action === 'halt.create') return 'warn';
+  if (action === 'market.pause' || action === 'halt.create' || action === 'auth.login_failed')
+    return 'warn';
   if (action.endsWith('.create') || action.endsWith('.resume')) return 'pos';
-  if (action === 'config.update' || action === 'auth.login') return 'info';
+  if (action === 'config.update' || action.startsWith('auth.')) return 'info';
   return 'brand';
 }
 
 type Row = AuditPageModel['rows'][number];
 
 function Details({ row, onCopy }: { row: Row; onCopy: (json: string) => void }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   const copy = t.admin.audit;
   return (
     <div className="grid gap-4 pt-3 lg:grid-cols-[minmax(0,1fr)_16.25rem]">
@@ -104,7 +105,7 @@ function Details({ row, onCopy }: { row: Row; onCopy: (json: string) => void }) 
 }
 
 function AuditTable({ page }: { page: AuditPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.audit;
   if (page.isError) return <LoadError what={copy.loading} onRetry={page.actions.retry} />;
   if (page.isLoading) return <TableSkeleton columns={6} rows={8} label={copy.loading} />;
@@ -125,7 +126,7 @@ function AuditTable({ page }: { page: AuditPageModel }) {
     );
   }
   return (
-    <Table>
+    <Table label={copy.title}>
       <THead>
         <TRow>
           <TH className="w-11">
@@ -134,8 +135,8 @@ function AuditTable({ page }: { page: AuditPageModel }) {
           <TH aria-sort="descending">{copy.columns.time}</TH>
           <TH>{copy.columns.actor}</TH>
           <TH>{copy.columns.action}</TH>
-          <TH>{copy.columns.entity}</TH>
-          <TH>{copy.columns.payload}</TH>
+          <TH className="max-md:hidden">{copy.columns.entity}</TH>
+          <TH className="max-md:hidden">{copy.columns.payload}</TH>
         </TRow>
       </THead>
       <TBody>
@@ -175,8 +176,10 @@ function AuditTable({ page }: { page: AuditPageModel }) {
                     {row.action}
                   </Badge>
                 </TCell>
-                <TCell>{row.entity}</TCell>
-                <TCell className="type-mono text-fg-2 max-w-90 truncate">{row.preview}</TCell>
+                <TCell className="max-md:hidden">{row.entity}</TCell>
+                <TCell className="type-mono text-fg-2 max-w-90 truncate max-md:hidden">
+                  {row.preview}
+                </TCell>
               </TRow>
               {open ? (
                 <tr>
@@ -198,29 +201,31 @@ function AuditTable({ page }: { page: AuditPageModel }) {
 
 export function AuditPage() {
   const page = useAuditPage();
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.audit;
 
   return (
     <>
       <PageHeader title={copy.title} subtitle={copy.subtitle({ n: f.number(page.total) })} />
       <div role="group" aria-label={copy.filters} className="flex flex-wrap items-center gap-2.5">
-        <Input
-          type="search"
-          icon={<User />}
-          className="w-60"
-          aria-label={copy.actor}
-          placeholder={copy.actorPlaceholder}
-          value={page.actor}
-          onChange={(event) => {
-            page.actions.setActor(event.target.value);
-          }}
-        />
-        <span className="relative flex items-center">
+        <div className="w-60 max-sm:w-full">
+          <Input
+            type="search"
+            icon={<User />}
+            className="w-full"
+            aria-label={copy.actor}
+            placeholder={copy.actorPlaceholder}
+            value={page.actor}
+            onChange={(event) => {
+              page.actions.setActor(event.target.value);
+            }}
+          />
+        </div>
+        <span className="relative flex items-center max-sm:w-full max-sm:[&>div]:w-full">
           <Funnel aria-hidden className="text-fg-3 pointer-events-none absolute start-3 size-4" />
           <Select
             aria-label={copy.action}
-            className="w-56 ps-9"
+            className="w-56 ps-9 max-sm:w-full"
             value={page.action}
             onChange={(event) => {
               page.actions.setAction(event.target.value as ActionFilter);

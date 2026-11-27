@@ -22,6 +22,13 @@ export interface AlertState {
   lastFiredAt: number | null;
 }
 
+export const ALERT_ISSUE_CODES = [
+  'ALREADY_ABOVE',
+  'ALREADY_BELOW',
+  'ALREADY_MOVED',
+  'MISSING_THRESHOLD',
+] as const;
+
 export type AlertIssue =
   | { code: 'ALREADY_ABOVE' | 'ALREADY_BELOW'; lastTicks: Ticks }
   | { code: 'ALREADY_MOVED'; moveBps: Bps }

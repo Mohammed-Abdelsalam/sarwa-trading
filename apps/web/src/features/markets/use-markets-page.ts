@@ -35,19 +35,20 @@ export function useMarketsPage() {
   const stale = useIsStale();
   const { mutate: toggle } = useToggleWatchlist();
   // Two panes from 1024 px: rows select into the side panel instead of opening a page (W-Markets).
+  // CSS shows the preview pane; this only switches what a row click does.
   const twoPane = useMediaQuery(`(min-width: ${String(breakpoints.lg)}px)`);
 
   // The list is small, so every row streams; selection and search never change what is subscribed.
   useLiveSymbols(rows.map((row) => row.symbol));
 
-  const selected = twoPane
-    ? (rows.find((row) => row.symbol === requested) ?? rows[0])?.symbol
-    : undefined;
+  const preview = (rows.find((row) => row.symbol === requested) ?? rows[0])?.symbol;
+  const selected = twoPane ? preview : undefined;
 
   return {
     rows,
     watched,
     selected,
+    preview,
     twoPane,
     stale,
     isLoading,

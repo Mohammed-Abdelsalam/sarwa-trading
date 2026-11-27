@@ -12,9 +12,9 @@ import {
 } from 'lucide-react';
 import { type Route } from 'next';
 
-import { type Messages } from '@sarwa/core';
+import { type AdminMessages } from '@sarwa/core/admin';
 
-export type NavKey = keyof Messages['admin']['nav'];
+export type NavKey = keyof AdminMessages['nav'];
 
 export const NAV: readonly { key: NavKey; href: Route; icon: LucideIcon }[] = [
   { key: 'overview', href: '/overview', icon: LayoutGrid },

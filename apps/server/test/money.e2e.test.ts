@@ -25,7 +25,7 @@ import {
 import { MarketService } from '../src/market/market.service';
 import { TradingEngine } from '../src/trading/engine.service';
 import { ExecutionService } from '../src/trading/execution.service';
-import { FakeClock, startApp } from './app';
+import { FakeClock, pinned, startApp } from './app';
 
 // Tuesday 1 Dec 2026, 10:00 in New York; Saturday; and the next Monday at 10:00.
 const T0 = Date.UTC(2026, 11, 1, 15, 0);
@@ -108,13 +108,11 @@ const shareBuy = (symbol: string, type: 'market' | 'stop', micros: number, quote
 });
 
 beforeAll(async () => {
-  ({ app } = await startApp({ clock }));
+  ({ app } = await startApp({ clock, ...pinned }));
   http = request(app.getHttpServer());
   market = app.get(MarketService);
   engine = app.get(TradingEngine);
   execution = app.get(ExecutionService);
-  market.random = () => 0.99;
-  execution.random = () => 0;
   const res = await http
     .post(api('/admin/auth/login'))
     .set('X-Forwarded-For', nextIp())
@@ -201,6 +199,7 @@ describe('a buy that gaps past its hold', () => {
     const after = await order(device, queued.id);
     const { cash, buyingPower } = await books(device);
 
+    expect(queued.rejection ?? null).toBeNull();
     expect(queued.status).toBe('queued');
     expect(after).toMatchObject({
       status: 'rejected',

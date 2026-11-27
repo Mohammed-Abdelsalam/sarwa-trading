@@ -470,6 +470,8 @@ export const adminAr = {
   },
   activity: {
     'auth.login': 'سجّل الدخول',
+    'auth.login_failed': 'فشل تسجيل الدخول',
+    'auth.logout': 'سجّل الخروج',
     'market.pause': 'أوقف السوق',
     'market.resume': 'استأنف السوق',
     'market.volatility': 'غيّر التقلّب',

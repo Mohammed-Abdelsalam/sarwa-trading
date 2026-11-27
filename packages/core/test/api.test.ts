@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
-import { DEVICE_ID_HEADER } from '@sarwa/contracts';
+import { DEVICE_ID_HEADER, ErrorCode } from '@sarwa/contracts';
 
 import {
   ApiError,
   createApiClient,
   createRequest,
-  isNotFound,
+  isApiError,
+  queryString,
   shouldRetry,
   TimeoutError,
 } from '../src/api';
@@ -25,8 +26,18 @@ function neverAnswers(): jest.Mock {
   );
 }
 
-const notFound = new ApiError({ type: 'about:blank', title: 'Not found', status: 404, code: 'X' });
-const unavailable = new ApiError({ type: 'about:blank', title: 'Down', status: 503, code: 'X' });
+const notFound = new ApiError({
+  type: 'about:blank',
+  title: 'Not found',
+  status: 404,
+  code: ErrorCode.NotFound,
+});
+const unavailable = new ApiError({
+  type: 'about:blank',
+  title: 'Down',
+  status: 503,
+  code: ErrorCode.Unavailable,
+});
 
 describe('createRequest', () => {
   const originalFetch = global.fetch;
@@ -62,6 +73,39 @@ describe('createRequest', () => {
 
     await expect(request('/health', z.object({ ok: z.boolean() }))).resolves.toEqual({ ok: true });
   });
+
+  it('sends the auth headers and credentials and reports a 401 to the auth slot', async () => {
+    const fetchMock = jest.fn((_url: string, _init: RequestInit) =>
+      Promise.resolve({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        json: () => Promise.reject(new Error('html')),
+      }),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const onUnauthorized = jest.fn();
+    const request = createRequest({
+      baseUrl: 'http://api',
+      auth: { headers: () => ({ 'x-test': '1' }), credentials: 'include', onUnauthorized },
+    });
+
+    const error: unknown = await request('/me', z.unknown()).catch((e: unknown) => e);
+
+    expect(isApiError(error, ErrorCode.Unauthorized)).toBe(true);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      credentials: 'include',
+      headers: expect.objectContaining({ 'x-test': '1' }) as unknown,
+    });
+  });
+});
+
+describe('queryString', () => {
+  it('leaves out empty values and encodes the rest', () => {
+    expect(queryString({ q: '', period: '1W', cursor: undefined, n: 2 })).toBe('?period=1W&n=2');
+    expect(queryString({})).toBe('');
+  });
 });
 
 describe('shouldRetry', () => {
@@ -80,17 +124,17 @@ describe('shouldRetry', () => {
       type: 'about:blank',
       title: 'Slow down',
       status: 429,
-      code: 'X',
+      code: ErrorCode.RateLimited,
     });
     expect(shouldRetry(0, tooMany)).toBe(true);
   });
 });
 
-describe('isNotFound', () => {
-  it('is true only for a 404 API error', () => {
-    expect(isNotFound(notFound)).toBe(true);
-    expect(isNotFound(unavailable)).toBe(false);
-    expect(isNotFound(new TimeoutError(10))).toBe(false);
+describe('isApiError', () => {
+  it('matches only an API error with that code', () => {
+    expect(isApiError(notFound, ErrorCode.NotFound)).toBe(true);
+    expect(isApiError(unavailable, ErrorCode.NotFound)).toBe(false);
+    expect(isApiError(new TimeoutError(10), ErrorCode.NotFound)).toBe(false);
   });
 });
 

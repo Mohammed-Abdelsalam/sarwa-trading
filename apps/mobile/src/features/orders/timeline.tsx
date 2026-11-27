@@ -1,11 +1,11 @@
 import { Check, Clock, X } from 'lucide-react-native';
 import { View } from 'react-native';
 
+import { type OrderTimelineStep as TimelineStep } from '@sarwa/core';
 import { type ColorRole } from '@sarwa/tokens';
 
 import { Text } from '../../components/ui/text';
 import { cx, useColors } from '../../lib/theme';
-import { type TimelineStep } from './order-timeline';
 
 const DOT: Record<TimelineStep['state'], [bg: string, icon: ColorRole]> = {
   done: ['bg-pos-subtle', 'pos'],

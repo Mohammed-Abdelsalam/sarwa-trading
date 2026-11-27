@@ -1,17 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 import { WatchlistTable } from '../../../src/features/watchlist/watchlist-views';
 import { providers } from '../../copy';
 import { makeStock } from '../../fixtures';
 
-const push = jest.fn();
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push }),
-}));
-
 describe('WatchlistTable', () => {
-  it('opens the stock on Enter on the row, but not on Enter on its star', () => {
-    const onRemove = jest.fn();
+  it('opens each stock through one link per row, not a focusable table row', () => {
     const { wrapper } = providers();
     render(
       <WatchlistTable
@@ -19,17 +13,13 @@ describe('WatchlistTable', () => {
         stale={false}
         sort={null}
         onSort={jest.fn()}
-        onRemove={onRemove}
+        onRemove={jest.fn()}
       />,
       { wrapper },
     );
-    const row = screen.getAllByRole('row')[1];
-    if (!row) throw new Error('no row');
 
-    fireEvent.keyDown(screen.getByRole('button', { name: /AAPL/ }), { key: 'Enter' });
-    expect(push).not.toHaveBeenCalled();
-
-    fireEvent.keyDown(row, { key: 'Enter' });
-    expect(push).toHaveBeenCalledWith('/stocks/AAPL');
+    expect(screen.getAllByRole('row')[1]).not.toHaveAttribute('tabindex');
+    expect(screen.getByRole('link', { name: /AAPL/ })).toHaveAttribute('href', '/stocks/AAPL');
+    expect(screen.getByRole('button', { name: /AAPL/ })).toHaveClass('relative', 'z-10');
   });
 });

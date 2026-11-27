@@ -2,9 +2,10 @@ import { fireEvent, screen } from '@testing-library/react-native';
 import { type ReactNode } from 'react';
 
 import { type StockWithQuote } from '@sarwa/contracts';
+import { topMovers } from '@sarwa/core';
 
 import { HomeScreen } from '../../../src/features/home/home-screen';
-import { topMovers, useHomeScreen } from '../../../src/features/home/use-home-screen';
+import { useHomeScreen } from '../../../src/features/home/use-home-screen';
 import { renderScreen } from '../../render';
 
 jest.mock('../../../src/features/home/use-home-screen', () => ({

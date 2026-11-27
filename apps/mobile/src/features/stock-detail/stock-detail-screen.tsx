@@ -20,7 +20,7 @@ import { RangeCard } from './range-card';
 import { RemovedStock } from './removed-stock';
 import { SimilarStocks } from './similar-stocks';
 import { TopBar } from './top-bar';
-import { useStockDetailScreen } from './use-stock-detail-screen';
+import { useSellLabel, useStockDetailScreen } from './use-stock-detail-screen';
 
 function StockTitle({ symbol, stock }: { symbol: string; stock: Stock | undefined }) {
   return (
@@ -49,6 +49,10 @@ function StockTitle({ symbol, stock }: { symbol: string; stock: Stock | undefine
       </View>
     </View>
   );
+}
+
+function StockTradeBar({ symbol }: { symbol: string }) {
+  return <TradeBar symbol={symbol} sellLabel={useSellLabel(symbol)} />;
 }
 
 export function StockDetailScreen({ symbol }: { symbol: string }) {
@@ -134,9 +138,7 @@ export function StockDetailScreen({ symbol }: { symbol: string }) {
           />
         </ScrollView>
       )}
-      {screen.notFound || screen.isError ? null : (
-        <TradeBar symbol={symbol} sellLabel={screen.sellLabel} />
-      )}
+      {screen.notFound || screen.isError ? null : <StockTradeBar symbol={symbol} />}
     </SafeAreaView>
   );
 }

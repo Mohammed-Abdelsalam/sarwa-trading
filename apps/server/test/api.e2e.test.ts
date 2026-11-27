@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { type INestApplication } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { type Application } from 'express';
 import request from 'supertest';
@@ -16,6 +17,7 @@ import {
 } from '@sarwa/contracts';
 
 import { PrismaService } from '../src/prisma.service';
+import { TradingEngine } from '../src/trading/engine.service';
 import { startApp } from './app';
 
 let app: INestApplication;
@@ -82,6 +84,14 @@ describe('public market API', () => {
     const invalid = await http.get(api('/stocks/AAPL/candles?period=5Y')).expect(400);
     expect(ProblemSchema.parse(invalid.body).errors).toHaveProperty('period');
   });
+
+  it('answers a repeated or oversized search with a validation problem, not a crash', async () => {
+    const repeated = await http.get(api('/stocks?q=a&q=b')).expect(400);
+    const oversized = await http.get(api(`/stocks?q=${'a'.repeat(100)}`)).expect(400);
+
+    expect(ProblemSchema.parse(repeated.body).errors).toHaveProperty('q');
+    expect(ProblemSchema.parse(oversized.body).code).toBe('VALIDATION_FAILED');
+  });
 });
 
 describe('watchlist', () => {
@@ -142,6 +152,49 @@ describe('health', () => {
     expect(ProblemSchema.safeParse(res.body).success).toBe(true);
     expect(res.body.code).toBe('UNAVAILABLE');
   });
+
+  it('tags every response with a request id, reusing a sane incoming one', async () => {
+    const fresh = await http.get(api('/health/live')).expect(200);
+    const reused = await http.get(api('/health/live')).set('X-Request-Id', 'edge-1234').expect(200);
+    const unsafe = await http
+      .get(api('/health/live'))
+      .set('X-Request-Id', 'not a safe id; drop table')
+      .expect(200);
+
+    expect(fresh.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+    expect(reused.headers['x-request-id']).toBe('edge-1234');
+    expect(unsafe.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('is live without touching the database', async () => {
+    const query = jest.spyOn(app.get(PrismaService), '$queryRaw');
+
+    const res = await http.get(api('/health/live')).expect(200);
+
+    expect(res.body).toEqual({ status: 'ok' });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('is ready once the database answers and the engine has loaded its book', async () => {
+    const res = await http.get(api('/health/ready')).expect(200);
+
+    expect(res.body).toEqual({ status: 'ok', checks: { database: 'ok', engine: 'ok' } });
+  });
+
+  it('is not ready while the database is down', async () => {
+    jest.spyOn(app.get(PrismaService), '$queryRaw').mockRejectedValueOnce(new Error('db down'));
+
+    const res = await http.get(api('/health/ready')).expect(503);
+
+    expect(res.body.code).toBe('UNAVAILABLE');
+  });
+
+  it('is not ready before the engine has loaded the working orders', async () => {
+    jest.spyOn(app.get(TradingEngine), 'isLoaded').mockReturnValue(false);
+
+    await http.get(api('/health/ready')).expect(503);
+    await http.get(api('/health')).expect(200);
+  });
 });
 
 describe('admin', () => {
@@ -164,6 +217,66 @@ describe('admin', () => {
 
     expect(res.body.detail).toBe('Invalid email or password');
     expect(compare).toHaveBeenCalledTimes(1);
+  });
+
+  it('ends the session on sign-out, so a copied cookie stops working', async () => {
+    const cookie = await login('admin@sarwa.dev', 'admin12345', '198.51.100.21');
+    await http.get(api('/admin/auth/me')).set('Cookie', cookie).expect(200);
+
+    await http.post(api('/admin/auth/logout')).set('Cookie', cookie).expect(204);
+
+    await http.get(api('/admin/auth/me')).set('Cookie', cookie).expect(401);
+    const fresh = await login('admin@sarwa.dev', 'admin12345', '198.51.100.22');
+    const audit = await http
+      .get(api('/admin/audit?action=auth.logout'))
+      .set('Cookie', fresh)
+      .expect(200);
+    expect(audit.body.items[0]).toMatchObject({ actorEmail: 'admin@sarwa.dev' });
+  });
+
+  it('locks an account after 5 wrong passwords, even across IPs, and audits each failure', async () => {
+    const admin = await login('admin@sarwa.dev', 'admin12345', '198.51.100.23');
+    const email = `locked-${randomUUID().slice(0, 8)}@sarwa.dev`;
+    await http
+      .post(api('/admin/users'))
+      .set('Cookie', admin)
+      .send({ email, name: 'Ops', role: 'VIEWER', password: 'correct-horse-1' })
+      .expect(201);
+
+    for (let i = 0; i < 5; i++) {
+      await http
+        .post(api('/admin/auth/login'))
+        .set('X-Forwarded-For', `198.51.101.${String(i + 1)}`)
+        .send({ email, password: 'wrong-password' })
+        .expect(401);
+    }
+    const locked = await http
+      .post(api('/admin/auth/login'))
+      .set('X-Forwarded-For', '198.51.101.99')
+      .send({ email, password: 'correct-horse-1' })
+      .expect(401);
+
+    expect(locked.body.detail).toBe('Invalid email or password');
+    const audit = await http
+      .get(api('/admin/audit?action=auth.login_failed&pageSize=100'))
+      .set('Cookie', admin)
+      .expect(200);
+    const failures = (audit.body.items as { actorEmail: string }[]).filter(
+      (item) => item.actorEmail === email,
+    );
+    expect(failures).toHaveLength(6);
+  });
+
+  it('refuses a session token that was not issued for the admin app', async () => {
+    const user = await app.get(PrismaService).adminUser.findUniqueOrThrow({
+      where: { email: 'admin@sarwa.dev' },
+    });
+    const foreign = await app.get(JwtService).signAsync({ sub: user.id }, { expiresIn: 60 });
+
+    await http
+      .get(api('/admin/auth/me'))
+      .set('Cookie', `${ADMIN_SESSION_COOKIE}=${foreign}`)
+      .expect(401);
   });
 
   it('trusts X-Forwarded-For only from the local admin proxy', () => {
@@ -208,6 +321,18 @@ describe('admin', () => {
       .map((item) => item.action)
       .sort();
     expect(forUser).toEqual(['user.create', 'user.role', 'user.status']);
+  });
+
+  it('rejects an oversized user id before touching the database', async () => {
+    const cookie = await login('admin@sarwa.dev', 'admin12345', '198.51.100.13');
+
+    const res = await http
+      .patch(api(`/admin/users/${'x'.repeat(65)}`))
+      .set('Cookie', cookie)
+      .send({ role: 'ADMIN' })
+      .expect(400);
+
+    expect(ProblemSchema.parse(res.body).code).toBe('VALIDATION_FAILED');
   });
 
   it('requires a session for admin routes', async () => {
@@ -269,6 +394,34 @@ describe('admin', () => {
     await http.get(api('/stocks/INTC')).expect(200);
   });
 
+  it('refuses admin writes from another site but allows its own proxied origin', async () => {
+    const cookie = await login('admin@sarwa.dev', 'admin12345', '198.51.100.7');
+    const write = () =>
+      http.patch(api('/admin/config')).set('Cookie', cookie).send({ maintenanceMode: false });
+
+    const foreign = await write().set('Origin', 'https://evil.example').expect(403);
+    await write().set('Sec-Fetch-Site', 'cross-site').expect(403);
+    await write().set('Sec-Fetch-Site', 'same-site').expect(403);
+    await http
+      .post(api('/admin/auth/login'))
+      .set('X-Forwarded-For', '198.51.100.8')
+      .set('Origin', 'https://evil.example')
+      .send({ email: 'admin@sarwa.dev', password: 'admin12345' })
+      .expect(403);
+    await http
+      .get(api('/admin/stats'))
+      .set('Cookie', cookie)
+      .set('Origin', 'https://evil.example')
+      .expect(200);
+    await write()
+      .set('Origin', 'http://admin.sarwa.test:3001')
+      .set('X-Forwarded-Host', 'admin.sarwa.test:3001')
+      .set('Sec-Fetch-Site', 'same-origin')
+      .expect(200);
+
+    expect(ProblemSchema.safeParse(foreign.body).success).toBe(true);
+  });
+
   it('makes watchlists read-only during maintenance', async () => {
     const cookie = await login('admin@sarwa.dev', 'admin12345');
     await http
@@ -282,6 +435,7 @@ describe('admin', () => {
       .set(DEVICE_ID_HEADER, randomUUID())
       .expect(503);
     expect(res.body.code).toBe('MAINTENANCE');
+    await http.delete(api('/watchlist/AAPL')).set(DEVICE_ID_HEADER, randomUUID()).expect(503);
 
     await http
       .patch(api('/admin/config'))

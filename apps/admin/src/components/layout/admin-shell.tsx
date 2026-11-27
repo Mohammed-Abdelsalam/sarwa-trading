@@ -1,16 +1,31 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 
-import { Sidebar } from './sidebar';
+import { NavDrawer, Sidebar } from './sidebar';
 import { Topbar } from './topbar';
 import { useAdminShell } from './use-admin-shell';
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const shell = useAdminShell();
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useAdminI18n();
+  const navToggle = useRef<HTMLButtonElement>(null);
+  // Dialogs and drawers portal to <body>, so the document itself must carry the direction.
+  useEffect(() => {
+    document.documentElement.dir = dir;
+    document.documentElement.lang = locale;
+  }, [dir, locale]);
+  // The drawer has no Radix trigger, so focus goes back to the menu button once it has unmounted.
+  const navWasOpen = useRef(false);
+  useEffect(() => {
+    if (shell.navOpen) navWasOpen.current = true;
+    else if (navWasOpen.current) {
+      navWasOpen.current = false;
+      navToggle.current?.focus();
+    }
+  }, [shell.navOpen]);
 
   return (
     <div dir={dir} className="bg-bg flex h-dvh">
@@ -25,6 +40,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
         collapsed={shell.collapsed}
         version={shell.version}
         onToggle={shell.actions.toggleSidebar}
+        className="max-lg:hidden"
+      />
+      <NavDrawer
+        open={shell.navOpen}
+        active={shell.active}
+        version={shell.version}
+        onClose={shell.actions.closeNav}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
@@ -32,10 +54,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
           user={shell.user}
           status={shell.status}
           theme={shell.theme}
+          navOpen={shell.navOpen}
+          navToggle={navToggle}
+          onOpenNav={shell.actions.openNav}
           onToggleTheme={shell.actions.toggleTheme}
           onSignOut={shell.actions.signOut}
         />
-        <main id="main" className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-8 py-7">
+        <main
+          id="main"
+          className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-5 md:px-8 md:py-7"
+        >
           {children}
         </main>
       </div>

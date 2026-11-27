@@ -23,6 +23,7 @@ describe('proxy', () => {
     expect(matches('/icons')).toBe(true);
     expect(matches('/_next/static/chunk.js')).toBe(false);
     expect(matches('/favicon.ico')).toBe(false);
+    expect(matches('/robots.txt')).toBe(false);
     expect(matches('/icon.png')).toBe(false);
     expect(matches('/api/admin/me')).toBe(false);
     expect(matches('/socket.io/')).toBe(false);

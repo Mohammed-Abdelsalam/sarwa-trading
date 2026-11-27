@@ -19,6 +19,7 @@ import {
 import { parseCents, parsePercentBps } from '@sarwa/domain';
 
 import { type I18n } from '../hooks/i18n';
+import { type AdminI18n } from './i18n';
 
 export type FieldError =
   'required' | 'invalid' | 'symbolFormat' | 'symbolTaken' | 'positive' | 'range';
@@ -264,7 +265,7 @@ export const SYMBOL_MAX_LENGTH = 10;
 export const REMEMBER_DAYS = 7;
 export const CONFIG_APPLY_SECONDS = 5;
 
-export function stockErrorText(code: FieldError, { t, f }: Pick<I18n, 't' | 'f'>): string {
+export function stockErrorText(code: FieldError, { t, f }: Pick<AdminI18n, 't' | 'f'>): string {
   const errors = t.admin.stocks.errors;
   switch (code) {
     case 'symbolFormat':

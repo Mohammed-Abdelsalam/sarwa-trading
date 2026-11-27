@@ -141,7 +141,7 @@ export function OrderDrawer({ id, onClose }: { id: string; onClose: () => void }
                   {(field) => (
                     <Input
                       {...field}
-                      prefix="$"
+                      prefix={drawer.currency}
                       inputMode="decimal"
                       value={drawer.priceText}
                       onChange={(event) => {

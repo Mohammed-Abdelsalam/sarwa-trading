@@ -1,4 +1,4 @@
-import { createFormatter, getMessages } from '@sarwa/i18n';
+import { createFormatter, getAdminMessages, getMessages } from '@sarwa/i18n';
 
 import { stockErrorText } from '../../src/admin/forms';
 import { orderNotionalCents, orderStatsBreakdown } from '../../src/admin/orders';
@@ -61,7 +61,10 @@ describe('orderStatsBreakdown', () => {
 });
 
 describe('stockErrorText', () => {
-  const copy = { t: getMessages('en'), f: createFormatter({ locale: 'en' }) };
+  const copy = {
+    t: { ...getMessages('en'), admin: getAdminMessages('en') },
+    f: createFormatter({ locale: 'en' }),
+  };
 
   it('fills the limits into the field error copy', () => {
     expect(stockErrorText('symbolFormat', copy)).toBe('1–10 uppercase letters, e.g. AAPL');

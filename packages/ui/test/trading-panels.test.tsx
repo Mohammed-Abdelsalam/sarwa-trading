@@ -75,6 +75,26 @@ describe('StatusBadge', () => {
 });
 
 describe('Heatmap', () => {
+  it('links each tile when given an href, and fits three columns on a phone', () => {
+    render(
+      <Heatmap
+        label="Sector heatmap"
+        tileHref={(key) => `/stocks/${key}`}
+        tiles={[{ key: 'NVDA', label: 'NVDA', change: 3.41, changeLabel: '+3.41%', weight: 0.2 }]}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: /^NVDA\s*\+3\.41%$/ })).toHaveAttribute(
+      'href',
+      '/stocks/NVDA',
+    );
+    expect(screen.getByRole('list', { name: 'Sector heatmap' })).toHaveClass(
+      'grid-cols-3',
+      'sm:grid-cols-4',
+      'md:grid-cols-6',
+    );
+  });
+
   it('always prints the move on each tile so it reads without colour', () => {
     render(
       <Heatmap
@@ -127,6 +147,13 @@ describe('AllocationBar', () => {
 });
 
 describe('MarketStatusPill', () => {
+  it('keeps the label for screen readers when compact shrinks it to a dot', () => {
+    render(<MarketStatusPill state="open" label="Market open" compact />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Market open');
+    expect(screen.getByText('Market open')).toHaveClass('max-xl:sr-only');
+  });
+
   it('announces the passed label with its state', () => {
     render(<MarketStatusPill state="closed" label="Closed · opens 9:30 AM" />);
     const pill = screen.getByRole('status');

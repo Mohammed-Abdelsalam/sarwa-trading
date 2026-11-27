@@ -78,7 +78,9 @@ export function SectorChips({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerClassName="gap-2 px-5"
+        // The padding lets each 36 pt chip's hit slop reach 44 pt without moving the layout.
+        className="-my-1"
+        contentContainerClassName="gap-2 px-5 py-1"
         accessibilityRole="tablist"
       >
         {SECTOR_FILTERS.map((sector) => {
@@ -88,6 +90,7 @@ export function SectorChips({
               key={sector}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
+              hitSlop={{ top: 4, bottom: 4 }}
               onPress={() => {
                 onChange(sector);
               }}

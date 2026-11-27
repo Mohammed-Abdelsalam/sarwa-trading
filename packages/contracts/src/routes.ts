@@ -1,5 +1,15 @@
 // Every REST path, relative to API_PREFIX. Servers mount them as-is; clients fill the params in
 // with routePath, so both sides break together when one changes.
+export const MARKET_ROUTES = {
+  stocks: 'stocks',
+  stock: 'stocks/:symbol',
+  candles: 'stocks/:symbol/candles',
+  watchlist: 'watchlist',
+  watchlistItem: 'watchlist/:symbol',
+  appConfig: 'app-config',
+  health: 'health',
+} as const;
+
 export const TRADING_ROUTES = {
   account: 'account',
   portfolio: 'portfolio',

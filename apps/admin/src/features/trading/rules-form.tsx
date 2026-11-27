@@ -1,12 +1,11 @@
-import { useI18n } from '@sarwa/core';
-import { NUMERIC_RULES, RULE_UNITS } from '@sarwa/core/admin';
+import { NUMERIC_RULES, RULE_UNITS, useAdminI18n } from '@sarwa/core/admin';
 import { Button, Callout, Card, Input, Switch } from '@sarwa/ui';
 
 import { Locked } from '../../components/common/access';
 import { type RulesFormModel } from './use-trading-page';
 
 export function RulesForm({ form, canEdit }: { form: RulesFormModel; canEdit: boolean }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   const draft = form.draft;
   if (!draft) return null;
 

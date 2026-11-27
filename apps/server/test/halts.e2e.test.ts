@@ -6,7 +6,7 @@ import { DEFAULT_CIRCUIT_BREAKER } from '@sarwa/domain';
 
 import { MarketService } from '../src/market/market.service';
 import { TradingEngine } from '../src/trading/engine.service';
-import { FakeClock, startApp } from './app';
+import { FakeClock, pinned, startApp } from './app';
 
 const T0 = Date.UTC(2026, 11, 1, 15, 0);
 
@@ -31,11 +31,10 @@ async function halts(): Promise<Halt[]> {
 }
 
 beforeAll(async () => {
-  ({ app } = await startApp({ clock }));
+  ({ app } = await startApp({ clock, random: pinned.random, ticker: pinned.ticker }));
   http = request(app.getHttpServer());
   market = app.get(MarketService);
   engine = app.get(TradingEngine);
-  market.random = () => 0.99;
   const res = await http
     .post(api('/admin/auth/login'))
     .set('X-Forwarded-For', '198.20.0.1')

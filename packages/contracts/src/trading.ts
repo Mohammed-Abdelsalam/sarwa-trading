@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   ALERT_CONDITIONS,
   ALERT_REPEATS,
+  CANCEL_REASONS,
   ORDER_STATUSES,
   ORDER_TYPES,
   REJECTION_CODES,
@@ -121,7 +122,7 @@ export const FillSchema = z.object({
   at: Timestamp,
 });
 
-export const CancelReasonSchema = z.enum(['user', 'admin_reset', 'insufficient_funds_at_open']);
+export const CancelReasonSchema = z.enum(CANCEL_REASONS);
 
 export const OrderSchema = z.object({
   id: Id,

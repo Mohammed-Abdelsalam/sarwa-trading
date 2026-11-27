@@ -10,6 +10,7 @@ import {
   useMarketConnection,
   useMarketStatus,
   useQuote,
+  useQuotes,
   useSyncStocksOnChange,
 } from '../../src/hooks';
 import { createTestClient, createWrapper, makeQuote } from '../utils';
@@ -171,5 +172,33 @@ describe('useIsStale', () => {
     });
 
     expect(result.current).toBe(true);
+  });
+});
+
+describe('useQuotes', () => {
+  it('subscribes to the symbols and re-renders only when one of their quotes changes', () => {
+    const client = createTestClient();
+    const { Wrapper } = createWrapper(client);
+    let commits = 0;
+    const { result } = renderHook(
+      () => {
+        commits += 1;
+        return useQuotes(['AAPL']);
+      },
+      { wrapper: Wrapper },
+    );
+    expect(client.market.acquire).toHaveBeenCalledWith(['AAPL']);
+    expect(result.current.AAPL).toBeUndefined();
+
+    act(() => {
+      client.store.getState().applyQuotes([makeQuote({ symbol: 'AAPL', price: 200, seq: 2 })]);
+    });
+    const before = commits;
+    act(() => {
+      client.store.getState().applyQuotes([makeQuote({ symbol: 'TSLA', seq: 3 })]);
+    });
+
+    expect(result.current.AAPL?.price).toBe(200);
+    expect(commits).toBe(before);
   });
 });

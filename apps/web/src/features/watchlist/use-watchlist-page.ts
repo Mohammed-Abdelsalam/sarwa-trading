@@ -9,8 +9,7 @@ import {
   useUndoableRemove,
   useWatchlistStocks,
 } from '@sarwa/core';
-
-import { useLocalPreference } from '../../lib/browser';
+import { useLocalPreference } from '@sarwa/ui';
 
 export type WatchlistView = 'table' | 'grid';
 const VIEWS: readonly WatchlistView[] = ['table', 'grid'];

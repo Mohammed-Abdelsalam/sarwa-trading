@@ -53,6 +53,18 @@ describe('StockRow', () => {
     expect(onToggleWatch).toHaveBeenCalledWith('AAPL', true);
   });
 
+  it('lets a screen reader remove a watchlist row without swiping', async () => {
+    const onRemove = jest.fn();
+    await renderScreen(<StockRow stock={apple} onRemove={onRemove} />);
+
+    const row = screen.getByRole('link');
+    expect(row.props.accessibilityActions).toEqual([
+      { name: 'remove', label: 'Remove from watchlist' },
+    ]);
+    await fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'remove' } });
+    expect(onRemove).toHaveBeenCalledWith('AAPL');
+  });
+
   it('greys out the price while prices are stale', async () => {
     await renderScreen(<StockRow stock={apple} stale />);
 

@@ -1,8 +1,11 @@
 import { cache } from 'react';
 
 import {
+  MARKET_ROUTES,
+  routePath,
   StockDetailResponseSchema,
   StocksResponseSchema,
+  TRADING_ROUTES,
   TradingStatusSchema,
 } from '@sarwa/contracts';
 import { createRequest } from '@sarwa/core/server';
@@ -18,13 +21,14 @@ const snapshot = { next: { revalidate: SNAPSHOT_REVALIDATE_SECONDS } };
 
 // cache() dedupes the call between a page and its generateMetadata within one request.
 export const getStockDetail = cache((symbol: string) =>
-  request(`/stocks/${encodeURIComponent(symbol)}`, StockDetailResponseSchema, snapshot),
+  request(routePath(MARKET_ROUTES.stock, { symbol }), StockDetailResponseSchema, snapshot),
 );
 
 export const getStocks = cache(
-  async () => (await request('/stocks', StocksResponseSchema, snapshot)).items,
+  async () =>
+    (await request(routePath(MARKET_ROUTES.stocks), StocksResponseSchema, snapshot)).items,
 );
 
 // The kill switch and halts decide whether a ticket may submit, so they are never served stale.
 export const getTradingStatus = () =>
-  request('/trading/status', TradingStatusSchema, { cache: 'no-store' });
+  request(routePath(TRADING_ROUTES.tradingStatus), TradingStatusSchema, { cache: 'no-store' });

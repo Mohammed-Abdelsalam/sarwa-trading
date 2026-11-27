@@ -65,7 +65,14 @@ export function applyTradingEvent(
       );
       return;
     }
+    case 'account.reset':
+      resync(queryClient);
+      return;
   }
+}
+
+function resync(queryClient: QueryClient): void {
+  for (const queryKey of RESYNC_KEYS) void queryClient.invalidateQueries({ queryKey });
 }
 
 const RESYNC_KEYS = [
@@ -96,9 +103,7 @@ export function useTradingEvents(): void {
     let openedBefore = wasOpen;
     return store.subscribe(({ connection }) => {
       const open = connection.status === 'open';
-      if (open && !wasOpen && openedBefore) {
-        for (const queryKey of RESYNC_KEYS) void queryClient.invalidateQueries({ queryKey });
-      }
+      if (open && !wasOpen && openedBefore) resync(queryClient);
       if (open) openedBefore = true;
       wasOpen = open;
     });

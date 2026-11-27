@@ -38,6 +38,7 @@ export class TradingEngine implements OnModuleInit, OnModuleDestroy {
   private subscription?: Subscription;
   private timer?: NodeJS.Timeout;
   private wasOpen = false;
+  private loaded = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -66,15 +67,31 @@ export class TradingEngine implements OnModuleInit, OnModuleDestroy {
     this.subscription = this.market.quotes$.subscribe((quotes) => {
       this.enqueue(quotes);
     });
+    this.subscription.add(
+      this.market.disabled$.subscribe((symbols) => {
+        this.queue
+          .run(() => this.cancelDisabled(symbols))
+          .catch((error: unknown) => {
+            this.logger.error(`Canceling orders on disabled symbols failed: ${String(error)}`);
+          });
+      }),
+    );
     this.timer = setInterval(() => {
       this.scheduleHousekeeping();
     }, HOUSEKEEPING_MS);
+    this.loaded = true;
     this.logger.log(`Loaded ${this.book.size()} working orders`);
   }
 
-  onModuleDestroy(): void {
+  isLoaded(): boolean {
+    return this.loaded;
+  }
+
+  // Stops taking new work, then lets queued fills finish before the database disconnects.
+  async onModuleDestroy(): Promise<void> {
     this.subscription?.unsubscribe();
     clearInterval(this.timer);
+    await this.queue.idle();
   }
 
   // Resolves after everything queued so far (including pending quotes) has been processed.
@@ -182,9 +199,22 @@ export class TradingEngine implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // A disabled symbol has no quotes, so its orders would hold cash or shares until they expire.
+  private async cancelDisabled(symbols: string[]): Promise<void> {
+    const rows = await this.prisma.order.findMany({
+      where: { symbol: { in: symbols }, status: { in: [...WORKING_STATUSES] } },
+    });
+    for (const row of rows) {
+      const closed = await this.execution.close(row, 'canceled', {
+        cancelReason: 'symbol_disabled',
+      });
+      await this.execution.publish(closed, 'order_canceled');
+    }
+  }
+
   private async announceEarlyClose(closesAt: number): Promise<void> {
     const accounts = await this.prisma.account.findMany({ select: { id: true } });
-    await this.notifications.notify(
+    this.notifications.enqueue(
       accounts.map((account) => account.id),
       {
         kind: 'market_notice',

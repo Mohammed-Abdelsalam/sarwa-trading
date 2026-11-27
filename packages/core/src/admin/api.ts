@@ -1,5 +1,3 @@
-import { type z } from 'zod';
-
 import {
   type Account,
   AccountSchema,
@@ -37,6 +35,7 @@ import {
   HaltImpactSchema,
   HaltSchema,
   type LoginRequest,
+  MARKET_ROUTES,
   type MarketCommand,
   type MarketCommandResponse,
   MarketCommandResponseSchema,
@@ -50,13 +49,7 @@ import {
   UsersResponseSchema,
 } from '@sarwa/contracts';
 
-import {
-  ApiError,
-  type CallOptions,
-  createRequest,
-  type Request,
-  type RequestOptions,
-} from '../api';
+import { type CallOptions, createRequest, queryString } from '../api';
 
 export interface AdminApi {
   login(body: LoginRequest): Promise<AdminUser>;
@@ -86,19 +79,6 @@ export interface AdminApi {
   resetAccount(id: string, confirm: string): Promise<Account>;
 }
 
-export function adminQueryString(query: object): string {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== '') params.set(key, String(value));
-  }
-  const text = params.toString();
-  return text ? `?${text}` : '';
-}
-
-export function isUnauthorized(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 401;
-}
-
 // Same-origin by default: the session cookie is httpOnly and SameSite=strict.
 export function createAdminApi({
   baseUrl = '',
@@ -109,20 +89,12 @@ export function createAdminApi({
   onUnauthorized?: () => void;
   timeoutMs?: number;
 } = {}): AdminApi {
-  const raw = createRequest({ baseUrl, credentials: 'include', timeoutMs });
-  const call = raw as (
-    path: string,
-    schema: z.ZodType | null,
-    options?: RequestOptions,
-  ) => Promise<unknown>;
-  const request = (async (path: string, schema: z.ZodType | null, options?: RequestOptions) => {
-    try {
-      return await call(path, schema, options);
-    } catch (error) {
-      if (isUnauthorized(error)) onUnauthorized?.();
-      throw error;
-    }
-  }) as Request;
+  const raw = createRequest({ baseUrl, auth: { credentials: 'include' }, timeoutMs });
+  const request = createRequest({
+    baseUrl,
+    auth: { credentials: 'include', onUnauthorized },
+    timeoutMs,
+  });
   const R = ADMIN_ROUTES;
 
   return {
@@ -132,10 +104,10 @@ export function createAdminApi({
     logout: () => raw(routePath(R.logout), null, { method: 'POST' }),
     me: async (options) => (await request(routePath(R.me), SessionResponseSchema, options)).user,
     stats: (options) => request(routePath(R.stats), AdminStatsSchema, options),
-    health: (options) => raw('/health', HealthResponseSchema, options),
+    health: (options) => raw(routePath(MARKET_ROUTES.health), HealthResponseSchema, options),
     marketCommand: (body) =>
       request(routePath(R.market), MarketCommandResponseSchema, { method: 'POST', body }),
-    getConfig: (options) => request('/app-config', AppConfigSchema, options),
+    getConfig: (options) => request(routePath(MARKET_ROUTES.appConfig), AppConfigSchema, options),
     updateConfig: (body) =>
       request(routePath(R.config), AppConfigSchema, { method: 'PATCH', body }),
     listStocks: (options) => request(routePath(R.stocks), AdminStocksResponseSchema, options),
@@ -148,28 +120,20 @@ export function createAdminApi({
     updateUser: (id, body) =>
       request(routePath(R.user, { id }), AdminUserSchema, { method: 'PATCH', body }),
     audit: (query, options) =>
-      request(`${routePath(R.audit)}${adminQueryString(query)}`, AuditPageSchema, options),
+      request(`${routePath(R.audit)}${queryString(query)}`, AuditPageSchema, options),
     trading: (options) => request(routePath(R.trading), AdminTradingSchema, options),
     updateTrading: (body) =>
       request(routePath(R.trading), AdminTradingSchema, { method: 'PATCH', body }),
     haltImpact: (symbol, options) =>
-      request(
-        `${routePath(R.haltImpact)}${adminQueryString({ symbol })}`,
-        HaltImpactSchema,
-        options,
-      ),
+      request(`${routePath(R.haltImpact)}${queryString({ symbol })}`, HaltImpactSchema, options),
     createHalt: (body) => request(routePath(R.halts), HaltSchema, { method: 'POST', body }),
     resumeHalt: (symbol) => request(routePath(R.resumeHalt, { symbol }), null, { method: 'POST' }),
     orders: (query, options) =>
-      request(
-        `${routePath(R.orders)}${adminQueryString(query)}`,
-        AdminOrdersResponseSchema,
-        options,
-      ),
+      request(`${routePath(R.orders)}${queryString(query)}`, AdminOrdersResponseSchema, options),
     orderStats: (options) => request(routePath(R.orderStats), AdminOrderStatsSchema, options),
     accounts: (query, options) =>
       request(
-        `${routePath(R.accounts)}${adminQueryString(query)}`,
+        `${routePath(R.accounts)}${queryString(query)}`,
         AdminAccountsResponseSchema,
         options,
       ),

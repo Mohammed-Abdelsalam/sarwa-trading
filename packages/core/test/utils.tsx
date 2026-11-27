@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 
-import { type Quote, type StockWithQuote } from '@sarwa/contracts';
+import { ErrorCode, type ErrorCodeValue, type Quote, type StockWithQuote } from '@sarwa/contracts';
 import { createFormatter, type Digits, getMessages, type Locale } from '@sarwa/i18n';
 
 import { ApiError, type ApiClient } from '../src/api';
@@ -53,8 +53,15 @@ export function makeStock(
   };
 }
 
+const CODES: Partial<Record<number, ErrorCodeValue>> = {
+  401: ErrorCode.Unauthorized,
+  404: ErrorCode.NotFound,
+  409: ErrorCode.Conflict,
+};
+
 export function makeProblem(status: number): ApiError {
-  return new ApiError({ type: 'about:blank', title: 'Error', status, code: 'X' });
+  const code = CODES[status] ?? ErrorCode.Internal;
+  return new ApiError({ type: 'about:blank', title: 'Error', status, code });
 }
 
 let nextId = 0;

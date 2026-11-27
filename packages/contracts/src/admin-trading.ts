@@ -134,9 +134,12 @@ export const AdminSocketEvent = {
 
 export const AdminOrderEventSchema = z.object({ v: z.literal(1), order: AdminOrderSchema });
 
+export const AdminTradingEventSchema = z.object({ v: z.literal(1), trading: AdminTradingSchema });
+
 export type AdminOrderEvent = z.infer<typeof AdminOrderEventSchema>;
+export type AdminTradingEvent = z.infer<typeof AdminTradingEventSchema>;
 
 export interface AdminServerToClientEvents {
   'admin.order': (event: AdminOrderEvent) => void;
-  'admin.trading': (event: { v: 1; trading: AdminTrading }) => void;
+  'admin.trading': (event: AdminTradingEvent) => void;
 }

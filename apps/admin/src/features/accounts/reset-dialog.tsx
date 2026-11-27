@@ -1,4 +1,5 @@
-import { cents, useI18n } from '@sarwa/core';
+import { cents } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import { Button, Callout, Dialog, Field, Input } from '@sarwa/ui';
 
 import { type AccountsPageModel } from './use-accounts-page';
@@ -16,7 +17,7 @@ export function ResetDialog({
   onConfirmText: (text: string) => void;
   onConfirm: () => void;
 }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   return (
     <Dialog
       open={reset.account !== null}
