@@ -1,8 +1,13 @@
 import {
+  bps,
+  type Bps,
   BPS_PER_UNIT,
+  cents,
   type Cents,
   divide,
+  micros,
   type Micros,
+  negate,
   notionalCents,
   scaleBps,
   sharesForCents,
@@ -101,6 +106,8 @@ export interface OrderEstimate {
   feesCents: Cents;
   holdCents: Cents;
   holdMicros: Micros;
+  // The price a share-sized buy's cash hold is taken at; each partial fill releases its part of it.
+  holdPriceTicks: Ticks | null;
   // Fills (or may fill) the moment it is accepted: a market order in session, or a marketable limit.
   executesNow: boolean;
   queued: boolean;
@@ -134,35 +141,45 @@ export function estimateOrder(draft: OrderDraft, ctx: OrderContext): OrderEstima
         ? ctx.sellableMicros
         : priceTicks > 0
           ? sharesForCents(draft.size.cents, priceTicks)
-          : 0;
+          : micros(0);
   const notional =
     draft.size.kind === 'amount' && draft.type === 'market'
       ? draft.size.cents
       : notionalCents(qtyMicros, priceTicks, draft.side === 'buy' ? 'up' : 'down');
+  const holdPriceTicks = buyHoldPriceTicks(draft, priceTicks, ctx);
 
   return {
     priceTicks,
     qtyMicros,
     notionalCents: notional,
-    feesCents: 0,
-    holdCents: draft.side === 'buy' ? buyHoldCents(draft, priceTicks, qtyMicros, ctx) : 0,
-    holdMicros: draft.side === 'sell' ? sellHoldMicros(draft, priceTicks, qtyMicros, ctx) : 0,
+    feesCents: cents(0),
+    holdCents:
+      draft.side !== 'buy'
+        ? cents(0)
+        : holdPriceTicks === null
+          ? notional
+          : notionalCents(qtyMicros, holdPriceTicks, 'up'),
+    holdPriceTicks,
+    holdMicros:
+      draft.side === 'sell' ? sellHoldMicros(draft, priceTicks, qtyMicros, ctx) : micros(0),
     executesNow,
     queued,
   };
 }
 
-// Cash a buy reserves. A dollar amount reserves exactly that; shares reserve enough for the worst
-// fill: slippage while open, the closed-market buffer (at least as large) for queued or stop orders.
-function buyHoldCents(draft: OrderDraft, priceTicks: Ticks, qty: Micros, ctx: OrderContext): Cents {
-  if (draft.type === 'market' && draft.size.kind === 'amount') return draft.size.cents;
-  if (draft.type === 'limit') return notionalCents(qty, priceTicks, 'up');
+// Cash a buy reserves is qty × this price. A dollar-amount market buy reserves exactly its amount
+// (null). Shares reserve for the worst fill: slippage while open, the closed-market buffer (at least
+// as large) for queued or stop orders.
+function buyHoldPriceTicks(draft: OrderDraft, priceTicks: Ticks, ctx: OrderContext): Ticks | null {
+  if (draft.side !== 'buy' || (draft.type === 'market' && draft.size.kind === 'amount'))
+    return null;
+  if (draft.type === 'limit') return priceTicks;
   const { maxSlippageBps, closedMarketBufferBps } = ctx.rules;
   const buffer =
     draft.type === 'market' && ctx.session.isOpen
       ? maxSlippageBps
-      : Math.max(maxSlippageBps, closedMarketBufferBps);
-  return notionalCents(qty, scaleBps(priceTicks, buffer, 'up'), 'up');
+      : bps(Math.max(maxSlippageBps, closedMarketBufferBps));
+  return scaleBps(priceTicks, buffer, 'up');
 }
 
 // A market sell for a dollar amount may need more shares if the bid slips before the fill.
@@ -173,13 +190,13 @@ function sellHoldMicros(
   ctx: OrderContext,
 ): Micros {
   if (draft.type !== 'market' || draft.size.kind !== 'amount') return qty;
-  const worstBid = scaleBps(priceTicks, -ctx.rules.maxSlippageBps, 'down');
-  return Math.min(ctx.sellableMicros, sharesForCents(draft.size.cents, worstBid, 'up'));
+  const worstBid = scaleBps(priceTicks, negate(ctx.rules.maxSlippageBps), 'down');
+  return micros(Math.min(ctx.sellableMicros, sharesForCents(draft.size.cents, worstBid, 'up')));
 }
 
 export function collarRange(lastTicks: Ticks, rules: Pick<ExecutionRules, 'collarBps'>) {
   return {
-    minTicks: scaleBps(lastTicks, -rules.collarBps, 'up'),
+    minTicks: scaleBps(lastTicks, negate(rules.collarBps), 'up'),
     maxTicks: scaleBps(lastTicks, rules.collarBps, 'down'),
   };
 }
@@ -245,7 +262,7 @@ export function needsLargeOrderConfirm(notional: Cents, equity: Cents): boolean 
 }
 
 // Signed slippage of a fill against the quoted price, in bps (positive = worse for the trader).
-export function slippageBps(side: Side, quotedTicks: Ticks, fillTicks: Ticks): number {
+export function slippageBps(side: Side, quotedTicks: Ticks, fillTicks: Ticks): Bps {
   const diff = side === 'buy' ? fillTicks - quotedTicks : quotedTicks - fillTicks;
-  return divide(BigInt(diff) * BigInt(BPS_PER_UNIT), BigInt(quotedTicks), 'nearest');
+  return bps(divide(BigInt(diff) * BigInt(BPS_PER_UNIT), BigInt(quotedTicks), 'nearest'));
 }

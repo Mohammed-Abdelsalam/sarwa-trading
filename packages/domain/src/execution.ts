@@ -1,12 +1,17 @@
 import {
+  type Bps,
+  cents,
   type Cents,
   divide,
   exactNotional,
   exactToCents,
+  micros,
   type Micros,
+  negate,
   notionalCents,
   scaleBps,
   sharesForCents,
+  ticks,
   type Ticks,
 } from './money';
 import { isMarketable, type OrderStatus, type OrderType, type Side } from './orders';
@@ -36,10 +41,10 @@ export interface WorkingOrder {
   holdPriceTicks: Ticks | null;
 }
 
-export function marketFillPrice(side: Side, quote: TradeQuote, slippageBps: number): Ticks {
+export function marketFillPrice(side: Side, quote: TradeQuote, slippageBps: Bps): Ticks {
   return side === 'buy'
     ? scaleBps(quote.askTicks, slippageBps, 'up')
-    : scaleBps(quote.bidTicks, -slippageBps, 'down');
+    : scaleBps(quote.bidTicks, negate(slippageBps), 'down');
 }
 
 // A limit fills at its price or better; null while the market hasn't reached it.
@@ -47,11 +52,11 @@ export function limitFillPrice(
   side: Side,
   limitTicks: Ticks,
   quote: TradeQuote,
-  slippageBps: number,
+  slippageBps: Bps,
 ): Ticks | null {
   if (!isMarketable(side, limitTicks, quote)) return null;
   const market = marketFillPrice(side, quote, slippageBps);
-  return side === 'buy' ? Math.min(limitTicks, market) : Math.max(limitTicks, market);
+  return ticks(side === 'buy' ? Math.min(limitTicks, market) : Math.max(limitTicks, market));
 }
 
 // Stops trigger on the last trade (the only real print) and then fill as market orders.
@@ -60,7 +65,7 @@ export function shouldTriggerStop(side: Side, stopTicks: Ticks, lastTicks: Ticks
 }
 
 export function remainingMicros(order: WorkingOrder): Micros {
-  return order.qtyMicros === null ? 0 : order.qtyMicros - order.filledMicros;
+  return micros(order.qtyMicros === null ? 0 : order.qtyMicros - order.filledMicros);
 }
 
 // How much fills now. Dollar orders fill whole at the fill price; limit orders fill up to the size
@@ -73,10 +78,10 @@ export function fillQuantity(
   if (order.amountCents !== null && order.qtyMicros === null) {
     return order.side === 'buy'
       ? sharesForCents(order.amountCents, priceTicks, 'down')
-      : Math.min(order.heldMicros, sharesForCents(order.amountCents, priceTicks, 'up'));
+      : micros(Math.min(order.heldMicros, sharesForCents(order.amountCents, priceTicks, 'up')));
   }
   const remaining = remainingMicros(order);
-  return order.type === 'limit' ? Math.min(remaining, displayedMicros) : remaining;
+  return order.type === 'limit' ? micros(Math.min(remaining, displayedMicros)) : remaining;
 }
 
 export interface FillResult {
@@ -90,12 +95,28 @@ export interface FillResult {
 
 export class IllegalFillError extends Error {}
 
+interface FillInput {
+  qtyMicros: Micros;
+  priceTicks: Ticks;
+}
+
+// What one fill moves cash by: the change in the rounded running total of the order's fills.
+export function fillNotionalCents(
+  order: Pick<WorkingOrder, 'side' | 'filledExactNotional' | 'filledNotionalCents'>,
+  fill: FillInput,
+): Cents {
+  const exact = order.filledExactNotional + exactNotional(fill.qtyMicros, fill.priceTicks);
+  return cents(
+    exactToCents(exact, order.side === 'buy' ? 'up' : 'down') - order.filledNotionalCents,
+  );
+}
+
 export function applyFill(
   cashCents: Cents,
   position: Position | null,
   order: WorkingOrder,
   symbol: string,
-  fill: { qtyMicros: Micros; priceTicks: Ticks },
+  fill: FillInput,
 ): FillResult {
   const { qtyMicros: qty, priceTicks: price } = fill;
   if (qty <= 0) throw new IllegalFillError('A fill needs a positive quantity');
@@ -109,19 +130,20 @@ export function applyFill(
     throw new IllegalFillError('A share-sized buy needs the price its cash hold was taken at');
   }
   const filledExact = order.filledExactNotional + exactNotional(qty, price);
-  const filledNotional = exactToCents(filledExact, order.side === 'buy' ? 'up' : 'down');
-  const notional = filledNotional - order.filledNotionalCents;
+  const notional = fillNotionalCents(order, fill);
+  const filledNotional = cents(order.filledNotionalCents + notional);
 
   let nextCash: Cents;
   let nextPosition: Position | null;
-  let realized = 0;
+  let realized = cents(0);
 
   if (order.side === 'buy') {
-    nextCash = cashCents - notional;
+    nextCash = cents(cashCents - notional);
+    if (nextCash < 0) throw new IllegalFillError('A buy can never take cash below 0');
     nextPosition = {
       symbol,
-      qtyMicros: (position?.qtyMicros ?? 0) + qty,
-      costBasisCents: (position?.costBasisCents ?? 0) + notional,
+      qtyMicros: micros((position?.qtyMicros ?? 0) + qty),
+      costBasisCents: cents((position?.costBasisCents ?? 0) + notional),
     };
   } else {
     if (!position || qty > position.qtyMicros)
@@ -135,20 +157,20 @@ export function applyFill(
             BigInt(position.qtyMicros),
             'nearest',
           );
-    realized = notional - basisRemoved;
-    nextCash = cashCents + notional;
+    realized = cents(notional - basisRemoved);
+    nextCash = cents(cashCents + notional);
     nextPosition =
       qty === position.qtyMicros
         ? null
         : {
             symbol,
-            qtyMicros: position.qtyMicros - qty,
-            costBasisCents: position.costBasisCents - basisRemoved,
+            qtyMicros: micros(position.qtyMicros - qty),
+            costBasisCents: cents(position.costBasisCents - basisRemoved),
           };
   }
 
-  const filledMicros = order.filledMicros + qty;
-  const remaining = order.qtyMicros === null ? 0 : order.qtyMicros - filledMicros;
+  const filledMicros = micros(order.filledMicros + qty);
+  const remaining = micros(order.qtyMicros === null ? 0 : order.qtyMicros - filledMicros);
   const done = remaining === 0;
   return {
     cashCents: nextCash,
@@ -165,13 +187,13 @@ export function applyFill(
       heldCents:
         order.side === 'buy' && order.holdPriceTicks !== null && !done
           ? remainingBuyHold(
-              filledMicros + remaining,
+              micros(filledMicros + remaining),
               order.holdPriceTicks,
               remaining,
               filledNotional,
             )
-          : 0,
-      heldMicros: order.side === 'sell' ? remaining : 0,
+          : cents(0),
+      heldMicros: order.side === 'sell' ? remaining : micros(0),
     },
   };
 }
@@ -180,7 +202,9 @@ export function applyFill(
 // spent: debited + held stays within the hold taken at placement, so buying power can't dip below 0.
 function remainingBuyHold(qty: Micros, holdPrice: Ticks, remaining: Micros, debited: Cents): Cents {
   const originalHold = notionalCents(qty, holdPrice, 'up');
-  return Math.max(0, Math.min(notionalCents(remaining, holdPrice, 'up'), originalHold - debited));
+  return cents(
+    Math.max(0, Math.min(notionalCents(remaining, holdPrice, 'up'), originalHold - debited)),
+  );
 }
 
 // Average fill price so far, for the order detail and the filled screen.
@@ -208,7 +232,7 @@ export function closeOrder(
   order: WorkingOrder,
   status: 'canceled' | 'expired' | 'rejected',
 ): WorkingOrder {
-  return { ...order, status, heldCents: 0, heldMicros: 0 };
+  return { ...order, status, heldCents: cents(0), heldMicros: micros(0) };
 }
 
 export interface PricePoint {
@@ -233,10 +257,10 @@ export function breakerTrips(
 ): boolean {
   if (!rules.enabled || window.length === 0) return false;
   const prices = window.map((point) => point.ticks);
-  const low = Math.min(...prices);
-  const high = Math.max(...prices);
+  const low = ticks(Math.min(...prices));
+  const high = ticks(Math.max(...prices));
   return (
     lastTicks >= scaleBps(low, rules.moveBps, 'up') ||
-    lastTicks <= scaleBps(high, -rules.moveBps, 'down')
+    lastTicks <= scaleBps(high, negate(rules.moveBps), 'down')
   );
 }
