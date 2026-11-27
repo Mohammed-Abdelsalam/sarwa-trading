@@ -183,6 +183,7 @@ async function seedDemoAccounts(): Promise<number> {
           heldCents: cents(0),
           heldMicros: micros(0),
           holdPriceTicks: priceTicks,
+          holdBudgetCents: null,
         },
         symbol,
         { qtyMicros, priceTicks },

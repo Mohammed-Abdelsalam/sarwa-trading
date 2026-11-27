@@ -127,6 +127,7 @@ export function toWorkingOrder(row: OrderRow): WorkingOrder {
     heldCents: cents(num(row.heldCents)),
     heldMicros: micros(num(row.heldMicros)),
     holdPriceTicks: unitOrNull(row.holdPriceTicks, ticks),
+    holdBudgetCents: unitOrNull(row.holdBudgetCents, cents),
   };
 }
 

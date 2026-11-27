@@ -37,7 +37,8 @@ export class AdminGateway implements OnGatewayInit {
     server.use((socket: Socket, next) => {
       this.sessions
         .verify(readCookie(socket.handshake.headers.cookie, ADMIN_SESSION_COOKIE))
-        .then(() => {
+        .then(async (admin) => {
+          await socket.join(adminRoom(admin.id));
           next();
         })
         .catch(() => {
@@ -54,4 +55,11 @@ export class AdminGateway implements OnGatewayInit {
   trading(trading: AdminTrading): void {
     this.server.emit('admin.trading', { v: 1, trading });
   }
+
+  // The session is only checked at connect, so a disabled or re-roled admin is dropped here.
+  dropAdmin(adminId: string): void {
+    this.server.in(adminRoom(adminId)).disconnectSockets(true);
+  }
 }
+
+const adminRoom = (adminId: string) => `admin:${adminId}`;

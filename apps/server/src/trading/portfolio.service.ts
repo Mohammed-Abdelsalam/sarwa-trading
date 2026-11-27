@@ -9,6 +9,7 @@ import {
 } from '@sarwa/contracts';
 import {
   addDays,
+  averageCostTicks,
   cents,
   dollarsToTicks,
   marketClock,
@@ -18,7 +19,6 @@ import {
   type PortfolioSummary,
   previousTradingDay,
   summarizePortfolio,
-  ticks,
 } from '@sarwa/domain';
 
 import { Clock } from '../common/clock';
@@ -62,28 +62,38 @@ export class PortfolioService implements OnModuleInit, OnModuleDestroy {
   }
 
   // The raw books; clients value them with live prices through @sarwa/domain.
-  async books(account: AccountRow): Promise<PortfolioResponse> {
+  async books(requester: AccountRow): Promise<PortfolioResponse> {
     const now = this.clock.now();
     const today = marketClock(now).date;
-    const scope = { accountId: account.id, epoch: account.epoch };
-    const [positions, working, todayFills, ytd, equityAtLastCloseCents] = await Promise.all([
-      this.prisma.position.findMany({
-        where: { accountId: account.id },
-        orderBy: { symbol: 'asc' },
-      }),
-      this.prisma.order.findMany({
-        where: { accountId: account.id, status: { in: [...WORKING_STATUSES] } },
-        orderBy: { createdAt: 'asc' },
-      }),
-      this.prisma.fill.findMany({
-        where: { ...scope, at: { gte: new Date(marketTime(today, 0)) } },
-      }),
-      this.prisma.fill.aggregate({
-        _sum: { realizedCents: true },
-        where: { ...scope, at: { gte: new Date(marketTime(`${today.slice(0, 4)}-01-01`, 0)) } },
-      }),
-      this.equityAtLastClose(account, now),
-    ]);
+    // One read of cash, positions, holds and fills, so a fill can't land between them.
+    const [account, positions, working, todayFills, ytd] = await this.prisma.$transaction(
+      async (tx) => {
+        const fresh = await tx.account.findUniqueOrThrow({ where: { id: requester.id } });
+        const scope = { accountId: fresh.id, epoch: fresh.epoch };
+        return [
+          fresh,
+          await tx.position.findMany({
+            where: { accountId: fresh.id },
+            orderBy: { symbol: 'asc' },
+          }),
+          await tx.order.findMany({
+            where: { accountId: fresh.id, status: { in: [...WORKING_STATUSES] } },
+            orderBy: { createdAt: 'asc' },
+          }),
+          await tx.fill.findMany({
+            where: { ...scope, at: { gte: new Date(marketTime(today, 0)) } },
+          }),
+          await tx.fill.aggregate({
+            _sum: { realizedCents: true },
+            where: {
+              ...scope,
+              at: { gte: new Date(marketTime(`${today.slice(0, 4)}-01-01`, 0)) },
+            },
+          }),
+        ] as const;
+      },
+    );
+    const equityAtLastCloseCents = await this.equityAtLastClose(account, now);
 
     return {
       account: toAccount(account),
@@ -130,15 +140,17 @@ export class PortfolioService implements OnModuleInit, OnModuleDestroy {
         equityAtLastCloseCents === null ? null : cents(equityAtLastCloseCents),
       positions: books.positions.map((p) => {
         const quote = this.market.quoteOf(p.symbol);
+        const position = {
+          symbol: p.symbol,
+          qtyMicros: micros(p.qtyMicros),
+          costBasisCents: cents(p.costBasisCents),
+        };
+        const fallback = averageCostTicks(position);
         return {
-          position: {
-            symbol: p.symbol,
-            qtyMicros: micros(p.qtyMicros),
-            costBasisCents: cents(p.costBasisCents),
-          },
+          position,
           sector: p.sector,
-          lastTicks: quote ? dollarsToTicks(quote.price) : ticks(0),
-          prevCloseTicks: quote ? dollarsToTicks(quote.prevClose) : ticks(0),
+          lastTicks: quote ? dollarsToTicks(quote.price) : fallback,
+          prevCloseTicks: quote ? dollarsToTicks(quote.prevClose) : fallback,
           ...(p.today && {
             today: {
               qtyAtOpenMicros: micros(p.today.qtyAtOpenMicros),

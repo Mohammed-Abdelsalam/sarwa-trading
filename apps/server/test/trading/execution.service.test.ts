@@ -46,6 +46,7 @@ const limitBuy = {
   heldCents: 101_000n,
   heldMicros: 0n,
   holdPriceTicks: 1_010_000n,
+  holdBudgetCents: 101_000n,
   triggeredAt: null,
 } as unknown as OrderRow;
 

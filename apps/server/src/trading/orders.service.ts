@@ -66,13 +66,14 @@ export class OrdersService {
   ) {}
 
   place(
-    account: AccountRow,
+    requester: AccountRow,
     idempotencyKey: string,
     requestHash: string,
     request: PlaceOrderRequest,
     receivedAt: number,
   ): Promise<Placement> {
     return this.queue.run(async () => {
+      const account = await this.fresh(requester);
       const previous = await this.prisma.order.findUnique({
         where: { accountId_idempotencyKey: { accountId: account.id, idempotencyKey } },
         include: { fills: true },
@@ -135,10 +136,8 @@ export class OrdersService {
           heldCents: BigInt(estimate.holdCents),
           heldMicros: BigInt(estimate.holdMicros),
           holdPriceTicks: holdPrice === null ? null : BigInt(holdPrice),
-          expiresAt:
-            request.type === 'market' && !estimate.queued
-              ? null
-              : new Date(orderExpiry(request.tif, now, this.config.get().sessionMode)),
+          holdBudgetCents: BigInt(estimate.holdCents),
+          expiresAt: new Date(orderExpiry(request.tif, now, this.config.get().sessionMode)),
         },
         include: { fills: true },
       });
@@ -183,8 +182,9 @@ export class OrdersService {
     });
   }
 
-  modify(account: AccountRow, id: string, patch: ModifyOrderRequest): Promise<Order> {
+  modify(requester: AccountRow, id: string, patch: ModifyOrderRequest): Promise<Order> {
     return this.queue.run(async () => {
+      const account = await this.fresh(requester);
       const row = await this.owned(account, id);
       const changeable =
         (row.type === 'limit' || row.type === 'stop') &&
@@ -236,6 +236,8 @@ export class OrdersService {
           heldCents: BigInt(estimate.holdCents),
           heldMicros: BigInt(estimate.holdMicros),
           holdPriceTicks: holdPrice === null ? null : BigInt(holdPrice),
+          // What already filled was spent at the old price; only the rest is held at the new one.
+          holdBudgetCents: row.filledNotionalCents + BigInt(estimate.holdCents),
           expiresAt: new Date(orderExpiry(draft.tif, now, this.config.get().sessionMode)),
           updatedAt: new Date(now),
         },
@@ -286,6 +288,11 @@ export class OrdersService {
       sellableMicros: sellableMicros(positionRow ? toPosition(positionRow) : null, holds),
       now,
     };
+  }
+
+  // The request's account row was read before it waited in the queue; a fill or reset may have moved on.
+  private fresh(account: AccountRow): Promise<AccountRow> {
+    return this.prisma.account.findUniqueOrThrow({ where: { id: account.id } });
   }
 
   private async owned(account: AccountRow, id: string) {

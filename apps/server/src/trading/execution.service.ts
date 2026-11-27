@@ -68,11 +68,14 @@ export class ExecutionService {
   ) {}
 
   // The caller has checked that the session is open, the market running and the symbol not halted.
-  async work(row: OrderRow, quote: TradeQuote): Promise<void> {
+  // Returns what filled, so the caller can share the quote's displayed size between orders.
+  async work(row: OrderRow, quote: TradeQuote): Promise<Micros> {
     const side = row.side as Side;
     let order = row;
     if (order.type === 'stop' && order.triggeredAt === null) {
-      if (!shouldTriggerStop(side, ticks(Number(order.stopTicks)), quote.lastTicks)) return;
+      if (!shouldTriggerStop(side, ticks(Number(order.stopTicks)), quote.lastTicks)) {
+        return micros(0);
+      }
       const now = new Date(this.clock.now());
       order = await this.prisma.order.update({
         where: { id: order.id },
@@ -87,11 +90,11 @@ export class ExecutionService {
       order.type === 'limit'
         ? limitFillPrice(side, ticks(Number(order.limitTicks)), quote, slippageBps)
         : marketFillPrice(side, quote, slippageBps);
-    if (price === null) return;
+    if (price === null) return micros(0);
 
     const displayed = side === 'buy' ? quote.askSizeMicros : quote.bidSizeMicros;
     const qty = fillQuantity(activate(toWorkingOrder(order)), price, displayed);
-    if (qty > 0) await this.fill(order.id, qty, price);
+    return qty > 0 ? this.fill(order.id, qty, price) : micros(0);
   }
 
   async close(
@@ -132,7 +135,7 @@ export class ExecutionService {
     return Number(_sum.heldCents ?? 0n);
   }
 
-  private async fill(orderId: string, wantedMicros: Micros, priceTicks: Ticks): Promise<void> {
+  private async fill(orderId: string, wantedMicros: Micros, priceTicks: Ticks): Promise<Micros> {
     const now = new Date(this.clock.now());
     const outcome = await this.prisma.$transaction(async (tx) => {
       const row = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
@@ -158,7 +161,7 @@ export class ExecutionService {
           field: 'size',
           sellableMicros: position?.qtyMicros ?? 0,
         };
-        return { order: await this.close(row, 'rejected', { rejection }, tx), filled: false };
+        return { order: await this.close(row, 'rejected', { rejection }, tx), filled: micros(0) };
       }
       // A stop or a queued order can gap past its hold: it may only spend cash no other order holds.
       if (row.side === 'buy') {
@@ -172,7 +175,7 @@ export class ExecutionService {
             requiredCents,
             availableCents: Math.max(0, availableCents),
           };
-          return { order: await this.close(row, 'rejected', { rejection }, tx), filled: false };
+          return { order: await this.close(row, 'rejected', { rejection }, tx), filled: micros(0) };
         }
       }
       const result: FillResult = applyFill(cashCents, position, working, row.symbol, {
@@ -221,16 +224,18 @@ export class ExecutionService {
         },
         include: { fills: true },
       });
-      return { order, filled: true };
+      return { order, filled: qtyMicros };
     });
-    if (!outcome) return;
+    if (!outcome) return micros(0);
 
-    const notice = !outcome.filled
-      ? 'order_rejected'
-      : outcome.order.status === 'filled'
-        ? 'order_filled'
-        : 'order_partially_filled';
+    const notice =
+      outcome.filled === 0
+        ? 'order_rejected'
+        : outcome.order.status === 'filled'
+          ? 'order_filled'
+          : 'order_partially_filled';
     await this.publish(outcome.order, notice);
+    return outcome.filled;
   }
 }
 

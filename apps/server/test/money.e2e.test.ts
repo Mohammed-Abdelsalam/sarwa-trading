@@ -167,7 +167,7 @@ describe('a buy that gaps past its hold', () => {
     const { askTicks } = spreadAround(dollarsToTicks(500), SPREAD_BPS);
     const qty = allIn(scaleBps(askTicks, bps(5), 'up'));
     // The fill at placement is lost (as after a crash), so the order fills on the next tick.
-    jest.spyOn(execution, 'work').mockResolvedValueOnce(undefined);
+    jest.spyOn(execution, 'work').mockResolvedValueOnce(micros(0));
     const buy = await placed(device, shareBuy('UNH', 'market', qty, 500));
 
     await moveTo('UNH', 505);

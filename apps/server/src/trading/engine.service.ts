@@ -2,7 +2,7 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { type Subscription } from 'rxjs';
 
 import { type Quote } from '@sarwa/contracts';
-import { MARKET_TIME_ZONE, marketClock, marketSession } from '@sarwa/domain';
+import { MARKET_TIME_ZONE, marketClock, marketSession, micros } from '@sarwa/domain';
 
 import { Clock } from '../common/clock';
 import { MarketService } from '../market/market.service';
@@ -61,6 +61,8 @@ export class TradingEngine implements OnModuleInit, OnModuleDestroy {
     });
     for (const row of working) this.book.sync(row);
     this.wasOpen = this.session().isOpen;
+    // Orders that expired while the server was down close before the first quote can reach them.
+    await this.queue.run(() => this.housekeeping());
     this.subscription = this.market.quotes$.subscribe((quotes) => {
       this.enqueue(quotes);
     });
@@ -139,12 +141,26 @@ export class TradingEngine implements OnModuleInit, OnModuleDestroy {
 
       const ids = this.book.ids(quote.symbol);
       if (ids.length === 0) continue;
-      // Time priority: the oldest order gets the displayed size first.
+      // Housekeeping may not have expired these yet, so an expired order is never worked.
       const orders = await this.prisma.order.findMany({
-        where: { id: { in: ids }, status: { in: [...WORKING_STATUSES] } },
+        where: {
+          id: { in: ids },
+          status: { in: [...WORKING_STATUSES] },
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date(now) } }],
+        },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
-      for (const order of orders) await this.execution.work(order, tradeQuote);
+      // Time priority: the oldest order takes the displayed size first; later ones share the rest.
+      let { askSizeMicros, bidSizeMicros } = tradeQuote;
+      for (const order of orders) {
+        const filled = await this.execution.work(order, {
+          ...tradeQuote,
+          askSizeMicros,
+          bidSizeMicros,
+        });
+        if (order.side === 'buy') askSizeMicros = micros(Math.max(0, askSizeMicros - filled));
+        else bidSizeMicros = micros(Math.max(0, bidSizeMicros - filled));
+      }
     }
   }
 

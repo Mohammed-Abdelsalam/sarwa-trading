@@ -25,9 +25,11 @@ import {
   averageCostTicks,
   bps,
   cents,
+  DEFAULT_EXECUTION_RULES,
   dollarsToTicks,
   micros,
   notionalCents,
+  orderExpiry,
   POLICY,
   scaleBps,
   sharesForCents,
@@ -39,6 +41,7 @@ import { MarketService } from '../src/market/market.service';
 import { PrismaService } from '../src/prisma.service';
 import { TradingEngine } from '../src/trading/engine.service';
 import { ExecutionService } from '../src/trading/execution.service';
+import { OrdersService } from '../src/trading/orders.service';
 import { PortfolioService } from '../src/trading/portfolio.service';
 import { FakeClock, startApp } from './app';
 
@@ -102,6 +105,11 @@ async function moveTo(symbol: string, price: number): Promise<void> {
   await engine.idle();
 }
 
+async function orderOf(device: Device, id: string): Promise<Order> {
+  return PlaceOrderResponseSchema.parse((await get(device, `/orders/${id}`).expect(200)).body)
+    .order;
+}
+
 async function portfolio(device: Device) {
   return PortfolioResponseSchema.parse((await get(device, '/portfolio').expect(200)).body);
 }
@@ -118,6 +126,14 @@ async function login(email: string, password: string, remember = false): Promise
 
 const admin = (method: 'get' | 'post' | 'patch' | 'delete', path: string, cookie = adminCookie) =>
   http[method](api(path)).set('Cookie', cookie).set('X-Forwarded-For', '127.0.0.1');
+
+async function newAdmin(role: 'ADMIN' | 'VIEWER'): Promise<{ id: string; cookie: string }> {
+  const email = `user-${randomUUID().slice(0, 8)}@sarwa.dev`;
+  const res = await admin('post', '/admin/users')
+    .send({ email, name: 'Ops', role, password: 'user12345678' })
+    .expect(201);
+  return { id: res.body.id as string, cookie: await login(email, 'user12345678') };
+}
 
 function waitFor<T>(socket: Socket, event: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -422,6 +438,191 @@ describe('expiry', () => {
     expect(expired).toMatchObject({ status: 'expired', heldCents: 0 });
     expect(inbox.items[0]?.payload).toMatchObject({ kind: 'order_expired', orderId: order.id });
   });
+
+  it('never fills a day order past its expiry, even before housekeeping runs', async () => {
+    const device = newDevice();
+    await moveTo('NFLX', 600);
+    const order = await placed(device, {
+      symbol: 'NFLX',
+      side: 'buy',
+      type: 'limit',
+      tif: 'day',
+      size: { kind: 'shares', micros: sharesToMicros(1) },
+      limitTicks: dollarsToTicks(590),
+      quotedTicks: dollarsToTicks(600),
+    });
+
+    clock.set(order.expiresAt!);
+    await moveTo('NFLX', 580);
+    const after = await orderOf(device, order.id);
+
+    expect(after.filledMicros).toBe(0);
+  });
+
+  it('gives a market order the day expiry so a stuck one releases its hold', async () => {
+    const device = newDevice();
+    await moveTo('TSLA', 250);
+    jest.spyOn(app.get(ExecutionService), 'work').mockResolvedValueOnce(micros(0));
+
+    const order = await placed(
+      device,
+      marketBuy('TSLA', { kind: 'shares', micros: sharesToMicros(1) }, dollarsToTicks(250)),
+    );
+
+    expect(order).toMatchObject({
+      status: 'open',
+      expiresAt: orderExpiry('day', T0, 'always-open'),
+    });
+  });
+});
+
+describe('displayed size', () => {
+  afterEach(() => {
+    clock.set(T0);
+  });
+
+  it("shares one quote's displayed size between resting limits, oldest first", async () => {
+    const device = newDevice();
+    await moveTo('V', 30);
+    const limitBuy = async () => {
+      clock.advance(1);
+      return placed(device, {
+        symbol: 'V',
+        side: 'buy',
+        type: 'limit',
+        tif: 'gtc',
+        size: { kind: 'shares', micros: sharesToMicros(400) },
+        limitTicks: dollarsToTicks(29),
+        quotedTicks: dollarsToTicks(30),
+      });
+    };
+    const orders = [await limitBuy(), await limitBuy(), await limitBuy()];
+
+    await moveTo('V', 28);
+    const filled = await Promise.all(
+      orders.map(async (order) => (await orderOf(device, order.id)).filledMicros),
+    );
+
+    expect(filled).toEqual([sharesToMicros(400), sharesToMicros(400), sharesToMicros(100)]);
+  });
+});
+
+describe('changing a partly filled buy', () => {
+  it('holds the rest at the new price after the limit is lowered', async () => {
+    const device = newDevice();
+    await moveTo('JPM', 21);
+    const order = await placed(device, {
+      symbol: 'JPM',
+      side: 'buy',
+      type: 'limit',
+      tif: 'gtc',
+      size: { kind: 'shares', micros: sharesToMicros(1_000) },
+      limitTicks: dollarsToTicks(20),
+      quotedTicks: dollarsToTicks(21),
+    });
+    await moveTo('JPM', 19.9);
+
+    await http
+      .patch(api(`/orders/${order.id}`))
+      .set(DEVICE_ID_HEADER, device.id)
+      .set('X-Forwarded-For', device.ip)
+      .send({ qtyMicros: sharesToMicros(2_000), limitTicks: dollarsToTicks(18) })
+      .expect(200);
+    await moveTo('JPM', 17.9);
+    const after = await orderOf(device, order.id);
+
+    expect(after).toMatchObject({
+      status: 'partially_filled',
+      filledMicros: sharesToMicros(1_800),
+      heldCents: notionalCents(sharesToMicros(200), dollarsToTicks(18), 'up'),
+    });
+  });
+});
+
+describe('requests that waited in the queue', () => {
+  const staleAccount = async (device: Device) => {
+    await get(device, '/account').expect(200);
+    return app.get(PrismaService).account.findUniqueOrThrow({ where: { deviceId: device.id } });
+  };
+  const changeAccount = (id: string, data: object) =>
+    app.get(PrismaService).account.update({ where: { id }, data });
+
+  it('places with the account as it is when the order runs', async () => {
+    const device = newDevice();
+    await moveTo('GOOGL', 150);
+    const stale = await staleAccount(device);
+    await changeAccount(stale.id, { epoch: { increment: 1 }, cashCents: 1_000n });
+
+    const { order } = await app.get(OrdersService).place(
+      stale,
+      key(),
+      'hash',
+      {
+        symbol: 'GOOGL',
+        side: 'buy',
+        type: 'market',
+        tif: 'day',
+        size: { kind: 'shares', micros: sharesToMicros(1) },
+        quotedTicks: dollarsToTicks(150),
+      },
+      performance.now(),
+    );
+    const row = await app.get(PrismaService).order.findUniqueOrThrow({ where: { id: order.id } });
+
+    expect(order.rejection?.code).toBe('INSUFFICIENT_FUNDS');
+    expect(row.epoch).toBe(stale.epoch + 1);
+  });
+
+  it('changes an order against the account as it is when the change runs', async () => {
+    const device = newDevice();
+    await moveTo('GOOGL', 150);
+    const resting = await placed(device, {
+      symbol: 'GOOGL',
+      side: 'buy',
+      type: 'limit',
+      tif: 'gtc',
+      size: { kind: 'shares', micros: sharesToMicros(1) },
+      limitTicks: dollarsToTicks(140),
+      quotedTicks: dollarsToTicks(150),
+    });
+    const stale = await staleAccount(device);
+    await changeAccount(stale.id, { cashCents: 20_000n });
+
+    await expect(
+      app.get(OrdersService).modify(stale, resting.id, { qtyMicros: sharesToMicros(10) }),
+    ).rejects.toMatchObject({ response: { code: 'INSUFFICIENT_FUNDS' } });
+  });
+
+  it('reads cash and positions from the same moment', async () => {
+    const device = newDevice();
+    await moveTo('META', 300);
+    const stale = await staleAccount(device);
+    await placed(
+      device,
+      marketBuy('META', { kind: 'shares', micros: sharesToMicros(10) }, dollarsToTicks(300)),
+    );
+
+    const books = await app.get(PortfolioService).books(stale);
+
+    expect(books.account.cashCents).toBe(
+      POLICY.startingCashCents - books.positions[0]!.costBasisCents,
+    );
+  });
+
+  it('values a position with no quote at its average cost', async () => {
+    const device = newDevice();
+    await moveTo('AMZN', 180);
+    await placed(
+      device,
+      marketBuy('AMZN', { kind: 'shares', micros: sharesToMicros(10) }, dollarsToTicks(180)),
+    );
+    const account = await staleAccount(device);
+    jest.spyOn(market, 'quoteOf').mockReturnValue(undefined);
+
+    const summary = await app.get(PortfolioService).summary(account);
+
+    expect(Math.abs(summary.equityCents - POLICY.startingCashCents)).toBeLessThanOrEqual(1);
+  });
 });
 
 describe('alerts', () => {
@@ -600,6 +801,63 @@ describe('admin', () => {
       before: { rules: expect.objectContaining({ maxSlippageBps: 6 }) },
       after: { rules: expect.objectContaining({ maxSlippageBps: 5 }) },
     });
+  });
+
+  it('refuses a min notional patch that is not below the saved max', async () => {
+    const res = await admin('patch', '/admin/trading')
+      .send({ rules: { minNotionalCents: DEFAULT_EXECUTION_RULES.maxNotionalCents } })
+      .expect(400);
+
+    expect(res.body.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('answers 404 for a user that does not exist', async () => {
+    const res = await admin('patch', '/admin/users/missing').send({ status: 'disabled' });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('keeps one active ADMIN when the last two demote each other at once', async () => {
+    const prisma = app.get(PrismaService);
+    const [b, c] = await Promise.all([newAdmin('ADMIN'), newAdmin('ADMIN')]);
+    const others = await prisma.adminUser.findMany({
+      where: { role: 'ADMIN', status: 'active', id: { notIn: [b.id, c.id] } },
+    });
+    await prisma.adminUser.updateMany({
+      where: { id: { in: others.map((o) => o.id) } },
+      data: { status: 'disabled' },
+    });
+
+    await Promise.all([
+      admin('patch', `/admin/users/${c.id}`, b.cookie).send({ role: 'VIEWER' }),
+      admin('patch', `/admin/users/${b.id}`, c.cookie).send({ role: 'VIEWER' }),
+    ]);
+    const activeAdmins = await prisma.adminUser.count({
+      where: { role: 'ADMIN', status: 'active' },
+    });
+    await prisma.adminUser.updateMany({
+      where: { id: { in: others.map((o) => o.id) } },
+      data: { status: 'active' },
+    });
+
+    expect(activeAdmins).toBe(1);
+  });
+
+  it('drops the live socket of an admin who is disabled or demoted', async () => {
+    const viewer = await newAdmin('VIEWER');
+    const demoted = await newAdmin('ADMIN');
+    const sockets = await Promise.all(
+      [viewer, demoted].map((user) =>
+        connect(ADMIN_NAMESPACE, { extraHeaders: { cookie: user.cookie } }),
+      ),
+    );
+    const dropped = sockets.map((socket) => waitFor<string>(socket, 'disconnect'));
+
+    await admin('patch', `/admin/users/${viewer.id}`).send({ status: 'disabled' }).expect(200);
+    await admin('patch', `/admin/users/${demoted.id}`).send({ role: 'VIEWER' }).expect(200);
+
+    await expect(Promise.all(dropped)).resolves.toHaveLength(2);
+    for (const socket of sockets) socket.disconnect();
   });
 
   it('refuses to delete a stock with trading history', async () => {

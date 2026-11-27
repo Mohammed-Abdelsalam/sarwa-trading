@@ -144,7 +144,8 @@ model Order {
   heldCents           BigInt    @default(0)
   heldMicros          BigInt    @default(0)
   holdPriceTicks      BigInt?
-  rejection           String?
+  holdBudgetCents     BigInt?
+  rejection          String?
   cancelReason        String?
   idempotencyKey      String
   requestHash         String
