@@ -4,7 +4,6 @@ import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query
 import { type Metadata, type Viewport } from 'next';
 import { IBM_Plex_Sans_Arabic, Inter, JetBrains_Mono, Manrope } from 'next/font/google';
 import { cookies } from 'next/headers';
-import { connection } from 'next/server';
 import { type ReactNode } from 'react';
 
 import { isRtl, queryKeys } from '@sarwa/core/server';
@@ -41,8 +40,8 @@ export const viewport: Viewport = {
 // here, above all of them: a boundary lower down can't fill a query the nav already created empty.
 // The trading status comes along so no ticket renders before the rules are known.
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  // Prices change every tick, so render per request instead of freezing a build-time snapshot.
-  await connection();
+  // Reading the cookies renders per request (language and digits); the market data itself comes
+  // from a short-lived snapshot cache, see server-api.
   const cookieStore = await cookies();
   const preferences = readLocalePreferences((name) => cookieStore.get(name)?.value);
   const queryClient = new QueryClient();
