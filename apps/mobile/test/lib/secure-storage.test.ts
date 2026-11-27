@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { createDeviceIdGetter, type KeyValueStorage } from '@sarwa/core';
 
+import { deviceModel, devicePlatform } from '../../src/lib/device';
 import { createSecureStorage } from '../../src/lib/secure-storage';
 
 jest.mock('expo-secure-store', () => {
@@ -11,6 +12,10 @@ jest.mock('expo-secure-store', () => {
     getItemAsync: jest.fn((key: string) => Promise.resolve(values.get(key) ?? null)),
     setItemAsync: jest.fn((key: string, value: string) => {
       values.set(key, value);
+      return Promise.resolve();
+    }),
+    deleteItemAsync: jest.fn((key: string) => {
+      values.delete(key);
       return Promise.resolve();
     }),
     reset: () => {
@@ -48,6 +53,14 @@ describe('createSecureStorage', () => {
     });
   });
 
+  it('removes a key, so a signed-out phone keeps no tokens', async () => {
+    const storage = createSecureStorage();
+    await storage.setItem('sarwa.refreshToken', 'refresh-1');
+    await storage.removeItem('sarwa.refreshToken');
+
+    expect(await storage.getItem('sarwa.refreshToken')).toBeNull();
+  });
+
   it('returns null for a key it never saw', async () => {
     expect(await createSecureStorage(memoryStorage()).getItem('sarwa.deviceId')).toBeNull();
   });
@@ -65,5 +78,12 @@ describe('createSecureStorage', () => {
 
     expect(await first()).toBe('device-1');
     expect(await second()).toBe('device-1');
+  });
+});
+
+describe('device', () => {
+  it('names the phone for the sessions list and reports its platform', () => {
+    expect(deviceModel()).toBe('iPhone 15');
+    expect(devicePlatform()).toBe('ios');
   });
 });

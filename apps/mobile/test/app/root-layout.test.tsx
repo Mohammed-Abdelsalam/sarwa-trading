@@ -35,6 +35,7 @@ jest.mock('../../src/features/maintenance/maintenance-screen', () => {
   const { Text: MockText } = jest.requireActual<{ Text: typeof Text }>('react-native');
   return { MaintenanceScreen: () => <MockText>maintenance</MockText> };
 });
+jest.mock('../../src/features/gating/account-overlays', () => ({ AccountOverlays: () => null }));
 jest.mock('../../src/lib/theme', () => ({ useColors: () => ({ bg: '#fff' }) }));
 
 describe('RootLayout', () => {

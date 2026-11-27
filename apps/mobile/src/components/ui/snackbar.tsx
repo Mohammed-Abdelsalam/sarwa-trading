@@ -17,8 +17,8 @@ export function Snackbar({
   onDismiss,
 }: {
   message: string;
-  actionLabel: string;
-  onAction: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
   onDismiss: () => void;
 }) {
   const reducedMotion = useReducedMotion();
@@ -35,15 +35,17 @@ export function Snackbar({
       <Text variant="sm" weight={600} className="flex-1">
         {message}
       </Text>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onAction}
-        className="h-11 justify-center rounded-control-sm px-3 active:bg-surface-3"
-      >
-        <Text variant="sm" weight={600} className="text-brand-fg">
-          {actionLabel}
-        </Text>
-      </Pressable>
+      {actionLabel ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onAction}
+          className="h-11 justify-center rounded-control-sm px-3 active:bg-surface-3"
+        >
+          <Text variant="sm" weight={600} className="text-brand-fg">
+            {actionLabel}
+          </Text>
+        </Pressable>
+      ) : null}
       <IconButton label={t.common.dismiss} icon={X} iconSize={16} size={44} onPress={onDismiss} />
     </Animated.View>
   );

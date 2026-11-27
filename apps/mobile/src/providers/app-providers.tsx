@@ -9,7 +9,11 @@ import {
   type Query,
   QueryClient,
 } from '@tanstack/react-query';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import {
+  type Persister,
+  persistQueryClientRestore,
+  PersistQueryClientProvider,
+} from '@tanstack/react-query-persist-client';
 import Constants from 'expo-constants';
 import { type ReactNode, useEffect, useState, useSyncExternalStore } from 'react';
 import { AppState, View } from 'react-native';
@@ -19,9 +23,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { type AppConfig } from '@sarwa/contracts';
 import {
   type Locale,
+  ME_SCOPE,
+  meKeys,
   queryKeys,
   SarwaProvider,
   shouldRetry,
+  useAuthSync,
   useI18n,
   useMarketConnection,
   useSyncStocksOnChange,
@@ -44,24 +51,28 @@ export function savedLocale(): Locale {
 }
 
 // Only what paints the first screens offline; candles, order pages and notifications refetch.
-const PERSISTED = new Set(
-  [
-    queryKeys.stocks,
-    queryKeys.appConfig,
-    queryKeys.tradingStatus,
-    queryKeys.watchlist,
-    queryKeys.portfolio,
-  ].map((key) => hashKey(key)),
+const PUBLIC_PERSISTED = new Set(
+  [queryKeys.stocks, queryKeys.appConfig, queryKeys.tradingStatus].map((key) => hashKey(key)),
 );
 
+function isPersisted(query: Query): boolean {
+  if (PUBLIC_PERSISTED.has(query.queryHash)) return true;
+  const [scope, userId] = query.queryKey;
+  if (scope !== ME_SCOPE[0] || typeof userId !== 'string') return false;
+  const keys = meKeys(userId);
+  return [keys.watchlist, keys.portfolio].some((key) => hashKey(key) === query.queryHash);
+}
+
 export function shouldPersistQuery(query: Query): boolean {
-  if (!defaultShouldDehydrateQuery(query) || !PERSISTED.has(query.queryHash)) return false;
+  if (!defaultShouldDehydrateQuery(query) || !isPersisted(query)) return false;
   // A saved maintenance flag would lock the next launch before the app could ask again.
   return (
     query.queryHash !== hashKey(queryKeys.appConfig) ||
     !(query.state.data as AppConfig).maintenanceMode
   );
 }
+
+export const GUEST_SCOPE = 'guest';
 
 // The scope keeps one identity's cache from being restored for another.
 // A new app version never restores cache shaped by an older contract.
@@ -77,7 +88,24 @@ export function createPersistOptions(scope: string) {
   };
 }
 
-export const persistOptions = createPersistOptions('device');
+let active = createPersistOptions(GUEST_SCOPE);
+
+// The provider subscribes once, so its persister follows whichever identity is signed in.
+const scopedPersister: Persister = {
+  persistClient: (persisted) => active.persister.persistClient(persisted),
+  restoreClient: () => active.persister.restoreClient(),
+  removeClient: () => active.persister.removeClient(),
+};
+
+export const persistOptions = { ...active, persister: scopedPersister };
+
+// Sign-in restores that user's saved cache; sign-out deletes it so the phone keeps no portfolio.
+export async function switchPersistScope(userId: string | null): Promise<void> {
+  const leaving = active;
+  active = createPersistOptions(userId ?? GUEST_SCOPE);
+  if (userId === null) await leaving.persister.removeClient();
+  await persistQueryClientRestore({ ...persistOptions, queryClient });
+}
 
 // Wi-Fi without internet (captive portal, dead hotspot) counts as offline; unknown reachability does not.
 export function isOnline(state: {
@@ -116,10 +144,15 @@ function useAppLifecycle(): { foreground: boolean; online: boolean } {
   return { foreground, online };
 }
 
+function onIdentityChange(userId: string | null) {
+  void switchPersistScope(userId);
+}
+
 function LiveSync() {
   useMarketConnection(useAppLifecycle());
   useSyncStocksOnChange();
   useTradingEvents();
+  useAuthSync({ onIdentityChange });
   // Fetched at boot so the order ticket rarely has to wait for the trading rules.
   useTradingStatus();
   return null;

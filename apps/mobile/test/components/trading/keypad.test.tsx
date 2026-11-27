@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react-native';
 
 import { Keypad } from '../../../src/components/trading/keypad';
-import { renderScreen } from '../../render';
+import { layoutDirection, renderScreen } from '../../render';
 
 describe('Keypad', () => {
   it('shows a dot on the decimal key and keeps the spoken name for screen readers', async () => {
@@ -14,5 +14,13 @@ describe('Keypad', () => {
 
     await fireEvent.press(decimal);
     expect(onKey).toHaveBeenCalledWith('.');
+  });
+
+  it('keeps the phone-pad order left to right in Arabic', async () => {
+    await renderScreen(<Keypad onKey={jest.fn()} />, { locale: 'ar' });
+
+    for (const key of screen.getAllByRole('keyboardkey')) {
+      expect(layoutDirection(key)).toBe('ltr');
+    }
   });
 });

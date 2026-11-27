@@ -230,7 +230,8 @@ export function PriceChart({
             </View>
           </GestureDetector>
           {type === 'candle' ? <VolumeBars shapes={chart.candles} width={width} /> : null}
-          <View className="flex-row justify-between px-5 pt-1.5">
+          {/* The plot is never mirrored, so its time labels run oldest-left too. */}
+          <View className="flex-row justify-between px-5 pt-1.5" style={{ direction: 'ltr' }}>
             {chart.axisLabels.map((candle, i) => (
               <Text
                 key={candle?.t ?? i}

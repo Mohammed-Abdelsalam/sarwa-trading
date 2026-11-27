@@ -1,3 +1,3 @@
-import { AccountScreen } from '../../features/account/account-screen';
+import { AccountTab } from '../../features/account/account-tab';
 
-export default AccountScreen;
+export default AccountTab;

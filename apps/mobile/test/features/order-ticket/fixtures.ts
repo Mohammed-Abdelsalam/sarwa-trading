@@ -11,11 +11,13 @@ export function ticketVm(
     entry?: Partial<TicketVm['entry']>;
     review?: Partial<TicketVm['review']>;
     result?: TicketVm['result'];
+    guest?: TicketVm['guest'];
   } = {},
 ): TicketVm {
   return {
     step: overrides.step ?? 'entry',
     symbol: 'AAPL',
+    guest: overrides.guest ?? null,
     sector: 'tech',
     header: {
       title: 'Buy AAPL',

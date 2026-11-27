@@ -1,3 +1,5 @@
 import { WatchlistScreen } from '../../features/watchlist/watchlist-screen';
 
-export default WatchlistScreen;
+export default function WatchlistRoute() {
+  return <WatchlistScreen />;
+}

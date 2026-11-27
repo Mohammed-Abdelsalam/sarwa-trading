@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { useState } from 'react';
 
 import {
@@ -6,6 +7,7 @@ import {
   type SortOption,
   useIsStale,
   useUndoableRemove,
+  useSession,
   useWatchlistStocks,
 } from '@sarwa/core';
 
@@ -14,14 +16,17 @@ export function useWatchlistScreen() {
   const { rows, average, isLoading, isError, retry } = useWatchlistStocks({ sort });
   const stale = useIsStale();
   const removal = useUndoableRemove();
+  const { isGuest, status } = useSession();
 
   return {
     rows,
     average,
     stale,
-    isLoading,
+    // The watchlist query waits for the session, so a restoring session counts as loading.
+    isLoading: isLoading || status === 'loading',
     isError,
     sort,
+    isGuest,
     removed: removal.pending,
     actions: {
       retry,
@@ -34,6 +39,9 @@ export function useWatchlistScreen() {
       },
       undo: removal.undo,
       dismissUndo: removal.dismiss,
+      signUp: () => {
+        router.push('/sign-up');
+      },
     },
   };
 }

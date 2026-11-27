@@ -13,6 +13,7 @@ import { Segmented } from '../../components/ui/segmented';
 import { Text } from '../../components/ui/text';
 import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
+import { GuestOrderFooter } from '../gating/guest-views';
 import { AmountDisplay, KeypadField } from './amount-display';
 import { type useOrderTicketScreen } from './use-order-ticket-screen';
 
@@ -21,7 +22,11 @@ type Screen = ReturnType<typeof useOrderTicketScreen>;
 const GATE_ICON = { pause: Pause, clock: Clock, wifi: WifiOff };
 const TYPES: Order['type'][] = ['market', 'limit', 'stop'];
 
-export function TicketEntry({ entry, actions }: Pick<Screen, 'entry' | 'actions'>) {
+export function TicketEntry({
+  entry,
+  guest,
+  actions,
+}: Pick<Screen, 'entry' | 'guest' | 'actions'>) {
   const colors = useColors();
   const { t } = useCopy();
   const { button } = entry;
@@ -146,21 +151,25 @@ export function TicketEntry({ entry, actions }: Pick<Screen, 'entry' | 'actions'
         <Keypad onKey={actions.key} />
       </View>
       <View className="px-4 pb-2 pt-2.5">
-        <Button
-          size="lg"
-          variant={button.blocked ? 'secondary' : 'primary'}
-          disabled={button.disabled}
-          icon={
-            button.blocked ? (
-              <Lock size={16} color={colors.fg} />
-            ) : button.queued ? (
-              <Clock size={16} color={colors['on-brand']} />
-            ) : undefined
-          }
-          onPress={actions.review}
-        >
-          {button.label}
-        </Button>
+        {guest ? (
+          <GuestOrderFooter view={guest} />
+        ) : (
+          <Button
+            size="lg"
+            variant={button.blocked ? 'secondary' : 'primary'}
+            disabled={button.disabled}
+            icon={
+              button.blocked ? (
+                <Lock size={16} color={colors.fg} />
+              ) : button.queued ? (
+                <Clock size={16} color={colors['on-brand']} />
+              ) : undefined
+            }
+            onPress={actions.review}
+          >
+            {button.label}
+          </Button>
+        )}
       </View>
     </>
   );

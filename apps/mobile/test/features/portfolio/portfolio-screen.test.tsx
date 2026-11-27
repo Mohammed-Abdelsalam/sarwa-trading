@@ -1,11 +1,12 @@
 import { fireEvent, screen } from '@testing-library/react-native';
 import { type ReactNode } from 'react';
+import { Text as MockText, View as MockView } from 'react-native';
 
 import { bps } from '@sarwa/core';
 
 import { PortfolioScreen } from '../../../src/features/portfolio/portfolio-screen';
 import { usePortfolioScreen } from '../../../src/features/portfolio/use-portfolio-screen';
-import { renderScreen } from '../../render';
+import { layoutDirection, renderScreen } from '../../render';
 
 jest.mock('../../../src/features/portfolio/use-portfolio-screen');
 jest.mock('../../../src/components/layout/app-banners', () => ({ AppBanners: () => null }));
@@ -14,15 +15,19 @@ jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => ({
   __esModule: true,
   default: ({
     children,
+    renderLeftActions,
     renderRightActions,
   }: {
     children: ReactNode;
-    renderRightActions: () => ReactNode;
+    renderLeftActions?: () => ReactNode;
+    renderRightActions?: () => ReactNode;
   }) => (
-    <>
+    <MockView testID="swipeable">
+      {renderLeftActions ? <MockText>left-action</MockText> : null}
       {children}
-      {renderRightActions()}
-    </>
+      {renderLeftActions?.()}
+      {renderRightActions?.()}
+    </MockView>
   ),
 }));
 
@@ -95,6 +100,22 @@ describe('PortfolioScreen', () => {
     expect(screen.getByText('$9,722.16')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Buy AAPL' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Sell AAPL' })).toBeOnTheScreen();
+  });
+
+  it('keeps the swipe physical in Arabic, with the actions on the trailing edge', async () => {
+    mockedHook.mockReturnValue(viewModel());
+    await renderScreen(<PortfolioScreen />, { locale: 'ar' });
+
+    expect(layoutDirection(screen.getByTestId('swipeable'))).toBe('ltr');
+    expect(screen.getByText('left-action')).toBeOnTheScreen();
+    expect(layoutDirection(screen.getByText('AAPL'))).toBe('rtl');
+  });
+
+  it('keeps the swipe actions on the right in English', async () => {
+    mockedHook.mockReturnValue(viewModel());
+    await renderScreen(<PortfolioScreen />);
+
+    expect(screen.queryByText('left-action')).not.toBeOnTheScreen();
   });
 
   it('changes the equity period and opens the P&L explainer', async () => {

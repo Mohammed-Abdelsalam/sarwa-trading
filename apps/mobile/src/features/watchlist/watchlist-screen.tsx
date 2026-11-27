@@ -74,6 +74,22 @@ function SwipeToRemoveRow({
   );
 }
 
+// A guest's stars live on this device until they sign up.
+function GuestNote({ onSignUp }: { onSignUp: () => void }) {
+  const { t } = useCopy();
+  return (
+    <Pressable
+      accessibilityRole="link"
+      onPress={onSignUp}
+      className="min-h-11 items-center justify-center px-5 pb-4"
+    >
+      <Text variant="caption" weight={600} className="text-center text-brand-fg">
+        {t.watchlist.guestNote}
+      </Text>
+    </Pressable>
+  );
+}
+
 function WatchlistSummary({
   count,
   average,
@@ -112,7 +128,9 @@ function WatchlistSummary({
 export function WatchlistScreen() {
   const colors = useColors();
   const { t } = useCopy();
-  const { rows, average, stale, isLoading, isError, sort, removed, actions } = useWatchlistScreen();
+  const { rows, average, stale, isLoading, isError, sort, isGuest, removed, actions } =
+    useWatchlistScreen();
+  const guestNote = isGuest ? <GuestNote onSignUp={actions.signUp} /> : null;
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
@@ -134,11 +152,14 @@ export function WatchlistScreen() {
           }
         />
       ) : rows.length === 0 ? (
-        <EmptyWatchlist
-          onBrowse={() => {
-            router.navigate('/markets');
-          }}
-        />
+        <>
+          <EmptyWatchlist
+            onBrowse={() => {
+              router.navigate('/markets');
+            }}
+          />
+          {guestNote}
+        </>
       ) : (
         // ScrollView, not FlashList: a recycled cell would carry one row's open swipe to another stock.
         <ScrollView contentContainerClassName={removed ? 'pb-24' : undefined}>
@@ -164,6 +185,7 @@ export function WatchlistScreen() {
               {t.watchlist.swipeHint}
             </Text>
           </View>
+          {guestNote}
         </ScrollView>
       )}
 

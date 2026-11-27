@@ -4,6 +4,8 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual<object>('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
+jest.mock('expo-device', () => ({ modelName: 'iPhone 15' }));
+
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(),
   selectionAsync: jest.fn(),
