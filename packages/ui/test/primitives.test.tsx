@@ -2,8 +2,10 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { Button, IconButton } from '../src/primitives/button';
-import { Banner, StateView } from '../src/primitives/feedback';
+import { Chip, SegmentedControl } from '../src/primitives/controls';
+import { Banner, StateView, Toast } from '../src/primitives/feedback';
 import { Field, Input } from '../src/primitives/form';
+import { Breadcrumbs } from '../src/primitives/navigation';
 
 describe('Button', () => {
   it('calls onClick when pressed', async () => {
@@ -93,5 +95,71 @@ describe('Field', () => {
     const input = screen.getByLabelText('Base price');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAccessibleDescription('Must be > 0');
+  });
+});
+
+describe('SegmentedControl', () => {
+  const options = [
+    { value: 'area', label: 'Area' },
+    { value: 'candle', label: 'Candlestick' },
+  ] as const;
+
+  it('is a radio group that changes on click and with arrow keys', async () => {
+    const onChange = jest.fn();
+    render(
+      <SegmentedControl label="Chart type" options={options} value="area" onChange={onChange} />,
+    );
+    expect(screen.getByRole('radio', { name: 'Area' })).toBeChecked();
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Candlestick' }));
+    expect(onChange).toHaveBeenLastCalledWith('candle');
+
+    screen.getByRole('radio', { name: 'Area' }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(onChange).toHaveBeenLastCalledWith('candle');
+  });
+});
+
+describe('Chip', () => {
+  it('passes through role and state for tab-like filters', () => {
+    render(
+      <Chip role="tab" aria-selected active>
+        All
+      </Chip>,
+    );
+    expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
+describe('Breadcrumbs', () => {
+  it('links every level but the current page', () => {
+    render(
+      <Breadcrumbs
+        items={[
+          { label: 'Markets', href: '/' },
+          { label: 'Technology', href: '/' },
+          { label: 'AAPL' },
+        ]}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Markets' })).toHaveAttribute('href', '/');
+    expect(screen.getByText('AAPL')).toHaveAttribute('aria-current', 'page');
+  });
+});
+
+describe('Toast', () => {
+  it('shows the message with its action and can be dismissed', async () => {
+    const onDismiss = jest.fn();
+    render(
+      <Toast
+        title="KO removed from Watchlist"
+        action={<button type="button">Undo</button>}
+        onDismiss={onDismiss}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

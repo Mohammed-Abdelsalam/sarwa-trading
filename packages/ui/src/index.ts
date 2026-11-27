@@ -1,12 +1,14 @@
 export { cn } from './lib/cn';
 export { Button, buttonVariants, IconButton, Spinner, type ButtonProps } from './primitives/button';
 export { Dialog, type DialogProps } from './primitives/dialog';
-export { Badge, Banner, Card, Skeleton, StateView } from './primitives/feedback';
+export { Chip, SegmentedControl, type ChipProps, type SegmentOption } from './primitives/controls';
+export { Badge, Banner, Card, Skeleton, StateView, Toast } from './primitives/feedback';
 export { Field, Input, Slider, Switch } from './primitives/form';
+export { Breadcrumbs, Kbd, Logo, type Crumb, type LinkComponent } from './primitives/navigation';
 export { ChangePill } from './trading/change-pill';
 export { ConnectionBadge } from './trading/connection-badge';
 export { PeriodTabs } from './trading/period-tabs';
 export { PriceFlash, PriceText, usePriceFlash } from './trading/price';
 export { Sparkline } from './trading/sparkline';
-export { StarButton } from './trading/star-button';
+export { StarButton, starLabel } from './trading/star-button';
 export { StockAvatar } from './trading/stock-avatar';
