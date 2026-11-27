@@ -26,13 +26,12 @@ import {
 } from '@sarwa/domain';
 
 import { Clock } from '../common/clock';
+import { EventBus } from '../common/events';
 import { MarketService } from '../market/market.service';
 import { PrismaService } from '../prisma.service';
 import { AccountsService } from './accounts.service';
 import { ExecutionQueue } from './execution-queue';
 import { toAlert, toTradeQuote } from './mappers';
-import { NotificationsService } from './notifications.service';
-import { TradingGateway } from './trading.gateway';
 
 const ruleOf = (row: AlertRow): AlertRule => ({
   condition: row.condition as AlertCondition,
@@ -51,8 +50,7 @@ export class AlertsService implements OnModuleInit {
     private readonly queue: ExecutionQueue,
     private readonly market: MarketService,
     private readonly accounts: AccountsService,
-    private readonly notifications: NotificationsService,
-    private readonly gateway: TradingGateway,
+    private readonly events: EventBus,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -148,16 +146,10 @@ export class AlertsService implements OnModuleInit {
   }
 
   private async announce(row: AlertRow, lastTicks: number): Promise<void> {
-    const alert = toAlert(row);
-    const { deviceId } = await this.accounts.ref(row.accountId);
-    this.gateway.alertTriggered(deviceId, alert, lastTicks);
-    await this.notifications.notify([row.accountId], {
-      kind: 'alert_triggered',
-      alertId: alert.id,
-      symbol: alert.symbol,
-      condition: alert.condition,
-      thresholdTicks: alert.thresholdTicks,
-      thresholdBps: alert.thresholdBps,
+    this.events.publish({
+      type: 'alert.fired',
+      account: await this.accounts.ref(row.accountId),
+      alert: toAlert(row),
       lastTicks,
     });
   }

@@ -12,6 +12,7 @@ import { POLICY } from '@sarwa/domain';
 
 import { type Actor, AuditService } from '../admin/audit.service';
 import { Clock } from '../common/clock';
+import { EventBus } from '../common/events';
 import { PrismaService } from '../prisma.service';
 import { ExecutionQueue } from './execution-queue';
 import { ExecutionService } from './execution.service';
@@ -35,6 +36,7 @@ export class AdminAccountsService {
     private readonly execution: ExecutionService,
     private readonly portfolio: PortfolioService,
     private readonly audit: AuditService,
+    private readonly events: EventBus,
   ) {}
 
   // Valued with live prices, so it's computed per account rather than sorted in SQL.
@@ -49,10 +51,12 @@ export class AdminAccountsService {
         fills: { orderBy: { at: 'desc' }, take: 1, select: { at: true } },
       },
     });
-    const items = await Promise.all(
-      accounts.map(async (account): Promise<AdminAccount> => {
-        const summary = await this.portfolio.summary(account);
-        return {
+    const summaries = await this.portfolio.summaries(accounts);
+    const items = accounts.flatMap((account): AdminAccount[] => {
+      const summary = summaries.get(account.id);
+      if (!summary) return [];
+      return [
+        {
           id: account.id,
           handle: account.handle,
           createdAt: account.createdAt.getTime(),
@@ -64,9 +68,9 @@ export class AdminAccountsService {
           positions: account._count.positions,
           openOrders: account._count.orders,
           lastTradeAt: account.fills[0]?.at.getTime() ?? null,
-        };
-      }),
-    );
+        },
+      ];
+    });
     items.sort(SORTS[query.sort]);
     const start = (query.page - 1) * query.pageSize;
     return {
@@ -138,6 +142,10 @@ export class AdminAccountsService {
       });
 
       for (const order of canceled) await this.execution.publish(order, 'order_canceled');
+      this.events.publish({
+        type: 'account.reset',
+        account: { accountId, deviceId: account.deviceId, handle: account.handle },
+      });
       return toAccount(updated);
     });
   }

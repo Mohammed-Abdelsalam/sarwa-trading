@@ -238,7 +238,7 @@ export class OrdersService {
           holdPriceTicks: holdPrice === null ? null : BigInt(holdPrice),
           // What already filled was spent at the old price; only the rest is held at the new one.
           holdBudgetCents: row.filledNotionalCents + BigInt(estimate.holdCents),
-          expiresAt: new Date(orderExpiry(draft.tif, now, this.config.get().sessionMode)),
+          // expiresAt is left alone: editing a GTC order must not extend its life.
           updatedAt: new Date(now),
         },
         include: { fills: true },

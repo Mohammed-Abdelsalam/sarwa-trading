@@ -6,12 +6,8 @@ import { type Account as AccountRow, Prisma } from '@prisma/client';
 import { POLICY } from '@sarwa/domain';
 
 import { Clock } from '../common/clock';
+import { type AccountRef } from '../common/events';
 import { PrismaService } from '../prisma.service';
-
-export interface AccountRef {
-  deviceId: string;
-  handle: string;
-}
 
 const newHandle = (): string => `ACC-${randomBytes(3).toString('hex').toUpperCase()}`;
 
@@ -64,7 +60,7 @@ export class AccountsService {
       where: { id: accountId },
       select: { deviceId: true, handle: true },
     });
-    const ref = { deviceId, handle };
+    const ref = { accountId, deviceId, handle };
     this.refs.set(accountId, ref);
     return ref;
   }

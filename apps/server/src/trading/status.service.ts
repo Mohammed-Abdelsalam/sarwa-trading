@@ -4,12 +4,11 @@ import { merge, type Subscription } from 'rxjs';
 import { type AdminTrading, type CalendarDay, type TradingStatus } from '@sarwa/contracts';
 import { addDays, marketClock, marketSession, marketTime, NYSE_CALENDAR } from '@sarwa/domain';
 
-import { AdminGateway } from '../admin/admin.gateway';
 import { Clock } from '../common/clock';
+import { EventBus } from '../common/events';
 import { TradingConfigService } from '../trading-config/trading-config.service';
 import { CircuitBreaker } from './circuit-breaker';
 import { HaltsService } from './halts.service';
-import { TradingGateway } from './trading.gateway';
 
 const UPCOMING_DAYS = 30;
 
@@ -22,8 +21,7 @@ export class StatusService implements OnModuleInit, OnModuleDestroy {
     private readonly config: TradingConfigService,
     private readonly halts: HaltsService,
     private readonly breaker: CircuitBreaker,
-    private readonly gateway: TradingGateway,
-    private readonly adminGateway: AdminGateway,
+    private readonly events: EventBus,
   ) {}
 
   onModuleInit(): void {
@@ -62,8 +60,7 @@ export class StatusService implements OnModuleInit, OnModuleDestroy {
   }
 
   publish(): void {
-    this.gateway.tradingStatus(this.status());
-    this.adminGateway.trading(this.admin());
+    this.events.publish({ type: 'trading.changed', status: this.status(), admin: this.admin() });
   }
 }
 

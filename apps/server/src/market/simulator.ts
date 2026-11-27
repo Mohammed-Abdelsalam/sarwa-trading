@@ -1,6 +1,6 @@
 import { type Candle, type Period } from '@sarwa/contracts';
 
-export type Random = () => number;
+export type RandomFn = () => number;
 
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -9,7 +9,7 @@ export const BASE_ANNUAL_VOLATILITY = 0.3;
 // Simulated time runs 60× faster than wall time so ticks are visible in a demo.
 export const TIME_SCALE = 60;
 
-export function seededRandom(seed: number): Random {
+export function seededRandom(seed: number): RandomFn {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
@@ -25,13 +25,13 @@ export function hashSeed(text: string): number {
   return h >>> 0;
 }
 
-export function gaussian(random: Random): number {
+export function gaussian(random: RandomFn): number {
   const u = Math.max(random(), Number.EPSILON);
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
 }
 
 // Geometric Brownian motion: never negative, and moves are proportional to price.
-export function nextPrice(price: number, sigma: number, dtMs: number, random: Random): number {
+export function nextPrice(price: number, sigma: number, dtMs: number, random: RandomFn): number {
   const dt = dtMs / YEAR_MS;
   const next =
     price * Math.exp(sigma * Math.sqrt(dt) * gaussian(random) - 0.5 * sigma * sigma * dt);

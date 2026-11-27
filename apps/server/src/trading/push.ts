@@ -37,6 +37,9 @@ export class LogPushSender extends PushSender {
 }
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+// Expo accepts at most 100 messages per request; a stalled request must not pile up.
+const EXPO_BATCH_SIZE = 100;
+const EXPO_TIMEOUT_MS = 5_000;
 
 export class ExpoPushSender extends PushSender {
   private readonly logger = new Logger('ExpoPush');
@@ -48,15 +51,18 @@ export class ExpoPushSender extends PushSender {
       targets.filter((t) => !mobile.includes(t)),
       message,
     );
-    if (mobile.length === 0) return;
-    const response = await fetch(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify(
-        mobile.map(({ token }) => ({ to: token, sound: 'default', ...message })),
-      ),
-    });
-    if (!response.ok) this.logger.warn(`Expo push failed with ${response.status}`);
+    for (let start = 0; start < mobile.length; start += EXPO_BATCH_SIZE) {
+      const batch = mobile.slice(start, start + EXPO_BATCH_SIZE);
+      const response = await fetch(EXPO_PUSH_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify(
+          batch.map(({ token }) => ({ to: token, sound: 'default', ...message })),
+        ),
+        signal: AbortSignal.timeout(EXPO_TIMEOUT_MS),
+      });
+      if (!response.ok) this.logger.warn(`Expo push failed with ${response.status}`);
+    }
   }
 }
 

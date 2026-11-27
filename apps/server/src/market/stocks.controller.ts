@@ -5,6 +5,8 @@ import {
   type CandlesQuery,
   type CandlesResponse,
   type StockDetailResponse,
+  type StocksQuery,
+  StocksQuerySchema,
   type StocksResponse,
   SymbolSchema,
 } from '@sarwa/contracts';
@@ -17,7 +19,7 @@ export class StocksController {
   constructor(private readonly market: MarketService) {}
 
   @Get()
-  list(@Query('q') q?: string): StocksResponse {
+  list(@Query(new ZodValidationPipe(StocksQuerySchema)) { q }: StocksQuery): StocksResponse {
     return { items: this.market.listStocks(q) };
   }
 

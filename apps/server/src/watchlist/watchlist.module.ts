@@ -1,9 +1,9 @@
-import { Controller, Delete, Get, HttpCode, Module, Param, Put } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Module, Param, Put, UseGuards } from '@nestjs/common';
 
 import { SymbolSchema, type WatchlistResponse } from '@sarwa/contracts';
 
 import { AppConfigModule } from '../app-config/app-config.module';
-import { DeviceId } from '../common/device';
+import { DeviceId, WritableGuard } from '../common/device';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { WatchlistService } from './watchlist.service';
 
@@ -19,12 +19,14 @@ export class WatchlistController {
   }
 
   @Put(':symbol')
+  @UseGuards(WritableGuard)
   @HttpCode(204)
   add(@DeviceId() deviceId: string, @SymbolParam() symbol: string): Promise<void> {
     return this.watchlist.add(deviceId, symbol);
   }
 
   @Delete(':symbol')
+  @UseGuards(WritableGuard)
   @HttpCode(204)
   remove(@DeviceId() deviceId: string, @SymbolParam() symbol: string): Promise<void> {
     return this.watchlist.remove(deviceId, symbol);

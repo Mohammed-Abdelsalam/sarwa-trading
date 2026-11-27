@@ -40,4 +40,20 @@ describe('ExecutionQueue', () => {
 
     expect(done).toBe(true);
   });
+
+  it('waits in idle for follow-up work a running task queues', async () => {
+    const queue = new ExecutionQueue();
+    let followUp = false;
+    void queue.run(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      void queue.run(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        followUp = true;
+      });
+    });
+
+    await queue.idle();
+
+    expect(followUp).toBe(true);
+  });
 });

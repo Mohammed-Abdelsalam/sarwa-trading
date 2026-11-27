@@ -23,7 +23,8 @@ import {
   ticksToDollars,
 } from '@sarwa/domain';
 
-import { Clock } from '../common/clock';
+import { Clock, Ticker } from '../common/clock';
+import { Random } from '../common/random';
 import { PrismaService } from '../prisma.service';
 import { TradingConfigService } from '../trading-config/trading-config.service';
 import {
@@ -31,7 +32,6 @@ import {
   gaussian,
   generateCandles,
   nextPrice,
-  type Random,
   roundPrice,
   TIME_SCALE,
 } from './simulator';
@@ -53,23 +53,26 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
   readonly quotes$ = new Subject<Quote[]>();
   readonly status$ = new Subject<MarketStatus>();
   readonly stocksChanged$ = new Subject<StocksChangedEvent>();
+  // Symbols the admin just disabled: their working orders can never fill again.
+  readonly disabled$ = new Subject<string[]>();
 
   private readonly logger = new Logger(MarketService.name);
   private instruments = new Map<string, Instrument>();
   private status!: MarketStatus;
-  private timer?: NodeJS.Timeout;
+  private stopTicks?: () => void;
   private persistTimer?: NodeJS.Timeout;
   private ticksLastSecond = { second: 0, count: 0, rate: 0 };
   // The New York date of the current trading day; a new date rolls the day over.
   private tradingDate: MarketDate | null = null;
   private readonly unsaved = new Set<string>();
-
-  random: Random = Math.random;
+  private readonly random = (): number => this.rng.next();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly clock: Clock,
     private readonly tradingConfig: TradingConfigService,
+    private readonly rng: Random,
+    private readonly ticker: Ticker,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -87,9 +90,9 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
         ? marketClock(now).date
         : null);
     await this.reload();
-    this.timer = setInterval(() => {
+    this.stopTicks = this.ticker.every(TICK_MS, () => {
       this.tick();
-    }, TICK_MS);
+    });
     this.persistTimer = setInterval(() => {
       void this.persistPrices();
     }, PERSIST_MS);
@@ -97,22 +100,26 @@ export class MarketService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleDestroy(): void {
-    clearInterval(this.timer);
+    this.stopTicks?.();
     clearInterval(this.persistTimer);
     this.quotes$.complete();
     this.status$.complete();
     this.stocksChanged$.complete();
+    this.disabled$.complete();
   }
 
   async reload(): Promise<void> {
     const rows = await this.prisma.stock.findMany({ orderBy: { symbol: 'asc' } });
     const next = new Map<string, Instrument>();
+    const disabled: string[] = [];
     for (const row of rows) {
       const existing = this.instruments.get(row.symbol);
+      if (existing?.row.isEnabled && !row.isEnabled) disabled.push(row.symbol);
       next.set(row.symbol, { row, quote: existing?.quote ?? this.openingQuote(row) });
     }
     this.instruments = next;
     this.stocksChanged$.next({ at: this.clock.now() });
+    if (disabled.length > 0) this.disabled$.next(disabled);
   }
 
   tick(now = this.clock.now()): Quote[] {

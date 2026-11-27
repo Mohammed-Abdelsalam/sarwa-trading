@@ -1,5 +1,9 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { type Account as AccountRow } from '@prisma/client';
+import {
+  type Account as AccountRow,
+  type Fill as FillRow,
+  type Position as PositionRow,
+} from '@prisma/client';
 
 import {
   type EquityPeriod,
@@ -19,6 +23,7 @@ import {
   type PortfolioSummary,
   previousTradingDay,
   summarizePortfolio,
+  todayActivity,
 } from '@sarwa/domain';
 
 import { Clock } from '../common/clock';
@@ -36,11 +41,23 @@ const PERIOD_MS: Record<EquityPeriod, number> = {
   ALL: Number.POSITIVE_INFINITY,
 };
 const MAX_POINTS = 300;
+// Keeps every IN list well under SQLite's bound-parameter limit.
+const BATCH_SIZE = 500;
+const SNAPSHOT_RETENTION = [
+  { after: 2 * DAY_MS, bucketMs: DAY_MS / 24 },
+  { after: 90 * DAY_MS, bucketMs: DAY_MS },
+] as const;
+
+interface AccountBooks {
+  row: AccountRow;
+  books: PortfolioResponse;
+}
 
 @Injectable()
 export class PortfolioService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PortfolioService.name);
   private timer?: NodeJS.Timeout;
+  private compactedAt = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -51,10 +68,36 @@ export class PortfolioService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.timer = setInterval(() => {
-      this.takeSnapshots().catch((error: unknown) => {
-        this.logger.warn(`Snapshots failed: ${String(error)}`);
-      });
+      this.takeSnapshots()
+        .then(() => this.compactHourly())
+        .catch((error: unknown) => {
+          this.logger.warn(`Snapshots failed: ${String(error)}`);
+        });
     }, POLICY.snapshotIntervalMs);
+  }
+
+  private async compactHourly(): Promise<void> {
+    const now = this.clock.now();
+    if (now - this.compactedAt < DAY_MS / 24) return;
+    this.compactedAt = now;
+    await this.compactSnapshots();
+  }
+
+  // Keeps the latest snapshot per hour after 2 days and per day after 90, so a year of equity
+  // stays a few thousand rows. Times are integer milliseconds in SQLite, so buckets are a division.
+  async compactSnapshots(): Promise<number> {
+    const now = this.clock.now();
+    let removed = 0;
+    for (const { after, bucketMs } of SNAPSHOT_RETENTION) {
+      const cutoff = now - after;
+      removed += await this.prisma.$executeRaw`
+        DELETE FROM "PortfolioSnapshot"
+        WHERE "t" < ${cutoff} AND "id" NOT IN (
+          SELECT MAX("id") FROM "PortfolioSnapshot" WHERE "t" < ${cutoff}
+          GROUP BY "accountId", "epoch", "t" / ${bucketMs}
+        )`;
+    }
+    return removed;
   }
 
   onModuleDestroy(): void {
@@ -62,70 +105,97 @@ export class PortfolioService implements OnModuleInit, OnModuleDestroy {
   }
 
   // The raw books; clients value them with live prices through @sarwa/domain.
-  async books(requester: AccountRow): Promise<PortfolioResponse> {
-    const now = this.clock.now();
-    const today = marketClock(now).date;
-    // One read of cash, positions, holds and fills, so a fill can't land between them.
-    const [account, positions, working, todayFills, ytd] = await this.prisma.$transaction(
-      async (tx) => {
-        const fresh = await tx.account.findUniqueOrThrow({ where: { id: requester.id } });
-        const scope = { accountId: fresh.id, epoch: fresh.epoch };
-        return [
-          fresh,
-          await tx.position.findMany({
-            where: { accountId: fresh.id },
-            orderBy: { symbol: 'asc' },
-          }),
-          await tx.order.findMany({
-            where: { accountId: fresh.id, status: { in: [...WORKING_STATUSES] } },
-            orderBy: { createdAt: 'asc' },
-          }),
-          await tx.fill.findMany({
-            where: { ...scope, at: { gte: new Date(marketTime(today, 0)) } },
-          }),
-          await tx.fill.aggregate({
-            _sum: { realizedCents: true },
-            where: {
-              ...scope,
-              at: { gte: new Date(marketTime(`${today.slice(0, 4)}-01-01`, 0)) },
-            },
-          }),
-        ] as const;
-      },
-    );
-    const equityAtLastCloseCents = await this.equityAtLastClose(account, now);
-
-    return {
-      account: toAccount(account),
-      positions: positions.map((row): PortfolioPosition => {
-        const qtyMicros = Number(row.qtyMicros);
-        const fills = todayFills.filter((fill) => fill.symbol === row.symbol);
-        const sum = (side: string, field: 'qtyMicros' | 'notionalCents') =>
-          fills.filter((f) => f.side === side).reduce((total, f) => total + Number(f[field]), 0);
-        return {
-          symbol: row.symbol,
-          sector: this.market.sectorOf(row.symbol),
-          qtyMicros,
-          costBasisCents: Number(row.costBasisCents),
-          today:
-            fills.length === 0
-              ? null
-              : {
-                  qtyAtOpenMicros: qtyMicros - sum('buy', 'qtyMicros') + sum('sell', 'qtyMicros'),
-                  boughtCents: sum('buy', 'notionalCents'),
-                  soldCents: sum('sell', 'notionalCents'),
-                },
-        };
-      }),
-      holds: working.map(toHold),
-      realizedYtdCents: Number(ytd._sum.realizedCents ?? 0n),
-      equityAtLastCloseCents,
-      asOf: now,
-    };
+  async books(account: AccountRow): Promise<PortfolioResponse> {
+    const [books] = await this.booksFor([account]);
+    if (!books) throw new Error(`Account ${account.id} not found`);
+    return books;
   }
 
   async summary(account: AccountRow): Promise<PortfolioSummary> {
-    const books = await this.books(account);
+    return this.summarize(await this.books(account));
+  }
+
+  async summaries(accounts: readonly AccountRow[]): Promise<Map<string, PortfolioSummary>> {
+    const books = await this.booksFor(accounts);
+    return new Map(books.map((entry) => [entry.account.id, this.summarize(entry)]));
+  }
+
+  // A fixed number of queries for any number of accounts; an account deleted meanwhile is skipped.
+  // The reads share one short batch transaction, so a fill can't land between cash and holds.
+  async booksFor(requested: readonly AccountRow[]): Promise<PortfolioResponse[]> {
+    return (await this.read(requested)).map((entry) => entry.books);
+  }
+
+  private async read(requested: readonly AccountRow[]): Promise<AccountBooks[]> {
+    const entries: AccountBooks[] = [];
+    for (let start = 0; start < requested.length; start += BATCH_SIZE) {
+      entries.push(...(await this.readBatch(requested.slice(start, start + BATCH_SIZE))));
+    }
+    return entries;
+  }
+
+  private async readBatch(requested: readonly AccountRow[]): Promise<AccountBooks[]> {
+    const now = this.clock.now();
+    const today = marketClock(now).date;
+    const ids = requested.map((account) => account.id);
+    const ofAccounts = { accountId: { in: ids } };
+    const [accounts, positions, working, todayFills, ytd] = await this.prisma.$transaction([
+      this.prisma.account.findMany({ where: { id: { in: ids } } }),
+      this.prisma.position.findMany({ where: ofAccounts, orderBy: { symbol: 'asc' } }),
+      this.prisma.order.findMany({
+        where: { ...ofAccounts, status: { in: [...WORKING_STATUSES] } },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.fill.findMany({
+        where: { ...ofAccounts, at: { gte: new Date(marketTime(today, 0)) } },
+      }),
+      this.prisma.fill.groupBy({
+        by: ['accountId', 'epoch'],
+        where: {
+          ...ofAccounts,
+          at: { gte: new Date(marketTime(`${today.slice(0, 4)}-01-01`, 0)) },
+        },
+        orderBy: { accountId: 'asc' },
+        _sum: { realizedCents: true },
+      }),
+    ]);
+    const equityAtLastClose = await this.equitiesAtLastClose(accounts, now);
+    const byId = new Map(accounts.map((account) => [account.id, account]));
+    const positionsOf = groupByAccount(positions);
+    const workingOf = groupByAccount(working);
+    const fillsOf = groupByAccount(todayFills);
+    const realizedOf = new Map(
+      ytd.map((r) => [`${r.accountId}:${String(r.epoch)}`, Number(r._sum.realizedCents ?? 0n)]),
+    );
+
+    return requested.flatMap((requester): AccountBooks[] => {
+      const row = byId.get(requester.id);
+      if (!row) return [];
+      const fills = (fillsOf.get(row.id) ?? []).filter((f) => f.epoch === row.epoch);
+      const books: PortfolioResponse = {
+        account: toAccount(row),
+        positions: (positionsOf.get(row.id) ?? []).map((p) => this.toPosition(p, fills)),
+        holds: (workingOf.get(row.id) ?? []).map(toHold),
+        realizedYtdCents: realizedOf.get(`${row.id}:${String(row.epoch)}`) ?? 0,
+        equityAtLastCloseCents: equityAtLastClose.get(row.id) ?? null,
+        asOf: now,
+      };
+      return [{ row, books }];
+    });
+  }
+
+  private toPosition(row: PositionRow, todayFills: readonly FillRow[]): PortfolioPosition {
+    const qtyMicros = Number(row.qtyMicros);
+    return {
+      symbol: row.symbol,
+      sector: this.market.sectorOf(row.symbol),
+      qtyMicros,
+      costBasisCents: Number(row.costBasisCents),
+      today: todayActivity(todayFills, { symbol: row.symbol, qtyMicros: micros(qtyMicros) }),
+    };
+  }
+
+  private summarize(books: PortfolioResponse): PortfolioSummary {
     const { equityAtLastCloseCents } = books;
     return summarizePortfolio({
       cashCents: cents(books.account.cashCents),
@@ -199,27 +269,52 @@ export class PortfolioService implements OnModuleInit, OnModuleDestroy {
       },
     });
     const t = new Date(this.clock.now());
-    for (const account of accounts) {
-      const { equityCents } = await this.summary(account);
-      await this.prisma.portfolioSnapshot.create({
-        data: { accountId: account.id, epoch: account.epoch, t, equityCents: BigInt(equityCents) },
-      });
-    }
-    return accounts.length;
+    const entries = await this.read(accounts);
+    await this.prisma.portfolioSnapshot.createMany({
+      data: entries.map(({ row, books }) => ({
+        accountId: row.id,
+        epoch: row.epoch,
+        t,
+        equityCents: BigInt(this.summarize(books).equityCents),
+      })),
+    });
+    return entries.length;
   }
 
-  // Equity at the previous session's close; null when the books didn't exist yet.
-  private async equityAtLastClose(account: AccountRow, now: number): Promise<number | null> {
+  // Equity at the previous session's close, by account id; absent when the books didn't exist yet.
+  private async equitiesAtLastClose(
+    accounts: readonly AccountRow[],
+    now: number,
+  ): Promise<Map<string, number>> {
     const today = marketClock(now).date;
     const closedAt =
       this.config.get().sessionMode === 'always-open'
         ? marketTime(today, 0)
         : previousTradingDay(addDays(today, -1)).closesAt;
-    if ((account.resetAt ?? account.createdAt).getTime() > closedAt) return null;
-    const snapshot = await this.prisma.portfolioSnapshot.findFirst({
-      where: { accountId: account.id, epoch: account.epoch, t: { lte: new Date(closedAt) } },
-      orderBy: { t: 'desc' },
+    const open = accounts.filter((a) => (a.resetAt ?? a.createdAt).getTime() <= closedAt);
+    if (open.length === 0) return new Map();
+    const epochOf = new Map(open.map((account) => [account.id, account.epoch]));
+    const latest = await this.prisma.portfolioSnapshot.groupBy({
+      by: ['accountId', 'epoch'],
+      where: { accountId: { in: [...epochOf.keys()] }, t: { lte: new Date(closedAt) } },
+      orderBy: { accountId: 'asc' },
+      _max: { t: true },
     });
-    return snapshot ? Number(snapshot.equityCents) : null;
+    const keys = latest.flatMap(({ accountId, epoch, _max }) =>
+      _max.t && epochOf.get(accountId) === epoch ? [{ accountId, epoch, t: _max.t }] : [],
+    );
+    if (keys.length === 0) return new Map();
+    const snapshots = await this.prisma.portfolioSnapshot.findMany({ where: { OR: keys } });
+    return new Map(snapshots.map((row) => [row.accountId, Number(row.equityCents)]));
   }
+}
+
+function groupByAccount<T extends { accountId: string }>(rows: readonly T[]): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const group = groups.get(row.accountId);
+    if (group) group.push(row);
+    else groups.set(row.accountId, [row]);
+  }
+  return groups;
 }
