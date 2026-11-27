@@ -6,6 +6,7 @@ import {
   type SortOption,
   useI18n,
   useIsStale,
+  useSession,
   useUndoableRemove,
   useWatchlistStocks,
 } from '@sarwa/core';
@@ -16,6 +17,7 @@ const VIEWS: readonly WatchlistView[] = ['table', 'grid'];
 
 export function useWatchlistPage() {
   const { t } = useI18n();
+  const { status, isGuest } = useSession();
   const [sort, setSort] = useState<SortOption | null>(null);
   const { rows, average, isLoading, isError, retry } = useWatchlistStocks({ sort });
   const stale = useIsStale();
@@ -26,8 +28,10 @@ export function useWatchlistPage() {
     rows,
     average,
     stale,
-    isLoading,
+    // The list waits for the session, then a guest's comes from the device account.
+    isLoading: isLoading || status === 'loading',
     isError,
+    guest: isGuest,
     view,
     sort,
     removed: removal.pending,

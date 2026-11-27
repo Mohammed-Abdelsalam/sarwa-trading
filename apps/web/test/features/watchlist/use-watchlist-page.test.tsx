@@ -2,21 +2,24 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { type ReactNode } from 'react';
 
-import { SarwaProvider, SORTS } from '@sarwa/core';
+import { type ClientAuth, SarwaProvider, SORTS } from '@sarwa/core';
 
 import { useWatchlistPage } from '../../../src/features/watchlist/use-watchlist-page';
-import { createTestClient, makeStock } from '../../fixtures';
+import { createTestClient, makeStock, makeUser, testAuth } from '../../fixtures';
 
-function renderPage() {
+function renderPage(auth?: ClientAuth) {
   const removeFromWatchlist = jest.fn(() => Promise.resolve());
   const addToWatchlist = jest.fn(() => Promise.resolve());
-  const client = createTestClient({
-    getWatchlist: () => Promise.resolve({ symbols: ['TSLA', 'AAPL', 'NVDA'] }),
-    listStocks: () =>
-      Promise.resolve({ items: [makeStock('AAPL'), makeStock('NVDA'), makeStock('TSLA')] }),
-    removeFromWatchlist,
-    addToWatchlist,
-  });
+  const client = createTestClient(
+    {
+      getWatchlist: () => Promise.resolve({ symbols: ['TSLA', 'AAPL', 'NVDA'] }),
+      listStocks: () =>
+        Promise.resolve({ items: [makeStock('AAPL'), makeStock('NVDA'), makeStock('TSLA')] }),
+      removeFromWatchlist,
+      addToWatchlist,
+    },
+    auth,
+  );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
@@ -85,6 +88,30 @@ describe('useWatchlistPage', () => {
       result.current.actions.setSort(null);
     });
     expect(symbols(result.current.rows)).toEqual(['TSLA', 'AAPL', 'NVDA']);
+  });
+
+  it("loads a guest's list and flags them for the account note", async () => {
+    const { result } = renderPage(testAuth());
+    await waitFor(() => {
+      expect(result.current.rows).toHaveLength(3);
+    });
+    expect(result.current.guest).toBe(true);
+  });
+
+  it("shows the skeleton while the session is loading, then the member's list", async () => {
+    const auth = testAuth({ status: 'loading' });
+    const { result } = renderPage(auth);
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.guest).toBe(false);
+
+    act(() => {
+      auth.session.getState().signIn(makeUser());
+    });
+    await waitFor(() => {
+      expect(result.current.rows).toHaveLength(3);
+    });
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.guest).toBe(false);
   });
 
   it('marks prices stale while offline', async () => {

@@ -33,6 +33,7 @@ function viewModel(
     stale: false,
     isLoading: false,
     isError: false,
+    guest: false,
     view: 'table',
     sort: null,
     removed: null,
@@ -94,6 +95,35 @@ describe('WatchlistPage', () => {
 
     expect(model.actions.undo).toHaveBeenCalledTimes(1);
     expect(model.actions.dismissUndo).toHaveBeenCalledTimes(1);
+  });
+
+  it("notes under a guest's empty state that an account keeps the list everywhere", () => {
+    mockedHook.mockReturnValue(viewModel({ guest: true }));
+    render(<WatchlistPage />);
+
+    expect(screen.getByRole('heading', { name: 'Your watchlist is empty' })).toBeInTheDocument();
+    expect(
+      screen.getByText(/Create an account to keep your watchlist on all your devices/),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Create account' })).toHaveAttribute('href', '/signup');
+  });
+
+  it("notes under a guest's list too, in Arabic", () => {
+    mockedHook.mockReturnValue(viewModel({ guest: true, rows: [makeStock('AAPL')] }));
+    render(<WatchlistPage />, { locale: 'ar' });
+
+    expect(screen.getByRole('listitem')).toHaveTextContent('AAPL');
+    expect(screen.getByText(/أنشئ حسابًا لتحتفظ بقائمة المفضلة على كل أجهزتك/)).toBeVisible();
+  });
+
+  it('keeps the note away from members and from a loading guest', () => {
+    mockedHook.mockReturnValue(viewModel({ rows: [makeStock('AAPL')] }));
+    const { rerender } = render(<WatchlistPage />);
+    expect(screen.queryByText(/keep your watchlist/)).not.toBeInTheDocument();
+
+    mockedHook.mockReturnValue(viewModel({ guest: true, isLoading: true }));
+    rerender(<WatchlistPage />);
+    expect(screen.queryByText(/keep your watchlist/)).not.toBeInTheDocument();
   });
 
   it('shows the count and average move in Arabic with Arabic-Indic digits', () => {

@@ -26,6 +26,7 @@ import {
   Sparkline,
   StarButton,
   StockAvatar,
+  Table,
 } from '@sarwa/ui';
 
 const COLOR = { up: 'text-pos', down: 'text-neg', flat: 'text-flat' } as const;
@@ -157,10 +158,14 @@ export function WatchlistTable({
   onSort: (key: SortKey) => void;
   onRemove: (symbol: string) => void;
 }) {
-  const columns = useI18n().t.watchlist.columns;
+  const { t } = useI18n();
+  const columns = t.watchlist.columns;
   return (
-    <div className="border-border bg-surface relative overflow-x-auto rounded-lg border">
-      <table className="type-sm [&_td]:border-border w-full border-separate border-spacing-0 [&_td]:border-b [&_tr:last-child_td]:border-b-0">
+    <div className="border-border bg-surface overflow-hidden rounded-lg border">
+      <Table
+        label={t.watchlist.title}
+        className="[&_td]:border-border [&_td]:border-b [&_tr:last-child_td]:border-b-0"
+      >
         <thead className="type-caption text-fg-3 [&_th]:border-border [&_th]:h-10 [&_th]:border-b [&_th]:font-semibold">
           <tr>
             <SortHeader label={columns.stock} column="name" sort={sort} onSort={onSort} />
@@ -195,12 +200,12 @@ export function WatchlistTable({
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="type-sm">
           {rows.map((stock) => (
             <TableRow key={stock.symbol} stock={stock} stale={stale} onRemove={onRemove} />
           ))}
         </tbody>
-      </table>
+      </Table>
     </div>
   );
 }
