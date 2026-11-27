@@ -1,20 +1,22 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react-native';
 import { Pressable } from 'react-native';
 
-import { type SortOption, WATCHLIST_ORDER_LABEL } from '@sarwa/core';
+import { sortLabel, type SortOption } from '@sarwa/core';
 
+import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
 import { Text } from '../ui/text';
 
 // A null sort is the watchlist's own order, the order the stocks were starred in.
 export function SortButton({ sort, onPress }: { sort: SortOption | null; onPress: () => void }) {
   const colors = useColors();
-  const label = sort?.label ?? WATCHLIST_ORDER_LABEL;
+  const { t } = useCopy();
+  const label = sortLabel(t, sort);
   const DirectionIcon = sort ? (sort.dir > 0 ? ArrowUp : ArrowDown) : null;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Sort by ${label}, tap to change`}
+      accessibilityLabel={t.sort.tapToChange({ label })}
       onPress={onPress}
       className="h-11 flex-row items-center gap-1.5 rounded-control-sm px-2 active:bg-surface-3"
     >

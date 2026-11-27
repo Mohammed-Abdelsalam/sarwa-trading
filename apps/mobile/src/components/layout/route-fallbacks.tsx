@@ -7,7 +7,7 @@ import { Button } from '../ui/button';
 import { StateView } from '../ui/state-view';
 
 const backToMarkets = () => {
-  router.replace('/');
+  router.replace('/markets');
 };
 
 // Rendered in place of the root layout, so it sets the theme variables itself.

@@ -13,6 +13,7 @@ import {
 } from '@sarwa/core';
 import { layout } from '@sarwa/tokens';
 
+import { useCopy } from '../../lib/i18n';
 import { cx, useLargeText } from '../../lib/theme';
 import { Skeleton } from '../ui/skeleton';
 import { Text } from '../ui/text';
@@ -36,6 +37,8 @@ export const StockRow = memo(function StockRow({
   onToggleWatch,
   stale = false,
 }: StockRowProps) {
+  const copy = useCopy();
+  const { t, f } = copy;
   const quote = useQuote(stock.symbol) ?? stock.quote;
   const largeText = useLargeText();
   const pct = changePct(quote);
@@ -51,9 +54,9 @@ export const StockRow = memo(function StockRow({
         !largeText && (withStar ? 'w-price-col' : 'w-price-col-wide'),
       )}
     >
-      <PriceFlash price={quote.price} format={formatListPrice} muted={stale} />
+      <PriceFlash price={quote.price} format={(value) => formatListPrice(f, value)} muted={stale} />
       <View className={stale ? 'opacity-70' : undefined}>
-        <ChangePill value={pct} label={formatPct(pct)} />
+        <ChangePill value={pct} label={formatPct(f, pct)} />
       </View>
     </View>
   );
@@ -62,7 +65,7 @@ export const StockRow = memo(function StockRow({
     <Link href={`/stock/${stock.symbol}`} asChild>
       <Pressable
         accessibilityRole="link"
-        accessibilityLabel={formatStockLabel({
+        accessibilityLabel={formatStockLabel(copy, {
           symbol: stock.symbol,
           name: stock.name,
           quote,
@@ -73,7 +76,7 @@ export const StockRow = memo(function StockRow({
             ? [
                 {
                   name: 'toggleWatch',
-                  label: watched ? 'Remove from watchlist' : 'Add to watchlist',
+                  label: watched ? t.watchlist.removeAction : t.watchlist.addAction,
                 },
               ]
             : undefined
@@ -137,8 +140,9 @@ export function StockRowSkeleton() {
 }
 
 export function StockListSkeleton({ rows }: { rows: number }) {
+  const { t } = useCopy();
   return (
-    <View accessible accessibilityRole="progressbar" accessibilityLabel="Loading stocks">
+    <View accessible accessibilityRole="progressbar" accessibilityLabel={t.markets.loading}>
       {Array.from({ length: rows }, (_, i) => (
         <StockRowSkeleton key={i} />
       ))}

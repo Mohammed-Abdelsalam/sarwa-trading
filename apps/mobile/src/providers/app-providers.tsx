@@ -12,8 +12,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   SarwaProvider,
   shouldRetry,
+  useI18n,
   useMarketConnection,
   useSyncStocksOnChange,
+  useTradingEvents,
+  useTradingStatus,
 } from '@sarwa/core';
 
 import { client } from '../lib/client';
@@ -63,21 +66,31 @@ function useAppLifecycle(): { foreground: boolean; online: boolean } {
 function LiveSync() {
   useMarketConnection(useAppLifecycle());
   useSyncStocksOnChange();
+  useTradingEvents();
+  // Fetched at boot so the order ticket rarely has to wait for the trading rules.
+  useTradingStatus();
   return null;
 }
 
-export function AppProviders({ children }: { children: ReactNode }) {
+// RN has no dir attribute: a direction style at the root flips every row and start/end below it.
+function Directional({ children }: { children: ReactNode }) {
   const themeVars = useThemeVars();
+  const { dir } = useI18n();
+  return (
+    <View style={[{ flex: 1, direction: dir }, themeVars]} className="bg-bg">
+      {children}
+    </View>
+  );
+}
 
+export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
           <SarwaProvider client={client}>
             <LiveSync />
-            <View style={[{ flex: 1 }, themeVars]} className="bg-bg">
-              {children}
-            </View>
+            <Directional>{children}</Directional>
           </SarwaProvider>
         </PersistQueryClientProvider>
       </SafeAreaProvider>

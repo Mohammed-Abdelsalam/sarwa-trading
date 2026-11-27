@@ -8,9 +8,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { LIVE_STATUS_LABELS, type LiveStatus } from '@sarwa/core';
+import { type LiveStatus, liveStatusLabel } from '@sarwa/core';
 import { type ColorRole } from '@sarwa/tokens';
 
+import { useCopy } from '../../lib/i18n';
 import { cx, useColors } from '../../lib/theme';
 import { Text } from '../ui/text';
 
@@ -29,13 +30,9 @@ const PULSE_MS: Partial<Record<LiveStatus, number>> = {
 };
 
 // The dot's shape differs per state (pulse, blink, ring, pause bar) so status reads without colour.
-export function ConnectionBadge({
-  status,
-  label = LIVE_STATUS_LABELS[status],
-}: {
-  status: LiveStatus;
-  label?: string;
-}) {
+export function ConnectionBadge({ status, label }: { status: LiveStatus; label?: string }) {
+  const { t } = useCopy();
+  const text = label ?? liveStatusLabel(t, status);
   const colors = useColors();
   const reducedMotion = useReducedMotion();
   const opacity = useSharedValue(1);
@@ -55,8 +52,8 @@ export function ConnectionBadge({
   return (
     <View
       accessibilityRole="text"
-      accessibilityLabel={label}
-      className="h-7 flex-row items-center gap-conn-gap rounded-full border border-border bg-surface pl-conn-start pr-2.5"
+      accessibilityLabel={text}
+      className="h-7 flex-row items-center gap-conn-gap rounded-full border border-border bg-surface pe-2.5 ps-conn-start"
     >
       <Animated.View
         className={cx('h-2 w-2', status === 'paused' ? 'rounded-xs' : 'rounded-full')}
@@ -68,7 +65,7 @@ export function ConnectionBadge({
         ]}
       />
       <Text variant="caption" weight={600}>
-        {label}
+        {text}
       </Text>
     </View>
   );

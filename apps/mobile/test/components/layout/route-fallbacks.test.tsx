@@ -21,6 +21,6 @@ describe('NotFoundScreen', () => {
     await render(<NotFoundScreen />);
 
     await fireEvent.press(screen.getByRole('button', { name: 'Back to Markets' }));
-    expect(router.replace).toHaveBeenCalledWith('/');
+    expect(router.replace).toHaveBeenCalledWith('/markets');
   });
 });

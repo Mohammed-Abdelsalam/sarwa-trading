@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { type Period, PERIODS } from '@sarwa/contracts';
 
+import { useCopy } from '../../lib/i18n';
 import { cx } from '../../lib/theme';
 import { Text } from '../ui/text';
 
@@ -17,9 +18,11 @@ export function PeriodTabs({
   enabled?: readonly Period[];
   size?: 'md' | 'lg';
 }) {
+  const { t } = useCopy();
   return (
     <View
       accessibilityRole="tablist"
+      accessibilityLabel={t.chart.period}
       className="flex-row gap-0.5 rounded-seg bg-surface-3 p-seg-pad"
     >
       {PERIODS.map((period) => {

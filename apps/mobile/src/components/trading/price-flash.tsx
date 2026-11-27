@@ -12,6 +12,7 @@ import Animated, {
 import { formatPrice } from '@sarwa/core';
 import { motion, type PriceSize } from '@sarwa/tokens';
 
+import { useCopy } from '../../lib/i18n';
 import { useColors } from '../../lib/theme';
 import { Text, type TextVariant } from '../ui/text';
 
@@ -28,7 +29,7 @@ const VARIANT: Record<PriceSize, TextVariant> = {
 export const PriceFlash = memo(function PriceFlash({
   price,
   size = 'md',
-  format = formatPrice,
+  format,
   muted = false,
 }: {
   price: number;
@@ -36,6 +37,7 @@ export const PriceFlash = memo(function PriceFlash({
   format?: (price: number) => string;
   muted?: boolean;
 }) {
+  const { f } = useCopy();
   const colors = useColors();
   const reducedMotion = useReducedMotion();
   const previous = useRef(price);
@@ -70,7 +72,7 @@ export const PriceFlash = memo(function PriceFlash({
   return (
     <Animated.View className="-mx-1.5 rounded-sm px-1.5" style={flashStyle}>
       <Text variant={VARIANT[size]} className={muted ? 'text-fg-2' : undefined}>
-        {format(price)}
+        {format ? format(price) : formatPrice(f, price)}
       </Text>
     </Animated.View>
   );

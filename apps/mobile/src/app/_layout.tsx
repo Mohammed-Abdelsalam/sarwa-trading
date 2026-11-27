@@ -32,6 +32,13 @@ function RootNavigator() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="stock/[symbol]" />
+      <Stack.Screen name="order/new" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="orders/index" />
+      <Stack.Screen name="orders/[id]" />
+      <Stack.Screen name="alerts" />
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="search" />
+      <Stack.Screen name="settings" />
     </Stack>
   );
 }

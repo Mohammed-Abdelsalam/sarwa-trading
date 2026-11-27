@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { CHART_TYPES, type ChartType } from '@sarwa/core';
 
+import { useCopy } from '../../lib/i18n';
 import { cx, useColors } from '../../lib/theme';
 
 const ICONS: Record<ChartType, LucideIcon> = { area: ChartArea, candle: ChartCandlestick };
@@ -17,24 +18,25 @@ export function ChartTypeToggle({
   onChange: (type: ChartType) => void;
 }) {
   const colors = useColors();
+  const { t } = useCopy();
   return (
     <View
       accessibilityRole="radiogroup"
-      accessibilityLabel="Chart type"
+      accessibilityLabel={t.chart.type}
       className="flex-row gap-0.5 rounded-seg bg-surface-3 p-seg-pad"
     >
-      {CHART_TYPES.map((option) => {
-        const selected = option.value === value;
-        const Icon = ICONS[option.value];
+      {CHART_TYPES.map((type) => {
+        const selected = type === value;
+        const Icon = ICONS[type];
         return (
           <Pressable
-            key={option.value}
+            key={type}
             accessibilityRole="radio"
-            accessibilityLabel={option.label}
+            accessibilityLabel={t.chart.types[type]}
             accessibilityState={{ checked: selected }}
             onPress={() => {
               void Haptics.selectionAsync();
-              onChange(option.value);
+              onChange(type);
             }}
             className={cx(
               'h-seg-lg w-11 items-center justify-center rounded-control-sm',

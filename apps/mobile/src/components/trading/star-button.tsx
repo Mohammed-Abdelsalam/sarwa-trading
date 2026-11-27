@@ -9,8 +9,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { watchLabel } from '@sarwa/core';
 import { layout, motion, type StarSize } from '@sarwa/tokens';
 
+import { useCopy } from '../../lib/i18n';
 import { cx, useColors } from '../../lib/theme';
 
 export function StarButton({
@@ -24,6 +26,7 @@ export function StarButton({
   onToggle: () => void;
   size?: StarSize;
 }) {
+  const { t } = useCopy();
   const colors = useColors();
   const reducedMotion = useReducedMotion();
   const scale = useSharedValue(1);
@@ -33,9 +36,7 @@ export function StarButton({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: watched }}
-      accessibilityLabel={
-        watched ? `Remove ${symbol} from watchlist` : `Add ${symbol} to watchlist`
-      }
+      accessibilityLabel={watchLabel(t, symbol, watched)}
       hitSlop={(layout.minTouchTarget - size) / 2}
       onPressIn={() => {
         if (!reducedMotion) scale.set(withTiming(0.86, { duration: motion.duration.fast }));
