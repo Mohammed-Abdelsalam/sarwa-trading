@@ -97,7 +97,9 @@ export function RangeCard({
   return (
     <section className="border-border bg-surface flex flex-col gap-2.5 rounded-lg border px-4.5 py-4">
       <h2 className="type-overline text-fg-3">{t.stock.range(weeks)}</h2>
+      {/* A price scale runs low to high left to right in every locale, like the chart. */}
       <div
+        dir="ltr"
         role="meter"
         aria-label={t.stock.rangeLabel(weeks)}
         aria-valuemin={low}
@@ -115,7 +117,7 @@ export function RangeCard({
           style={{ left: `${String(position * 100)}%` }}
         />
       </div>
-      <div className="type-num-sm text-fg-2 flex justify-between">
+      <div dir="ltr" className="type-num-sm text-fg-2 flex justify-between">
         <span>{formatPrice(f, low)}</span>
         <span>{formatPrice(f, high)}</span>
       </div>

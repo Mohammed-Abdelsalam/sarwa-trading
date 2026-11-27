@@ -45,9 +45,7 @@ export function HomePage() {
             </div>
             {page.equity ? (
               <>
-                <span className="text-[2.5rem] leading-11.5 font-semibold tracking-tight tabular-nums">
-                  {page.equity.value}
-                </span>
+                <span className="type-display">{page.equity.value}</span>
                 <span className="type-sm">
                   <span className={cn('font-semibold', TONE[page.equity.direction])}>
                     <span aria-hidden>{DIRECTION_ARROW[page.equity.direction]} </span>

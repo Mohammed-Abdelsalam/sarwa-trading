@@ -43,7 +43,12 @@ function BrowserNotifications() {
   const copy = useCopy();
   const show = useEffectEvent((notification: TradingNotification) => {
     const { title, body } = notificationText(notification.payload, copy);
-    new Notification(title, { body, tag: notification.id });
+    // Android Chrome only allows notifications from a service worker; the in-app bell still has it.
+    try {
+      new Notification(title, { body, tag: notification.id });
+    } catch {
+      return;
+    }
   });
 
   useEffect(

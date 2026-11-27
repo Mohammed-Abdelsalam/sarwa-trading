@@ -55,9 +55,7 @@ export function PortfolioPage() {
           <h1 className="type-sm text-fg-2 font-semibold">{labels.title}</h1>
           {summary ? (
             <>
-              <p className="text-[3rem] leading-13.5 font-semibold tracking-tight tabular-nums max-md:text-4xl">
-                {summary.equity}
-              </p>
+              <p className="type-display max-md:text-4xl">{summary.equity}</p>
               <p className="type-sm">
                 <span className={cn('font-semibold', TONE[summary.todayDirection])}>
                   <span aria-hidden>{DIRECTION_ARROW[summary.todayDirection]} </span>
@@ -98,7 +96,7 @@ export function PortfolioPage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22.5rem]">
         <Card className="min-w-0 pt-3.5 pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-1.5">
-            <PeriodTabs value={page.period} onChange={actions.setPeriod} />
+            <PeriodTabs value={page.period} onChange={actions.setPeriod} label={labels.period} />
             <span className="type-sm text-fg-3">{labels.equityChart}</span>
           </div>
           <EquityChart

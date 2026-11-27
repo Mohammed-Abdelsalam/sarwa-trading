@@ -7,8 +7,7 @@ import {
   changeBps,
   direction,
   DIRECTION_ARROW,
-  negate,
-  parseCents,
+  parseMoveBps,
   parseTicks,
   POLICY,
   toTradeQuote,
@@ -31,11 +30,8 @@ export function alertRequest(form: {
 }): CreateAlertRequest | null {
   const { symbol, condition, repeat } = form;
   if (condition === 'move_today') {
-    // A percent with two decimals has the cents scale: "-5.25" → −525 bps.
-    const [, sign, digits = ''] = /^\s*([-+]?)(.*)$/.exec(form.target) ?? [];
-    const unsigned = parseCents(digits);
-    const bps = unsigned === null ? null : sign === '-' ? negate(unsigned) : unsigned;
-    return bps === null ? null : { symbol, condition, repeat, thresholdBps: bps };
+    const moveBps = parseMoveBps(form.target);
+    return moveBps === null ? null : { symbol, condition, repeat, thresholdBps: moveBps };
   }
   const ticks = parseTicks(form.target);
   return ticks === null ? null : { symbol, condition, repeat, thresholdTicks: ticks };

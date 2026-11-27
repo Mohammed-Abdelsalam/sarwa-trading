@@ -136,5 +136,6 @@ describe('PortfolioPage', () => {
 
     expect(await screen.findByText('إجمالي القيمة · حساب تجريبي')).toBeInTheDocument();
     expect((await screen.findAllByText(/١٢.٨٦٤.٨٠/)).length).toBeGreaterThan(0);
+    expect(screen.getByRole('tablist', { name: 'فترة الرسم' })).toBeInTheDocument();
   });
 });

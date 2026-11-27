@@ -137,6 +137,45 @@ describe('OrdersPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('sends one cancel per row however often it is clicked', async () => {
+    const cancelOrder = jest.fn(() => new Promise(() => undefined));
+    renderPage(cancelOrder);
+
+    const button = await screen.findByRole('button', { name: 'Cancel XOM order' });
+    await userEvent.click(button);
+    await userEvent.click(button);
+
+    expect(button).toBeDisabled();
+    expect(cancelOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('explains an invalid modify instead of doing nothing', async () => {
+    window.history.replaceState(null, '', '/orders?order=o_8ef3');
+    renderPage();
+
+    const drawer = await screen.findByRole('dialog', { name: 'Sell XOM · Limit' });
+    await userEvent.click(await within(drawer).findByRole('button', { name: 'Modify' }));
+    await userEvent.type(within(drawer).getByRole('textbox', { name: 'New price' }), 'abc');
+    await userEvent.click(within(drawer).getByRole('button', { name: 'Save changes' }));
+
+    expect(within(drawer).getByRole('alert')).toHaveTextContent('Enter a valid number.');
+  });
+
+  it('starts fresh when another order is opened in the drawer', async () => {
+    window.history.replaceState(null, '', '/orders?order=o_8ef3');
+    const view = renderPage();
+    const drawer = await screen.findByRole('dialog', { name: 'Sell XOM · Limit' });
+    await userEvent.click(await within(drawer).findByRole('button', { name: 'Modify' }));
+
+    window.history.replaceState(null, '', '/orders?order=o_8f21');
+    view.rerender(<OrdersPage />);
+    window.history.replaceState(null, '', '/orders?order=o_8ef3');
+    view.rerender(<OrdersPage />);
+
+    const reopened = await screen.findByRole('dialog', { name: 'Sell XOM · Limit' });
+    expect(await within(reopened).findByRole('button', { name: 'Modify' })).toBeInTheDocument();
+  });
+
   it('loads older orders on demand', async () => {
     const listOrders = jest.fn((query?: { cursor?: string }) =>
       Promise.resolve(

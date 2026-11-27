@@ -108,6 +108,7 @@ export function useOrderDrawer(id: string) {
   const [editing, setEditing] = useState(false);
   const [priceText, setPriceText] = useState('');
   const [qtyText, setQtyText] = useState('');
+  const [invalid, setInvalid] = useState(false);
   const order = query.data;
   const outcome = cancel.data?.outcome;
 
@@ -179,6 +180,7 @@ export function useOrderDrawer(id: string) {
     qtyText,
     cancelling: cancel.isPending,
     saving: modify.isPending,
+    editError: invalid ? m.orders.modifyInvalid : undefined,
     notice:
       outcome === 'already_filled'
         ? {
@@ -217,12 +219,22 @@ export function useOrderDrawer(id: string) {
         setEditing(false);
         setPriceText('');
         setQtyText('');
+        setInvalid(false);
       },
-      setPriceText,
-      setQtyText,
+      setPriceText: (text: string) => {
+        setPriceText(text);
+        setInvalid(false);
+      },
+      setQtyText: (text: string) => {
+        setQtyText(text);
+        setInvalid(false);
+      },
       save: () => {
         const body = patch();
-        if (!body) return;
+        if (!body) {
+          setInvalid(true);
+          return;
+        }
         modify.mutate(
           { id, patch: body },
           {

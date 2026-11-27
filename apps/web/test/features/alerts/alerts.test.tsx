@@ -65,6 +65,18 @@ describe('AlertDialog', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Enter a valid number.');
   });
 
+  it('rejects a move beyond 100% before sending it', async () => {
+    const { wrapper, createAlert } = setup();
+    render(<AlertDialog initialSymbol="AAPL" onClose={jest.fn()} />, { wrapper });
+
+    await userEvent.click(await screen.findByRole('radio', { name: '% move today' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Target move' }), '150');
+    await userEvent.click(screen.getByRole('button', { name: 'Create alert' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a valid number.');
+    expect(createAlert).not.toHaveBeenCalled();
+  });
+
   it('creates a repeating price alert and closes', async () => {
     const onClose = jest.fn();
     const { wrapper, createAlert } = setup();

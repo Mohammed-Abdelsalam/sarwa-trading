@@ -159,6 +159,7 @@ export function usePortfolioPage() {
       howPlA11y: t.portfolio.howPlA11y,
       howPlBody: t.portfolio.howPlBody,
       close: t.common.close,
+      period: t.chart.period,
       equityChart: t.portfolio.equityChart({
         duration: t.common.minutes(f.count(POLICY.snapshotIntervalMs / 60_000)),
       }),

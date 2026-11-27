@@ -61,7 +61,8 @@ export function PriceChart({
           </Button>
         </div>
       ) : (
-        <>
+        // Time runs left to right in every locale, so the plot, axes and labels stay LTR together.
+        <div dir="ltr">
           <div className="relative mr-18 max-md:mr-0" style={{ height }}>
             <div
               role="slider"
@@ -244,7 +245,7 @@ export function PriceChart({
               <span key={candle?.t ?? i}>{candle ? f.chartTime(candle.t, period) : ''}</span>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

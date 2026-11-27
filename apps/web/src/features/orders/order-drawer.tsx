@@ -137,7 +137,7 @@ export function OrderDrawer({ id, onClose }: { id: string; onClose: () => void }
               }}
             >
               {order.editPrice ? (
-                <Field label={labels.newPrice}>
+                <Field label={labels.newPrice} error={drawer.editError}>
                   {(field) => (
                     <Input
                       {...field}
@@ -152,7 +152,10 @@ export function OrderDrawer({ id, onClose }: { id: string; onClose: () => void }
                 </Field>
               ) : null}
               {order.editQty ? (
-                <Field label={labels.newQuantity}>
+                <Field
+                  label={labels.newQuantity}
+                  error={order.editPrice ? undefined : drawer.editError}
+                >
                   {(field) => (
                     <Input
                       {...field}

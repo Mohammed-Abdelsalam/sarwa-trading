@@ -36,13 +36,13 @@ function SortHeader({
   column,
   sort,
   onSort,
-  align = 'left',
+  align = 'start',
 }: {
   label: string;
   column: SortKey;
   sort: SortOption | null;
   onSort: (key: SortKey) => void;
-  align?: 'left' | 'right';
+  align?: 'start' | 'end';
 }) {
   const active = sort?.key === column;
   const Icon = !active ? ArrowUpDown : sort.dir > 0 ? ArrowUp : ArrowDown;
@@ -50,7 +50,7 @@ function SortHeader({
     <th
       scope="col"
       aria-sort={active ? (sort.dir > 0 ? 'ascending' : 'descending') : undefined}
-      className={cn('px-3', align === 'right' && 'text-right')}
+      className={cn('px-3', align === 'end' && 'text-end')}
     >
       <button
         type="button"
@@ -93,7 +93,7 @@ function TableRow({
         router.push(href);
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Enter') router.push(href);
+        if (event.key === 'Enter' && event.target === event.currentTarget) router.push(href);
       }}
     >
       <td className="ps-5!">
@@ -105,13 +105,13 @@ function TableRow({
           </span>
         </Link>
       </td>
-      <td className="text-right">
+      <td className="text-end">
         <PriceFlash price={quote.price} format={(price) => formatPrice(f, price)} muted={stale} />
       </td>
-      <td className={cn('text-right font-semibold tabular-nums', COLOR[direction(delta)])}>
+      <td className={cn('text-end font-semibold tabular-nums', COLOR[direction(delta)])}>
         {formatChange(f, delta)}
       </td>
-      <td className="text-right">
+      <td className="text-end">
         <ChangePill value={pct} label={formatPct(f, pct)} size="sm" />
       </td>
       <td>
@@ -124,15 +124,15 @@ function TableRow({
             <span
               className="bg-fg-2 absolute -top-0.75 h-2.5 w-0.75 rounded-full"
               style={{
-                left: `${String(rangePosition(quote.price, quote.dayLow, quote.dayHigh) * 100)}%`,
+                insetInlineStart: `${String(rangePosition(quote.price, quote.dayLow, quote.dayHigh) * 100)}%`,
               }}
             />
           </span>
           <span>{formatPrice(f, quote.dayHigh)}</span>
         </div>
       </td>
-      <td className="text-fg-2 text-right tabular-nums">{formatMarketCap(f, stock.marketCap)}</td>
-      <td className="text-right">
+      <td className="text-fg-2 text-end tabular-nums">{formatMarketCap(f, stock.marketCap)}</td>
+      <td className="text-end">
         <StarButton
           label={watchLabel(t, stock.symbol, true)}
           watched
@@ -171,9 +171,9 @@ export function WatchlistTable({
               column="price"
               sort={sort}
               onSort={onSort}
-              align="right"
+              align="end"
             />
-            <th scope="col" className="px-3 text-right">
+            <th scope="col" className="px-3 text-end">
               {columns.change}
             </th>
             <SortHeader
@@ -181,15 +181,15 @@ export function WatchlistTable({
               column="change"
               sort={sort}
               onSort={onSort}
-              align="right"
+              align="end"
             />
-            <th scope="col" className="px-3 text-left">
+            <th scope="col" className="px-3 text-start">
               {columns.today}
             </th>
-            <th scope="col" className="px-3 text-left">
+            <th scope="col" className="px-3 text-start">
               {columns.dayRange}
             </th>
-            <th scope="col" className="px-3 text-right">
+            <th scope="col" className="px-3 text-end">
               {columns.marketCap}
             </th>
             <th scope="col">

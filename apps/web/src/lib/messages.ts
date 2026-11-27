@@ -67,7 +67,7 @@ const en = {
     saveChanges: 'Save changes',
     cancelError: "Couldn't cancel the order. Try again.",
     modifyError: "Couldn't modify the order. Check the values and try again.",
-    rejected: 'Rejected',
+    modifyInvalid: 'Enter a valid number.',
   },
   alerts: {
     stock: 'Stock',
@@ -88,6 +88,17 @@ const en = {
     notificationsUnsupported: "This browser doesn't support notifications.",
     account: 'Paper account',
     accountId: 'Account ID',
+  },
+  errorPage: {
+    title: 'Something went wrong',
+    body: 'The page hit an unexpected error. Your watchlist is safe.',
+    retry: 'Try again',
+  },
+  notFound: {
+    metaTitle: 'Not found',
+    title: 'Page not found',
+    body: "This link doesn't lead anywhere in Mini Trading.",
+    back: 'Back to Markets',
   },
 };
 
@@ -155,7 +166,7 @@ const ar: AppMessages = {
     saveChanges: 'حفظ التغييرات',
     cancelError: 'تعذّر إلغاء الأمر. حاول مجددًا.',
     modifyError: 'تعذّر تعديل الأمر. تحقق من القيم وحاول مجددًا.',
-    rejected: 'مرفوض',
+    modifyInvalid: 'أدخل رقمًا صحيحًا.',
   },
   alerts: {
     stock: 'السهم',
@@ -176,6 +187,17 @@ const ar: AppMessages = {
     notificationsUnsupported: 'هذا المتصفح لا يدعم الإشعارات.',
     account: 'الحساب التجريبي',
     accountId: 'رقم الحساب',
+  },
+  errorPage: {
+    title: 'حدث خطأ ما',
+    body: 'واجهت الصفحة خطأً غير متوقع. قائمة المفضلة لديك آمنة.',
+    retry: 'حاول مجددًا',
+  },
+  notFound: {
+    metaTitle: 'غير موجودة',
+    title: 'الصفحة غير موجودة',
+    body: 'هذا الرابط لا يؤدي إلى أي مكان في Mini Trading.',
+    back: 'العودة إلى الأسواق',
   },
 };
 

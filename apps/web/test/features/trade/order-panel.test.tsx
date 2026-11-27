@@ -198,3 +198,41 @@ describe('OrderPanel · review', () => {
     expect(push).toHaveBeenCalledWith('/portfolio');
   });
 });
+
+describe('OrderPanel · drawer', () => {
+  const desktop = window.matchMedia;
+
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/stocks/AAPL?trade=buy');
+    // 768–1279 px: the ticket is a drawer that can be closed.
+    window.matchMedia = (query: string) =>
+      ({
+        matches: !query.includes('1280'),
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }) as unknown as MediaQueryList;
+  });
+
+  afterEach(() => {
+    window.matchMedia = desktop;
+  });
+
+  it('does not place with Ctrl+Enter once closed, and reopens on entry', async () => {
+    const { placeOrder } = renderPanel();
+    const drawer = () => screen.getByRole('dialog', { name: 'Order ticket' });
+    expect(await within(drawer()).findAllByText('$10,000.00')).toHaveLength(2);
+    await userEvent.type(within(drawer()).getByRole('textbox', { name: 'Quantity' }), '500{Enter}');
+    expect(within(drawer()).getByRole('heading', { name: 'Review order' })).toBeInTheDocument();
+
+    await userEvent.click(within(drawer()).getByRole('button', { name: 'Close order ticket' }));
+    fireEvent.keyDown(document.body, { key: 'Enter', ctrlKey: true });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 10)));
+    expect(placeOrder).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Buy' }));
+    expect(
+      within(drawer()).queryByRole('heading', { name: 'Review order' }),
+    ).not.toBeInTheDocument();
+  });
+});

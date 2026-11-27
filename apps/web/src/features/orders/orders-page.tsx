@@ -189,6 +189,7 @@ export function OrdersPage({ routeOrderId }: { routeOrderId?: string }) {
                           size="sm"
                           variant="ghost"
                           aria-label={labels.cancelA11y(row.symbol)}
+                          loading={row.cancelling}
                           onClick={(event) => {
                             event.stopPropagation();
                             actions.cancel(row.id);
@@ -213,7 +214,9 @@ export function OrdersPage({ routeOrderId }: { routeOrderId?: string }) {
         )}
       </Card>
 
-      {page.selected ? <OrderDrawer id={page.selected} onClose={actions.closeDetail} /> : null}
+      {page.selected ? (
+        <OrderDrawer key={page.selected} id={page.selected} onClose={actions.closeDetail} />
+      ) : null}
     </div>
   );
 }

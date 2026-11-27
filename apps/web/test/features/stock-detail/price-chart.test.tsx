@@ -109,4 +109,13 @@ describe('PriceChart', () => {
     expect(screen.getAllByText('⁦$١٠٫٠٠⁩')).toHaveLength(2);
     expect(screen.queryByText('$10.00')).not.toBeInTheDocument();
   });
+
+  it('keeps the plot and its time axis left to right in RTL, so labels line up', () => {
+    mockSeries();
+    render(<PriceChart symbol="AAPL" period="1D" />, { locale: 'ar' });
+
+    // The direction is an attribute on an ancestor; Testing Library has no query for it.
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(screen.getByRole('slider').closest('[dir]')).toHaveAttribute('dir', 'ltr');
+  });
 });

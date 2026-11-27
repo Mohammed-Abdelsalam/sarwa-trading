@@ -81,7 +81,10 @@ export function useOrdersPage(routeOrderId?: string) {
   const since = range === 'all' ? 0 : now - Number(range) * DAY_MS;
   const rows = items
     .filter((order) => (!symbol || order.symbol === symbol) && order.createdAt >= since)
-    .map((order) => orderRow(order, lastTicks.get(order.symbol) ?? null, now, copy));
+    .map((order) => ({
+      ...orderRow(order, lastTicks.get(order.symbol) ?? null, now, copy),
+      cancelling: cancel.isPending && cancel.variables === order.id,
+    }));
   const openCount = open.data?.items.length ?? 0;
   const outcome = cancel.data?.outcome;
 

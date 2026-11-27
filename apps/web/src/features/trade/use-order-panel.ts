@@ -133,12 +133,14 @@ export function useOrderPanel(symbol: string) {
   const close = () => {
     replaceSearchParam('trade', null);
     if (ticket.step === 'result') ticket.reset();
+    // A sending order keeps its review so the answer still shows when the ticket reopens.
+    else if (ticket.step === 'review' && ticket.submitStatus !== 'sending') ticket.backToEntry();
   };
 
   useWindowKeyDown((event) => {
     const key = event.key.toLowerCase();
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-      if (ticket.step !== 'review') return;
+      if (!open || ticket.step !== 'review') return;
       event.preventDefault();
       ticket.submit();
       return;
