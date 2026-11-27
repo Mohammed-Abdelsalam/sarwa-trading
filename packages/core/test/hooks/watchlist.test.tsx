@@ -1,7 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import {
-  queryKeys,
+  meKeys,
+  useAuthSync,
   useIsWatched,
   useToggleWatchlist,
   useUndoableRemove,
@@ -11,7 +12,15 @@ import {
   useWatchToggle,
 } from '../../src/hooks';
 import { SORTS } from '../../src/markets';
-import { createTestClient, createWrapper, makeProblem, makeStock } from '../utils';
+import {
+  createAuthClient,
+  createTestClient,
+  createWrapper,
+  deviceKeys,
+  makeProblem,
+  makeStock,
+  makeUser,
+} from '../utils';
 
 describe('useWatchlist', () => {
   it('passes the query abort signal to the API so leaving a screen cancels the request', async () => {
@@ -24,6 +33,55 @@ describe('useWatchlist', () => {
       expect(result.current.isSuccess).toBe(true);
     });
     expect(getWatchlist).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) });
+  });
+});
+
+describe('useWatchlist for a guest', () => {
+  it('waits for the session, then loads the guest list under the device key', async () => {
+    const getWatchlist = jest.fn(() => Promise.resolve({ symbols: ['AAPL'] }));
+    const client = createAuthClient({ getWatchlist }, { status: 'loading' });
+    const { Wrapper, queryClient } = createWrapper(client);
+    const { result } = renderHook(() => useWatchlist(), { wrapper: Wrapper });
+    expect(result.current.fetchStatus).toBe('idle');
+
+    act(() => {
+      client.auth.session.getState().signOut();
+    });
+
+    await waitFor(() => {
+      expect(result.current.data).toEqual(['AAPL']);
+    });
+    expect(queryClient.getQueryData(deviceKeys.watchlist)).toEqual(['AAPL']);
+  });
+
+  it('drops the guest list on sign-in and fetches the user list under their key', async () => {
+    const getWatchlist = jest
+      .fn()
+      .mockResolvedValueOnce({ symbols: ['AAPL'] })
+      .mockResolvedValue({ symbols: ['AAPL', 'TSLA'] });
+    const client = createAuthClient({ getWatchlist });
+    const { Wrapper, queryClient } = createWrapper(client);
+    const { result } = renderHook(
+      () => {
+        useAuthSync();
+        return useWatchlist();
+      },
+      { wrapper: Wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.data).toEqual(['AAPL']);
+    });
+
+    act(() => {
+      client.auth.session.getState().signIn(makeUser());
+    });
+
+    await waitFor(() => {
+      expect(result.current.data).toEqual(['AAPL', 'TSLA']);
+    });
+    expect(getWatchlist).toHaveBeenCalledTimes(2);
+    expect(queryClient.getQueryData(meKeys('u1').watchlist)).toEqual(['AAPL', 'TSLA']);
+    expect(queryClient.getQueryData(deviceKeys.watchlist)).toBeUndefined();
   });
 });
 
@@ -45,7 +103,7 @@ describe('useToggleWatchlist', () => {
   it('adds a symbol optimistically before the server answers', async () => {
     const client = createTestClient({ addToWatchlist: () => new Promise<void>(() => undefined) });
     const { Wrapper, queryClient } = createWrapper(client);
-    queryClient.setQueryData(queryKeys.watchlist, []);
+    queryClient.setQueryData(deviceKeys.watchlist, []);
 
     const { result } = renderHook(() => useToggleWatchlist(), { wrapper: Wrapper });
     act(() => {
@@ -53,7 +111,7 @@ describe('useToggleWatchlist', () => {
     });
 
     await waitFor(() => {
-      expect(queryClient.getQueryData(queryKeys.watchlist)).toEqual(['AAPL']);
+      expect(queryClient.getQueryData(deviceKeys.watchlist)).toEqual(['AAPL']);
     });
   });
 
@@ -62,7 +120,7 @@ describe('useToggleWatchlist', () => {
       removeFromWatchlist: () => new Promise<void>(() => undefined),
     });
     const { Wrapper, queryClient } = createWrapper(client);
-    queryClient.setQueryData(queryKeys.watchlist, ['AAPL', 'TSLA']);
+    queryClient.setQueryData(deviceKeys.watchlist, ['AAPL', 'TSLA']);
 
     const { result } = renderHook(() => useToggleWatchlist(), { wrapper: Wrapper });
     act(() => {
@@ -70,7 +128,7 @@ describe('useToggleWatchlist', () => {
     });
 
     await waitFor(() => {
-      expect(queryClient.getQueryData(queryKeys.watchlist)).toEqual(['TSLA']);
+      expect(queryClient.getQueryData(deviceKeys.watchlist)).toEqual(['TSLA']);
     });
   });
 
@@ -79,7 +137,7 @@ describe('useToggleWatchlist', () => {
       removeFromWatchlist: () => Promise.reject(makeProblem(503)),
     });
     const { Wrapper, queryClient } = createWrapper(client);
-    queryClient.setQueryData(queryKeys.watchlist, ['AAPL', 'TSLA']);
+    queryClient.setQueryData(deviceKeys.watchlist, ['AAPL', 'TSLA']);
 
     const { result } = renderHook(() => useToggleWatchlist(), { wrapper: Wrapper });
     act(() => {
@@ -89,7 +147,7 @@ describe('useToggleWatchlist', () => {
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
     });
-    expect(queryClient.getQueryData(queryKeys.watchlist)).toEqual(['AAPL', 'TSLA']);
+    expect(queryClient.getQueryData(deviceKeys.watchlist)).toEqual(['AAPL', 'TSLA']);
   });
 
   it('refetches right away when a toggle fails with nothing cached to roll back to', async () => {
@@ -109,7 +167,7 @@ describe('useToggleWatchlist', () => {
     });
 
     await waitFor(() => {
-      expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.watchlist });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: deviceKeys.watchlist });
     });
   });
 
@@ -119,7 +177,7 @@ describe('useToggleWatchlist', () => {
       addToWatchlist: () => new Promise<void>((resolve) => settle.push(resolve)),
     });
     const { Wrapper, queryClient } = createWrapper(client);
-    queryClient.setQueryData(queryKeys.watchlist, []);
+    queryClient.setQueryData(deviceKeys.watchlist, []);
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useToggleWatchlist(), { wrapper: Wrapper });
 
@@ -139,7 +197,7 @@ describe('useToggleWatchlist', () => {
     });
 
     expect(invalidate).not.toHaveBeenCalled();
-    expect(queryClient.getQueryData(queryKeys.watchlist)).toEqual(['AAPL', 'NVDA']);
+    expect(queryClient.getQueryData(deviceKeys.watchlist)).toEqual(['AAPL', 'NVDA']);
 
     await act(async () => {
       settle[1]?.();
@@ -148,7 +206,7 @@ describe('useToggleWatchlist', () => {
     await waitFor(() => {
       expect(invalidate).toHaveBeenCalledTimes(1);
     });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.watchlist });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: deviceKeys.watchlist });
   });
 });
 
@@ -268,6 +326,32 @@ describe('useWatchToggle', () => {
       expect(result.current.watched).toBe(true);
     });
     expect(addToWatchlist).toHaveBeenCalledWith('AAPL');
+  });
+});
+
+describe('useWatchToggle for a guest', () => {
+  it('stars right away with no sign-in gate', async () => {
+    const addToWatchlist = jest.fn(() => new Promise<void>(() => undefined));
+    const client = createAuthClient({
+      getWatchlist: () => Promise.resolve({ symbols: [] }),
+      addToWatchlist,
+    });
+    const { Wrapper, queryClient } = createWrapper(client);
+    const { result } = renderHook(() => useWatchToggle('AAPL'), { wrapper: Wrapper });
+    await waitFor(() => {
+      expect(queryClient.getQueryData(deviceKeys.watchlist)).toEqual([]);
+    });
+
+    act(() => {
+      result.current.toggle();
+    });
+
+    await waitFor(() => {
+      expect(result.current.watched).toBe(true);
+    });
+    expect(queryClient.getQueryData(deviceKeys.watchlist)).toEqual(['AAPL']);
+    expect(addToWatchlist).toHaveBeenCalledWith('AAPL');
+    expect(client.auth.gate.getState().isOpen).toBe(false);
   });
 });
 

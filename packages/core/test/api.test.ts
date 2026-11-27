@@ -1,12 +1,18 @@
 import { z } from 'zod';
 
-import { DEVICE_ID_HEADER, ErrorCode } from '@sarwa/contracts';
+import {
+  DEVICE_ID_HEADER,
+  ErrorCode,
+  GuestDataPresentProblemSchema,
+  RateLimitedProblemSchema,
+} from '@sarwa/contracts';
 
 import {
   ApiError,
   createApiClient,
   createRequest,
   isApiError,
+  problemDetails,
   queryString,
   shouldRetry,
   TimeoutError,
@@ -98,6 +104,117 @@ describe('createRequest', () => {
       credentials: 'include',
       headers: expect.objectContaining({ 'x-test': '1' }) as unknown,
     });
+  });
+
+  function answers(...statuses: number[]): jest.Mock {
+    const queue = [...statuses];
+    return jest.fn((_url: string, _init: RequestInit) => {
+      const status = queue.shift() ?? 200;
+      return Promise.resolve({
+        ok: status < 400,
+        status,
+        statusText: '',
+        json: () => Promise.resolve({ ok: true }),
+      });
+    });
+  }
+
+  it('renews the session once after a 401 and sends the request again', async () => {
+    const fetchMock = answers(401, 200);
+    global.fetch = fetchMock;
+    const refresh = jest.fn(() => Promise.resolve(true));
+    const onUnauthorized = jest.fn();
+    const request = createRequest({ baseUrl: 'http://api', auth: { refresh, onUnauthorized } });
+
+    await expect(request('/me', z.object({ ok: z.boolean() }))).resolves.toEqual({ ok: true });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('gives up after one renewal, or when the session cannot be renewed', async () => {
+    global.fetch = answers(401, 401);
+    const onUnauthorized = jest.fn();
+    const renewed = createRequest({
+      baseUrl: 'http://api',
+      auth: { refresh: () => Promise.resolve(true), onUnauthorized },
+    });
+    await expect(renewed('/me', null)).rejects.toBeInstanceOf(ApiError);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+
+    global.fetch = answers(401);
+    const expired = createRequest({
+      baseUrl: 'http://api',
+      auth: { refresh: () => Promise.resolve(false), onUnauthorized },
+    });
+    await expect(expired('/me', null)).rejects.toBeInstanceOf(ApiError);
+    expect(onUnauthorized).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats a 401 on an anonymous call as its answer', async () => {
+    global.fetch = answers(401);
+    const refresh = jest.fn(() => Promise.resolve(true));
+    const onUnauthorized = jest.fn();
+    const request = createRequest({ baseUrl: 'http://api', auth: { refresh, onUnauthorized } });
+
+    await expect(request('/auth/sign-in', null, { anonymous: true })).rejects.toBeInstanceOf(
+      ApiError,
+    );
+    expect(refresh).not.toHaveBeenCalled();
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('tells the auth headers which method is being sent', async () => {
+    global.fetch = answers(200);
+    const headers = jest.fn(() => ({}));
+    const request = createRequest({ baseUrl: 'http://api', auth: { headers } });
+
+    await request('/me/profile', null, { method: 'PATCH' });
+    await request('/me', null);
+
+    expect(headers.mock.calls).toEqual([[{ method: 'PATCH' }], [{ method: 'GET' }]]);
+  });
+
+  it('keeps the request id for the error state, and reads text bodies', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        headers: new Headers({ 'x-request-id': 'req-42' }),
+        json: () => Promise.resolve(null),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        text: () => Promise.resolve('a,b'),
+      });
+    const request = createRequest({ baseUrl: 'http://api' });
+
+    const error: unknown = await request('/admin/customers', null).catch((e: unknown) => e);
+    expect(error).toMatchObject({ requestId: 'req-42', status: 500 });
+    await expect(request('/admin/customers/export.csv', 'text')).resolves.toBe('a,b');
+  });
+
+  it('keeps the fields a problem carries beyond the standard ones', async () => {
+    const problem = {
+      type: 'about:blank',
+      title: 'Too many',
+      status: 429,
+      code: ErrorCode.RateLimited,
+      retryAfterSeconds: 42,
+    };
+    global.fetch = jest.fn(() =>
+      Promise.resolve({ ok: false, status: 429, json: () => Promise.resolve(problem) }),
+    ) as unknown as typeof fetch;
+    const request = createRequest({ baseUrl: 'http://api' });
+
+    const error: unknown = await request('/auth/sign-in', null).catch((e: unknown) => e);
+
+    expect(problemDetails(error, RateLimitedProblemSchema)?.retryAfterSeconds).toBe(42);
+    expect(problemDetails(error, GuestDataPresentProblemSchema)).toBeNull();
+    expect(problemDetails(new Error('x'), RateLimitedProblemSchema)).toBeNull();
   });
 });
 

@@ -2,7 +2,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 
 import {
-  type AdminAccount,
   type AdminOrder,
   type AdminStock,
   type AdminTrading,
@@ -61,23 +60,6 @@ export function makeAdminTrading(overrides: Partial<AdminTrading> = {}): AdminTr
     tripsToday: [],
     changedBy: null,
     changedAt: null,
-    ...overrides,
-  };
-}
-
-export function makeAccount(overrides: Partial<AdminAccount> = {}): AdminAccount {
-  return {
-    id: 'acc-1',
-    handle: 'ACC-00AA11',
-    createdAt: 1_000,
-    equityCents: 10_000_000,
-    cashCents: 5_000_000,
-    todayCents: 0,
-    allTimeCents: 0,
-    allTimeBps: 0,
-    positions: 0,
-    openOrders: 0,
-    lastTradeAt: null,
     ...overrides,
   };
 }

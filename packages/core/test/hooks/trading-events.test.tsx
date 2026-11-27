@@ -23,7 +23,7 @@ import {
   makeOrder,
   makeTradingStatus,
 } from '../trading-fixtures';
-import { createTestClient, createWrapper } from '../utils';
+import { createTestClient, createWrapper, deviceKeys } from '../utils';
 
 function setup() {
   const client = createTestClient({
@@ -45,22 +45,22 @@ describe('useTradingEvents', () => {
   it('upserts an updated order into the matching lists and its detail, and refreshes the books', () => {
     const { queryClient, emit } = setup();
     const empty: OrdersResponse = { items: [], nextCursor: null };
-    queryClient.setQueryData(queryKeys.orders({ filter: 'open' }), empty);
-    queryClient.setQueryData(queryKeys.orders({ filter: 'filled' }), empty);
-    queryClient.setQueryData(queryKeys.portfolio, { stale: false });
+    queryClient.setQueryData(deviceKeys.orders({ filter: 'open' }), empty);
+    queryClient.setQueryData(deviceKeys.orders({ filter: 'filled' }), empty);
+    queryClient.setQueryData(deviceKeys.portfolio, { stale: false });
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
     emit(orderEvent(makeOrder()));
 
     expect(
-      queryClient.getQueryData<OrdersResponse>(queryKeys.orders({ filter: 'open' }))?.items,
+      queryClient.getQueryData<OrdersResponse>(deviceKeys.orders({ filter: 'open' }))?.items,
     ).toHaveLength(1);
     expect(
-      queryClient.getQueryData<OrdersResponse>(queryKeys.orders({ filter: 'filled' }))?.items,
+      queryClient.getQueryData<OrdersResponse>(deviceKeys.orders({ filter: 'filled' }))?.items,
     ).toHaveLength(0);
-    expect(queryClient.getQueryData(queryKeys.order('ord-1'))).toEqual(makeOrder());
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.portfolio });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.account });
+    expect(queryClient.getQueryData(deviceKeys.order('ord-1'))).toEqual(makeOrder());
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: deviceKeys.portfolio });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: deviceKeys.account });
   });
 
   it('refetches everything personal when an admin resets the account', () => {
@@ -69,32 +69,26 @@ describe('useTradingEvents', () => {
 
     emit({ name: 'account.reset', payload: { v: 1 } });
 
-    for (const queryKey of [
-      queryKeys.allOrders,
-      queryKeys.portfolio,
-      queryKeys.account,
-      queryKeys.notifications,
-      queryKeys.alerts,
-    ]) {
+    for (const queryKey of [deviceKeys.root, queryKeys.tradingStatus]) {
       expect(invalidate).toHaveBeenCalledWith({ queryKey });
     }
   });
 
   it('moves a filled order out of the open list and tracks the fill once', () => {
     const { client, queryClient, emit } = setup();
-    queryClient.setQueryData(queryKeys.orders({ filter: 'open' }), {
+    queryClient.setQueryData(deviceKeys.orders({ filter: 'open' }), {
       items: [makeOrder()],
       nextCursor: null,
     });
-    queryClient.setQueryData(queryKeys.orders(), { items: [makeOrder()], nextCursor: null });
+    queryClient.setQueryData(deviceKeys.orders(), { items: [makeOrder()], nextCursor: null });
 
     emit(orderEvent(makeFilledOrder()));
     emit(orderEvent(makeFilledOrder()));
 
     expect(
-      queryClient.getQueryData<OrdersResponse>(queryKeys.orders({ filter: 'open' }))?.items,
+      queryClient.getQueryData<OrdersResponse>(deviceKeys.orders({ filter: 'open' }))?.items,
     ).toEqual([]);
-    expect(queryClient.getQueryData<OrdersResponse>(queryKeys.orders())?.items).toEqual([
+    expect(queryClient.getQueryData<OrdersResponse>(deviceKeys.orders())?.items).toEqual([
       makeFilledOrder(),
     ]);
     expect(client.analytics.track).toHaveBeenCalledTimes(1);
@@ -108,16 +102,16 @@ describe('useTradingEvents', () => {
 
   it('ignores an update older than the cached order', () => {
     const { queryClient, emit } = setup();
-    queryClient.setQueryData(queryKeys.order('ord-1'), makeFilledOrder());
+    queryClient.setQueryData(deviceKeys.order('ord-1'), makeFilledOrder());
 
     emit(orderEvent(makeOrder({ updatedAt: 1_500 })));
 
-    expect(queryClient.getQueryData<Order>(queryKeys.order('ord-1'))?.status).toBe('filled');
+    expect(queryClient.getQueryData<Order>(deviceKeys.order('ord-1'))?.status).toBe('filled');
   });
 
   it('prepends a new notification once and bumps the unread count', () => {
     const { queryClient, emit } = setup();
-    queryClient.setQueryData<Inbox>(queryKeys.notifications, {
+    queryClient.setQueryData<Inbox>(deviceKeys.notifications, {
       pages: [
         { items: [makeNotification({ id: 'old', readAt: 5 })], nextCursor: null, unreadCount: 0 },
       ],
@@ -131,14 +125,14 @@ describe('useTradingEvents', () => {
     emit(event);
     emit(event);
 
-    const data = queryClient.getQueryData<Inbox>(queryKeys.notifications)?.pages[0];
+    const data = queryClient.getQueryData<Inbox>(deviceKeys.notifications)?.pages[0];
     expect(data?.items.map((n) => n.id)).toEqual(['n-1', 'old']);
     expect(data?.unreadCount).toBe(1);
   });
 
   it('replaces a triggered alert', () => {
     const { queryClient, emit } = setup();
-    queryClient.setQueryData<AlertsResponse>(queryKeys.alerts, {
+    queryClient.setQueryData<AlertsResponse>(deviceKeys.alerts, {
       items: [makeAlert()],
       activeCount: 1,
       limit: 50,
@@ -149,7 +143,9 @@ describe('useTradingEvents', () => {
       payload: { v: 1, alert: makeAlert({ armed: false, lastFiredAt: 9 }), lastTicks: 2_600_000 },
     });
 
-    expect(queryClient.getQueryData<AlertsResponse>(queryKeys.alerts)?.items[0]?.armed).toBe(false);
+    expect(queryClient.getQueryData<AlertsResponse>(deviceKeys.alerts)?.items[0]?.armed).toBe(
+      false,
+    );
   });
 
   it('refetches the alerts after a trigger so the active count follows', () => {
@@ -161,7 +157,7 @@ describe('useTradingEvents', () => {
       payload: { v: 1, alert: makeAlert({ armed: false, lastFiredAt: 9 }), lastTicks: 2_600_000 },
     });
 
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.alerts });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: deviceKeys.alerts });
   });
 
   it('refetches every private cache when the socket reconnects, not on the first connect', () => {
@@ -182,14 +178,7 @@ describe('useTradingEvents', () => {
     });
     setConnection('open');
 
-    for (const queryKey of [
-      queryKeys.allOrders,
-      queryKeys.portfolio,
-      queryKeys.account,
-      queryKeys.notifications,
-      queryKeys.alerts,
-      queryKeys.tradingStatus,
-    ]) {
+    for (const queryKey of [deviceKeys.root, queryKeys.tradingStatus]) {
       expect(invalidate).toHaveBeenCalledWith({ queryKey });
     }
   });

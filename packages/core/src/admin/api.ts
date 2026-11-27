@@ -1,10 +1,6 @@
 import {
-  type Account,
-  AccountSchema,
+  type AcceptInviteRequest,
   ADMIN_ROUTES,
-  type AdminAccountsQuery,
-  type AdminAccountsResponse,
-  AdminAccountsResponseSchema,
   type AdminOrdersQuery,
   type AdminOrdersResponse,
   AdminOrdersResponseSchema,
@@ -26,21 +22,48 @@ import {
   AuditPageSchema,
   type AuditQuery,
   type CreateHalt,
+  type CreateInviteRequest,
   type CreateStock,
-  type CreateUser,
+  type CustomerActionResponse,
+  CustomerActionResponseSchema,
+  type CustomerActivityResponse,
+  CustomerActivityResponseSchema,
+  type CustomerDetail,
+  CustomerDetailSchema,
+  type CustomerKpis,
+  CustomerKpisSchema,
+  type CustomerPageQuery,
+  type CustomerReasonRequest,
+  type CustomerRevealResponse,
+  CustomerRevealResponseSchema,
+  type CustomersQuery,
+  type CustomersResponse,
+  CustomersResponseSchema,
+  type CustomerSessionsResponse,
+  CustomerSessionsResponseSchema,
   type Halt,
   type HealthResponse,
   HealthResponseSchema,
   type HaltImpact,
   HaltImpactSchema,
   HaltSchema,
+  type InviteInfo,
+  InviteInfoSchema,
+  type InviteRow,
+  InviteResponseSchema,
+  type InvitesResponse,
+  InvitesResponseSchema,
   type LoginRequest,
   MARKET_ROUTES,
   type MarketCommand,
   type MarketCommandResponse,
   MarketCommandResponseSchema,
+  type OrdersResponse,
+  OrdersResponseSchema,
+  type ResetCustomerAccountRequest,
   routePath,
   SessionResponseSchema,
+  type SuspendCustomerRequest,
   type UpdateAppConfig,
   type UpdateStock,
   type UpdateTrading,
@@ -65,7 +88,6 @@ export interface AdminApi {
   updateStock(symbol: string, patch: UpdateStock): Promise<AdminStock>;
   deleteStock(symbol: string): Promise<void>;
   listUsers(options?: CallOptions): Promise<UsersResponse>;
-  createUser(body: CreateUser): Promise<AdminUser>;
   updateUser(id: string, patch: UpdateUser): Promise<AdminUser>;
   audit(query: AuditQuery, options?: CallOptions): Promise<AuditPage>;
   trading(options?: CallOptions): Promise<AdminTrading>;
@@ -75,8 +97,37 @@ export interface AdminApi {
   resumeHalt(symbol: string): Promise<void>;
   orders(query: AdminOrdersQuery, options?: CallOptions): Promise<AdminOrdersResponse>;
   orderStats(options?: CallOptions): Promise<AdminOrderStats>;
-  accounts(query: AdminAccountsQuery, options?: CallOptions): Promise<AdminAccountsResponse>;
-  resetAccount(id: string, confirm: string): Promise<Account>;
+  customers(query: CustomersQuery, options?: CallOptions): Promise<CustomersResponse>;
+  customerKpis(options?: CallOptions): Promise<CustomerKpis>;
+  // The CSV text for the current filters; ADMIN only and audited.
+  exportCustomers(query: CustomersQuery): Promise<string>;
+  customer(handle: string, options?: CallOptions): Promise<CustomerDetail>;
+  customerOrders(
+    handle: string,
+    query: CustomerPageQuery,
+    options?: CallOptions,
+  ): Promise<OrdersResponse>;
+  customerSessions(handle: string, options?: CallOptions): Promise<CustomerSessionsResponse>;
+  customerActivity(
+    handle: string,
+    query: CustomerPageQuery,
+    options?: CallOptions,
+  ): Promise<CustomerActivityResponse>;
+  suspendCustomer(handle: string, body: SuspendCustomerRequest): Promise<CustomerActionResponse>;
+  reactivateCustomer(handle: string, body: CustomerReasonRequest): Promise<CustomerActionResponse>;
+  signOutCustomer(handle: string, body: CustomerReasonRequest): Promise<CustomerActionResponse>;
+  sendCustomerReset(handle: string, body: CustomerReasonRequest): Promise<CustomerActionResponse>;
+  resetCustomerAccount(
+    handle: string,
+    body: ResetCustomerAccountRequest,
+  ): Promise<CustomerActionResponse>;
+  revealCustomer(handle: string): Promise<CustomerRevealResponse>;
+  invites(options?: CallOptions): Promise<InvitesResponse>;
+  createInvite(body: CreateInviteRequest): Promise<InviteRow>;
+  resendInvite(id: string): Promise<InviteRow>;
+  revokeInvite(id: string): Promise<void>;
+  inviteInfo(token: string, options?: CallOptions): Promise<InviteInfo>;
+  acceptInvite(body: AcceptInviteRequest): Promise<AdminUser>;
 }
 
 // Same-origin by default: the session cookie is httpOnly and SameSite=strict.
@@ -96,6 +147,14 @@ export function createAdminApi({
     timeoutMs,
   });
   const R = ADMIN_ROUTES;
+  type CustomerActionRoute =
+    | typeof R.suspendCustomer
+    | typeof R.reactivateCustomer
+    | typeof R.signOutCustomer
+    | typeof R.sendCustomerReset
+    | typeof R.resetCustomerAccount;
+  const customerAction = (route: CustomerActionRoute, handle: string, body: unknown) =>
+    request(routePath(route, { handle }), CustomerActionResponseSchema, { method: 'POST', body });
 
   return {
     // Login answers 401 for wrong credentials, so it never triggers the sign-in redirect.
@@ -116,7 +175,6 @@ export function createAdminApi({
       request(routePath(R.stock, { symbol }), AdminStockSchema, { method: 'PATCH', body }),
     deleteStock: (symbol) => request(routePath(R.stock, { symbol }), null, { method: 'DELETE' }),
     listUsers: (options) => request(routePath(R.users), UsersResponseSchema, options),
-    createUser: (body) => request(routePath(R.users), AdminUserSchema, { method: 'POST', body }),
     updateUser: (id, body) =>
       request(routePath(R.user, { id }), AdminUserSchema, { method: 'PATCH', body }),
     audit: (query, options) =>
@@ -131,16 +189,47 @@ export function createAdminApi({
     orders: (query, options) =>
       request(`${routePath(R.orders)}${queryString(query)}`, AdminOrdersResponseSchema, options),
     orderStats: (options) => request(routePath(R.orderStats), AdminOrderStatsSchema, options),
-    accounts: (query, options) =>
+    customers: (query, options) =>
+      request(`${routePath(R.customers)}${queryString(query)}`, CustomersResponseSchema, options),
+    customerKpis: (options) => request(routePath(R.customerKpis), CustomerKpisSchema, options),
+    exportCustomers: (query) =>
+      request(`${routePath(R.customersExport)}${queryString(query)}`, 'text'),
+    customer: (handle, options) =>
+      request(routePath(R.customer, { handle }), CustomerDetailSchema, options),
+    customerOrders: (handle, query, options) =>
       request(
-        `${routePath(R.accounts)}${queryString(query)}`,
-        AdminAccountsResponseSchema,
+        `${routePath(R.customerOrders, { handle })}${queryString(query)}`,
+        OrdersResponseSchema,
         options,
       ),
-    resetAccount: (id, confirm) =>
-      request(routePath(R.resetAccount, { id }), AccountSchema, {
+    customerSessions: (handle, options) =>
+      request(routePath(R.customerSessions, { handle }), CustomerSessionsResponseSchema, options),
+    customerActivity: (handle, query, options) =>
+      request(
+        `${routePath(R.customerActivity, { handle })}${queryString(query)}`,
+        CustomerActivityResponseSchema,
+        options,
+      ),
+    suspendCustomer: (handle, body) => customerAction(R.suspendCustomer, handle, body),
+    reactivateCustomer: (handle, body) => customerAction(R.reactivateCustomer, handle, body),
+    signOutCustomer: (handle, body) => customerAction(R.signOutCustomer, handle, body),
+    sendCustomerReset: (handle, body) => customerAction(R.sendCustomerReset, handle, body),
+    resetCustomerAccount: (handle, body) => customerAction(R.resetCustomerAccount, handle, body),
+    revealCustomer: (handle) =>
+      request(routePath(R.revealCustomer, { handle }), CustomerRevealResponseSchema, {
         method: 'POST',
-        body: { confirm },
       }),
+    invites: (options) => request(routePath(R.invites), InvitesResponseSchema, options),
+    createInvite: async (body) =>
+      (await request(routePath(R.invites), InviteResponseSchema, { method: 'POST', body })).invite,
+    resendInvite: async (id) =>
+      (await request(routePath(R.resendInvite, { id }), InviteResponseSchema, { method: 'POST' }))
+        .invite,
+    revokeInvite: (id) => request(routePath(R.invite, { id }), null, { method: 'DELETE' }),
+    // The accept page is public: a 401 there never sends the invitee to the sign-in page.
+    inviteInfo: (token, options) =>
+      raw(routePath(R.inviteByToken, { token }), InviteInfoSchema, options),
+    acceptInvite: async (body) =>
+      (await raw(routePath(R.acceptInvite), SessionResponseSchema, { method: 'POST', body })).user,
   };
 }

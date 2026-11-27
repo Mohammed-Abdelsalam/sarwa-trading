@@ -27,6 +27,7 @@ describe('notificationTarget', () => {
       }),
     ).toEqual({ kind: 'order', orderId: 'o1' });
     expect(notificationTarget({ kind: 'market_notice', message: 'Hi' })).toBeNull();
+    expect(notificationTarget({ kind: 'welcome' })).toBeNull();
   });
 });
 

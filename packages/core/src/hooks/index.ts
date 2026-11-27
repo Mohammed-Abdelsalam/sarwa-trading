@@ -1,5 +1,8 @@
 export * from './alerts';
+export * from './auth';
 export * from './config';
+export * from './gate';
+export * from './home';
 export * from './i18n';
 export * from './keys';
 export * from './live';
@@ -9,6 +12,7 @@ export * from './order-ticket';
 export * from './orders';
 export * from './portfolio';
 export * from './preferences';
+export * from './session';
 export * from './time';
 export * from './trading-events';
 export * from './trading-status';

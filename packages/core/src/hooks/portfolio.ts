@@ -18,36 +18,42 @@ import { sellableMicros } from '@sarwa/domain';
 
 import { useSarwa } from '../provider';
 import { livePortfolio, toHold, toPosition } from '../trading';
-import { queryKeys } from './keys';
 import { useLiveSymbols } from './live';
 import { useStocks } from './market';
+import { usePrivateScope } from './session';
 
 export function useAccount(): UseQueryResult<Account> {
   const { api } = useSarwa();
+  const { keys, enabled } = usePrivateScope();
   return useQuery({
-    queryKey: queryKeys.account,
+    queryKey: keys.account,
     queryFn: ({ signal }) => api.getAccount({ signal }),
     staleTime: 30_000,
+    enabled,
   });
 }
 
 export function useEquityCurve(period: EquityPeriod): UseQueryResult<EquityResponse> {
   const { api } = useSarwa();
+  const { keys, enabled } = usePrivateScope();
   return useQuery({
-    queryKey: queryKeys.equity(period),
+    queryKey: keys.equity(period),
     queryFn: ({ signal }) => api.getEquity(period, { signal }),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
+    enabled,
   });
 }
 
 export function usePortfolio() {
   const { api, store } = useSarwa();
   const queryClient = useQueryClient();
+  const { keys, enabled } = usePrivateScope();
   const query = useQuery({
-    queryKey: queryKeys.portfolio,
+    queryKey: keys.portfolio,
     queryFn: ({ signal }) => api.getPortfolio({ signal }),
     staleTime: 30_000,
+    enabled,
   });
   const stocks = useStocks();
   const books = query.data;
@@ -78,8 +84,8 @@ export function usePortfolio() {
       const held = position(symbol);
       return sellableMicros(held && toPosition(held), (books?.holds ?? []).map(toHold));
     },
-    isLoading: query.isPending,
+    isLoading: enabled && query.isPending,
     isError: query.isError && !books,
-    refresh: () => queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
+    refresh: () => queryClient.invalidateQueries({ queryKey: keys.portfolio }),
   };
 }

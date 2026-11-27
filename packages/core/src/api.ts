@@ -52,8 +52,16 @@ import {
   WatchlistResponseSchema,
 } from '@sarwa/contracts';
 
+import { type AuthApi, createAuthApi } from './auth/api';
+
 export class ApiError extends Error {
-  constructor(readonly problem: Problem) {
+  // `body` keeps the fields a problem schema strips, such as a guest ticket or a retry time.
+  constructor(
+    readonly problem: Problem,
+    readonly body: unknown = problem,
+    // The server's X-Request-Id, for error states that quote it to support.
+    readonly requestId: string | null = null,
+  ) {
     super(problem.detail ?? problem.title);
     this.name = 'ApiError';
   }
@@ -72,6 +80,13 @@ export class TimeoutError extends Error {
 
 export function isApiError(error: unknown, code: ErrorCodeValue): error is ApiError {
   return error instanceof ApiError && error.problem.code === code;
+}
+
+// Reads a problem that carries more than the standard fields, e.g. RateLimitedProblemSchema.
+export function problemDetails<T extends z.ZodType>(error: unknown, schema: T): z.output<T> | null {
+  if (!(error instanceof ApiError)) return null;
+  const parsed = schema.safeParse(error.body);
+  return parsed.success ? parsed.data : null;
 }
 
 // A body that isn't a problem (e.g. a proxy's HTML error page) still gets the code its status means.
@@ -123,6 +138,8 @@ function abortable(ms: number, outer: AbortSignal | null | undefined) {
 export interface RequestOptions extends Omit<RequestInit, 'body' | 'headers'> {
   body?: unknown;
   headers?: Record<string, string>;
+  // Sign-in, refresh and the emailed links: a 401 there is the answer, not an expired session.
+  anonymous?: boolean;
 }
 
 export type CallOptions = Pick<RequestOptions, 'signal'>;
@@ -130,12 +147,19 @@ export type CallOptions = Pick<RequestOptions, 'signal'>;
 export interface Request {
   <T extends z.ZodType>(path: string, schema: T, options?: RequestOptions): Promise<z.output<T>>;
   (path: string, schema: null, options?: RequestOptions): Promise<void>;
+  (path: string, schema: 'text', options?: RequestOptions): Promise<string>;
 }
 
-// Who the caller is: the device id today, a signed-in session later. Adding one never touches a call.
+export const REQUEST_ID_HEADER = 'x-request-id';
+
+// Who the caller is: the device id, plus a signed-in session when there is one.
 export interface RequestAuth {
-  headers?: () => Promise<Record<string, string>> | Record<string, string>;
+  headers?: (request: {
+    method: string;
+  }) => Promise<Record<string, string>> | Record<string, string>;
   credentials?: RequestCredentials;
+  // Asked after a 401; true means the session was renewed and the request is sent once more.
+  refresh?: () => Promise<boolean>;
   onUnauthorized?: () => void;
 }
 
@@ -152,27 +176,32 @@ export function createRequest({
 
   const request = async (
     path: string,
-    schema: z.ZodType | null,
-    { body, headers, signal, ...init }: RequestOptions = {},
+    schema: z.ZodType | 'text' | null,
+    { body, headers, signal, anonymous = false, ...init }: RequestOptions = {},
   ): Promise<unknown> => {
     const call = abortable(timeoutMs, signal);
-    try {
-      const response = await fetch(`${root}${path}`, {
+    const send = async () =>
+      fetch(`${root}${path}`, {
         ...init,
         signal: call.signal,
         credentials: auth.credentials,
         headers: {
           Accept: 'application/json',
           ...(body !== undefined && { 'Content-Type': 'application/json' }),
-          ...(await auth.headers?.()),
+          ...(await auth.headers?.({ method: init.method ?? 'GET' })),
           ...headers,
         },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
+    try {
+      let response = await send();
+      const session = !anonymous;
+      if (response.status === 401 && session && (await auth.refresh?.())) response = await send();
 
       if (!response.ok) {
-        const parsed = ProblemSchema.safeParse(await response.json().catch(() => null));
-        if (response.status === 401) auth.onUnauthorized?.();
+        const raw: unknown = await response.json().catch(() => null);
+        const parsed = ProblemSchema.safeParse(raw);
+        if (response.status === 401 && session) auth.onUnauthorized?.();
         throw new ApiError(
           parsed.success
             ? parsed.data
@@ -182,8 +211,11 @@ export function createRequest({
                 status: response.status,
                 code: CODE_BY_STATUS[response.status] ?? ErrorCode.Internal,
               },
+          raw,
+          (response.headers as Headers | undefined)?.get(REQUEST_ID_HEADER) ?? null,
         );
       }
+      if (schema === 'text') return await response.text();
       if (schema === null || response.status === 204) return undefined;
       return schema.parse(await response.json());
     } catch (error) {
@@ -240,7 +272,7 @@ export interface NotificationsApi {
 }
 
 export interface ApiClient
-  extends MarketApi, WatchlistApi, TradingApi, AlertsApi, NotificationsApi {
+  extends MarketApi, WatchlistApi, TradingApi, AlertsApi, NotificationsApi, AuthApi {
   request: Request;
 }
 
@@ -360,9 +392,9 @@ export function createApiClient({
     baseUrl,
     auth: {
       ...auth,
-      headers: async () => ({
+      headers: async (request) => ({
         [DEVICE_ID_HEADER]: await getDeviceId(),
-        ...(await auth.headers?.()),
+        ...(await auth.headers?.(request)),
       }),
     },
   });
@@ -373,5 +405,6 @@ export function createApiClient({
     ...createTradingApi(request),
     ...createAlertsApi(request),
     ...createNotificationsApi(request),
+    ...createAuthApi(request),
   };
 }

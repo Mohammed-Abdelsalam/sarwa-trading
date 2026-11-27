@@ -9,7 +9,9 @@ export {
   createApiClient,
   createRequest,
   isApiError,
+  problemDetails,
   queryString,
+  REQUEST_ID_HEADER,
   REQUEST_TIMEOUT_MS,
   shouldRetry,
   TimeoutError,
@@ -23,6 +25,26 @@ export {
   type TradingApi,
   type WatchlistApi,
 } from './api';
+export { createAuthApi, type AuthApi } from './auth/api';
+export {
+  AuthIntentSchema,
+  createGateStore,
+  createIntentStorage,
+  createSessionAuth,
+  createSessionStore,
+  endSession,
+  startSession,
+  type AuthIntent,
+  type ClientAuth,
+  type GateState,
+  type GateStore,
+  type IntentStorage,
+  type SessionState,
+  type SessionStatus,
+  type SessionStore,
+  type SignedOutReason,
+} from './auth/session';
+export { bearerAuth, webCookieAuth, type AuthTransport, type TokenStorage } from './auth/transport';
 export { createSarwaClient, type SarwaClientOptions } from './client';
 export {
   axisCandles,
@@ -118,6 +140,7 @@ export {
   type Ticks,
   type TimeInForce,
 } from '@sarwa/domain';
+export * from './account-rules';
 export {
   createFormatter,
   DIGITS,

@@ -4,14 +4,14 @@ import { type AlertsResponse } from '@sarwa/contracts';
 
 import { ApiError } from '../../src/api';
 import {
-  queryKeys,
+  useAlertForm,
   useAlerts,
   useCreateAlert,
   useDeleteAlert,
   useUpdateAlert,
 } from '../../src/hooks';
 import { makeAlert } from '../trading-fixtures';
-import { createTestClient, createWrapper, makeQuote } from '../utils';
+import { createTestClient, createWrapper, deviceKeys, makeQuote } from '../utils';
 
 const LIST: AlertsResponse = { items: [makeAlert()], activeCount: 1, limit: 50 };
 
@@ -19,7 +19,7 @@ function setup(api: Parameters<typeof createTestClient>[0] = {}) {
   const client = createTestClient({ listAlerts: () => Promise.resolve(LIST), ...api });
   client.store.getState().applyQuotes([makeQuote({ price: 231.48 })]);
   const { Wrapper, queryClient } = createWrapper(client);
-  queryClient.setQueryData(queryKeys.alerts, LIST);
+  queryClient.setQueryData(deviceKeys.alerts, LIST);
   return { client, queryClient, Wrapper };
 }
 
@@ -68,7 +68,7 @@ describe('useCreateAlert', () => {
     await waitFor(() => {
       expect(result.current.create.status).toBe('success');
     });
-    expect(queryClient.getQueryData<AlertsResponse>(queryKeys.alerts)?.items[0]).toEqual(created);
+    expect(queryClient.getQueryData<AlertsResponse>(deviceKeys.alerts)?.items[0]).toEqual(created);
     expect(result.current.create.issue).toBeNull();
     expect(client.analytics.track).toHaveBeenCalledWith({
       name: 'alert_created',
@@ -107,6 +107,19 @@ describe('useCreateAlert', () => {
   });
 });
 
+describe('useAlertForm', () => {
+  it('starts from what a saved alert intent restores', () => {
+    const { Wrapper } = setup();
+    const { result } = renderHook(
+      () => useAlertForm('AAPL', { condition: 'price_below', target: '200' }),
+      { wrapper: Wrapper },
+    );
+
+    expect(result.current).toMatchObject({ condition: 'price_below', target: '200' });
+    expect(result.current.request).toMatchObject({ condition: 'price_below' });
+  });
+});
+
 describe('useUpdateAlert and useDeleteAlert', () => {
   it('replace and remove alerts in the cached list', async () => {
     const { queryClient, Wrapper } = setup({
@@ -116,7 +129,7 @@ describe('useUpdateAlert and useDeleteAlert', () => {
     const { result } = renderHook(() => ({ update: useUpdateAlert(), remove: useDeleteAlert() }), {
       wrapper: Wrapper,
     });
-    const items = () => queryClient.getQueryData<AlertsResponse>(queryKeys.alerts)?.items;
+    const items = () => queryClient.getQueryData<AlertsResponse>(deviceKeys.alerts)?.items;
 
     act(() => {
       result.current.update.mutate({ id: 'al-1', patch: { enabled: false } });

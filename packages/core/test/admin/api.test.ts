@@ -1,11 +1,5 @@
 import { createAdminApi } from '../../src/admin/api';
-import {
-  makeAccount,
-  makeAdminStock,
-  makeAdminTrading,
-  makeAdminUser,
-  makeConfig,
-} from './fixtures';
+import { makeAdminStock, makeAdminTrading, makeAdminUser, makeConfig } from './fixtures';
 
 type Call = [string, RequestInit];
 
@@ -158,15 +152,6 @@ describe('createAdminApi', () => {
       { items: [] },
     ],
     [
-      'create user',
-      (api: ReturnType<typeof createAdminApi>) =>
-        api.createUser({ email: 'a@b.co', name: 'A', role: 'VIEWER', password: 'password1' }),
-      'POST',
-      '/admin/users',
-      200,
-      makeAdminUser(),
-    ],
-    [
       'update user',
       (api: ReturnType<typeof createAdminApi>) => api.updateUser('u1', { role: 'VIEWER' }),
       'PATCH',
@@ -249,14 +234,6 @@ describe('createAdminApi', () => {
         amountOrders: 0,
       },
     ],
-    [
-      'accounts',
-      (api: ReturnType<typeof createAdminApi>) => api.accounts({ q: 'ACC', sort: 'equity' }),
-      'GET',
-      '/admin/accounts?q=ACC&sort=equity',
-      200,
-      { items: [makeAccount()], total: 1, page: 1, pageSize: 25 },
-    ],
   ] as const)('calls %s', async (_name, call, method, path, status, body) => {
     use(respond(status, body));
 
@@ -265,24 +242,5 @@ describe('createAdminApi', () => {
     const [url, init] = lastCall();
     expect(url).toBe(`/api/v1${path}`);
     expect(init.method ?? 'GET').toBe(method);
-  });
-
-  it('resets an account with the typed confirmation', async () => {
-    use(
-      respond(200, {
-        id: 'acc-1',
-        handle: 'ACC-00AA11',
-        cashCents: 1,
-        startingCashCents: 1,
-        createdAt: 1,
-        resetAt: 2,
-      }),
-    );
-
-    await createAdminApi().resetAccount('acc-1', 'RESET ACC-00AA11');
-
-    const [url, init] = lastCall();
-    expect(url).toBe('/api/v1/admin/accounts/acc-1/reset');
-    expect(JSON.parse(init.body as string)).toEqual({ confirm: 'RESET ACC-00AA11' });
   });
 });

@@ -14,15 +14,18 @@ import { alertRequest } from '../alerts';
 import { ApiError, isApiError } from '../api';
 import { useSarwa } from '../provider';
 import { toTradeQuote } from '../trading';
-import { queryKeys } from './keys';
+import { useRequireAuth } from './gate';
 import { useLiveSymbols, useQuote } from './live';
+import { usePrivateScope } from './session';
 
 export function useAlerts(): UseQueryResult<AlertsResponse> {
   const { api } = useSarwa();
+  const { keys, enabled } = usePrivateScope();
   return useQuery({
-    queryKey: queryKeys.alerts,
+    queryKey: keys.alerts,
     queryFn: ({ signal }) => api.listAlerts({ signal }),
     staleTime: 30_000,
+    enabled,
   });
 }
 
@@ -36,18 +39,20 @@ function replaceAlert(current: AlertsResponse | undefined, alert: Alert) {
 export function useCreateAlert() {
   const { api, store, analytics } = useSarwa();
   const queryClient = useQueryClient();
+  const { keys } = usePrivateScope();
+  const { run } = useRequireAuth();
   const [issue, setIssue] = useState<AlertIssue | null>(null);
 
   const mutation = useMutation({
     mutationFn: (request: CreateAlertRequest) => api.createAlert(request),
     onSuccess: (alert) => {
-      queryClient.setQueryData<AlertsResponse>(queryKeys.alerts, (current) =>
+      queryClient.setQueryData<AlertsResponse>(keys.alerts, (current) =>
         current
           ? { ...current, items: [alert, ...current.items], activeCount: current.activeCount + 1 }
           : current,
       );
       analytics.track({ name: 'alert_created', condition: alert.condition, repeat: alert.repeat });
-      return queryClient.invalidateQueries({ queryKey: queryKeys.alerts });
+      return queryClient.invalidateQueries({ queryKey: keys.alerts });
     },
   });
 
@@ -71,7 +76,11 @@ export function useCreateAlert() {
           )
         : null;
       setIssue(found);
-      if (!found) mutation.mutate(request);
+      if (!found) {
+        run({ kind: 'alert', symbol: request.symbol }, () => {
+          mutation.mutate(request);
+        });
+      }
       return found;
     },
     reset: () => {
@@ -84,11 +93,12 @@ export function useCreateAlert() {
 export function useUpdateAlert() {
   const { api } = useSarwa();
   const queryClient = useQueryClient();
+  const { keys } = usePrivateScope();
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateAlertRequest }) =>
       api.updateAlert(id, patch),
     onSuccess: (alert) => {
-      queryClient.setQueryData<AlertsResponse>(queryKeys.alerts, (current) =>
+      queryClient.setQueryData<AlertsResponse>(keys.alerts, (current) =>
         replaceAlert(current, alert),
       );
     },
@@ -98,25 +108,33 @@ export function useUpdateAlert() {
 export function useDeleteAlert() {
   const { api } = useSarwa();
   const queryClient = useQueryClient();
+  const { keys } = usePrivateScope();
   return useMutation({
     mutationFn: (id: string) => api.deleteAlert(id),
     onSuccess: (_result, id) => {
-      queryClient.setQueryData<AlertsResponse>(queryKeys.alerts, (current) =>
+      queryClient.setQueryData<AlertsResponse>(keys.alerts, (current) =>
         current ? { ...current, items: current.items.filter((item) => item.id !== id) } : current,
       );
-      return queryClient.invalidateQueries({ queryKey: queryKeys.alerts });
+      return queryClient.invalidateQueries({ queryKey: keys.alerts });
     },
   });
 }
 
 // The create-alert form both apps show: typed text in, a request (or null) and the live quote out.
-export function useAlertForm(symbol: string) {
+// `initial` restores what a guest's alert intent saved.
+export function useAlertForm(
+  symbol: string,
+  initial: { condition?: Alert['condition']; target?: string } = {},
+) {
   const create = useCreateAlert();
+  const { run } = useRequireAuth();
   const limit = useAlerts().data?.limit ?? null;
   useLiveSymbols(symbol ? [symbol] : []);
   const quote = useQuote(symbol);
-  const [condition, setCondition] = useState<Alert['condition']>('price_above');
-  const [target, setTarget] = useState('');
+  const [condition, setCondition] = useState<Alert['condition']>(
+    initial.condition ?? 'price_above',
+  );
+  const [target, setTarget] = useState(initial.target ?? '');
   const [repeat, setRepeat] = useState<Alert['repeat']>('once');
   const request = alertRequest({ symbol, condition, target, repeat });
 
@@ -140,10 +158,13 @@ export function useAlertForm(symbol: string) {
     },
     setRepeat,
     reset: create.reset,
-    // False when the target isn't a usable number, so nothing was sent.
+    // False when the target isn't a usable number, so nothing was sent. A guest keeps the form
+    // for after sign-in.
     submit: (): boolean => {
       if (!request) return false;
-      create.create(request);
+      run({ kind: 'alert', symbol, condition, target }, () => {
+        create.create(request);
+      });
       return true;
     },
   };

@@ -1,12 +1,28 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 
-import { ErrorCode, type ErrorCodeValue, type Quote, type StockWithQuote } from '@sarwa/contracts';
+import {
+  type CustomerUser,
+  ErrorCode,
+  type ErrorCodeValue,
+  type Quote,
+  type StockWithQuote,
+} from '@sarwa/contracts';
 import { createFormatter, type Digits, getMessages, type Locale } from '@sarwa/i18n';
 
 import { ApiError, type ApiClient } from '../src/api';
+import {
+  type ClientAuth,
+  createGateStore,
+  createIntentStorage,
+  createSessionStore,
+  type SessionStatus,
+} from '../src/auth/session';
+import { type AuthTransport, type TokenStorage } from '../src/auth/transport';
 import { type KeyValueStorage } from '../src/device';
 import { type Localized } from '../src/format';
+import { meKeys } from '../src/hooks/keys';
+import { DEVICE_SCOPE } from '../src/hooks/session';
 import { type MarketSocket } from '../src/market-socket';
 import { type SarwaClient, SarwaProvider } from '../src/provider';
 import { createLiveStore } from '../src/store';
@@ -64,6 +80,9 @@ export function makeProblem(status: number): ApiError {
   return new ApiError({ type: 'about:blank', title: 'Error', status, code });
 }
 
+// Without customer auth wired, personal data is keyed under the device scope.
+export const deviceKeys = meKeys(DEVICE_SCOPE);
+
 let nextId = 0;
 
 export function createTestClient(api: Partial<ApiClient> = {}): SarwaClient {
@@ -83,6 +102,52 @@ export function createTestClient(api: Partial<ApiClient> = {}): SarwaClient {
     analytics: { track: jest.fn() },
     newId: jest.fn(() => `key-${String((nextId += 1))}`),
   };
+}
+
+export function makeUser(overrides: Partial<CustomerUser> = {}): CustomerUser {
+  return {
+    id: 'u1',
+    email: 'sara@example.com',
+    name: 'Sara',
+    emailVerified: false,
+    createdAt: 1,
+    passwordChangedAt: null,
+    account: { id: 'acc-1', handle: 'ACC-7F2A9C' },
+    ...overrides,
+  };
+}
+
+export function createFakeTransport() {
+  return {
+    platform: 'ios',
+    headers: jest.fn(() => Promise.resolve({})),
+    hasCredentials: jest.fn(() => Promise.resolve(true)),
+    refreshBody: jest.fn(() => Promise.resolve(null)),
+    save: jest.fn(() => Promise.resolve()),
+    clear: jest.fn(() => Promise.resolve()),
+    socketToken: jest.fn(() => Promise.resolve(undefined)),
+    savedUser: jest.fn<Promise<CustomerUser | null>, []>(() => Promise.resolve(null)),
+  } satisfies AuthTransport;
+}
+
+// A client with customer auth wired, already in the given state.
+export function createAuthClient(
+  api: Partial<ApiClient> = {},
+  { status = 'guest', user = makeUser() }: { status?: SessionStatus; user?: CustomerUser } = {},
+) {
+  const storage = createMemoryStorage();
+  const auth = {
+    transport: createFakeTransport(),
+    session: createSessionStore({
+      status,
+      user: status === 'authenticated' ? user : null,
+      suspension: null,
+      revokedReason: null,
+    }),
+    gate: createGateStore(),
+    intents: createIntentStorage(storage),
+  } satisfies ClientAuth;
+  return { ...createTestClient(api), storage, auth };
 }
 
 export function createMemoryStorage(initial: Record<string, string> = {}): KeyValueStorage {
@@ -106,4 +171,22 @@ export function createWrapper(client: SarwaClient) {
     </QueryClientProvider>
   );
   return { Wrapper, queryClient };
+}
+
+export function memoryTokens(initial: Record<string, string> = {}): TokenStorage & {
+  values: Map<string, string>;
+} {
+  const values = new Map(Object.entries(initial));
+  return {
+    values,
+    getItem: (key) => Promise.resolve(values.get(key) ?? null),
+    setItem: (key, value) => {
+      values.set(key, value);
+      return Promise.resolve();
+    },
+    removeItem: (key) => {
+      values.delete(key);
+      return Promise.resolve();
+    },
+  };
 }

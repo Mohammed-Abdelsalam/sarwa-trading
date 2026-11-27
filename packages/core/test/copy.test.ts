@@ -98,6 +98,14 @@ describe('notificationText', () => {
       body: 'Hi',
     });
   });
+
+  it('greets a new customer by name, and still reads well without one', () => {
+    expect(notificationText({ kind: 'welcome' }, copy(), { name: 'Sara' })).toEqual({
+      title: 'Welcome to Mini Trading, Sara',
+      body: 'Your $100,000.00 practice account is ready. Place your first trade whenever you like.',
+    });
+    expect(notificationText({ kind: 'welcome' }, copy()).title).toBe('Welcome to Mini Trading');
+  });
 });
 
 describe('alertRuleText', () => {
