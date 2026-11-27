@@ -7,13 +7,16 @@ import {
   nextSort,
   nextWatchlistSort,
   rangePosition,
+  SECTOR_FILTERS,
   sectorFilterLabel,
   similarStocks,
   sortByColumn,
+  sortLabel,
   SORTS,
   sortStocks,
+  watchLabel,
 } from '../src/markets';
-import { makeQuote } from './utils';
+import { localized, makeQuote } from './utils';
 
 function stock(
   symbol: string,
@@ -95,31 +98,35 @@ describe('averageChangePct', () => {
 });
 
 describe('keyStats', () => {
+  const quote = makeQuote({ open: 229.1, volume: 52_300_000 });
+  const detail = (peRatio: number | null) => ({
+    stock: {
+      symbol: 'AAPL',
+      name: 'Apple',
+      sector: 'tech' as const,
+      exchange: 'NASDAQ' as const,
+      currency: 'USD' as const,
+    },
+    quote,
+    stats: { marketCap: 3_500_000_000_000, peRatio, week52High: 260, week52Low: 160, avgVolume: 1 },
+  });
+
   it('formats the stats grid, with a dash for a missing P/E', () => {
-    const quote = makeQuote({ open: 229.1, volume: 52_300_000 });
-    const stats = keyStats(
-      {
-        stock: {
-          symbol: 'AAPL',
-          name: 'Apple',
-          sector: 'tech',
-          exchange: 'NASDAQ',
-          currency: 'USD',
-        },
-        quote,
-        stats: {
-          marketCap: 3_500_000_000_000,
-          peRatio: null,
-          week52High: 260,
-          week52Low: 160,
-          avgVolume: 1,
-        },
-      },
-      quote,
-    );
+    const stats = keyStats(localized(), detail(null), quote);
+
     expect(stats).toContainEqual({ label: 'P/E (TTM)', value: '—' });
     expect(stats).toContainEqual({ label: 'Market cap', value: '$3.5T' });
     expect(stats).toContainEqual({ label: 'Volume', value: '52.3M' });
+    expect(stats).toContainEqual({ label: '52W high', value: '$260.00' });
+    expect(stats).toContainEqual({ label: 'Sector', value: 'Technology' });
+  });
+
+  it('labels and formats every stat in Arabic with Arabic-Indic digits', () => {
+    const stats = keyStats(localized('ar', 'arab'), detail(28.43), quote);
+
+    expect(stats).toContainEqual({ label: 'مكرر الربحية (TTM)', value: '٢٨٫٤' });
+    expect(stats).toContainEqual({ label: 'أعلى ٥٢ أسبوع', value: '⁦$٢٦٠٫٠٠⁩' });
+    expect(stats).toContainEqual({ label: 'القطاع', value: 'التكنولوجيا' });
   });
 });
 
@@ -150,8 +157,32 @@ describe('sortByColumn', () => {
 
 describe('sectorFilterLabel', () => {
   it('names each sector filter, including All', () => {
-    expect(sectorFilterLabel('all')).toBe('All');
-    expect(sectorFilterLabel('fin')).toBe('Finance');
+    const { t } = localized();
+    expect(SECTOR_FILTERS[0]).toBe('all');
+    expect(sectorFilterLabel(t, 'all')).toBe('All');
+    expect(sectorFilterLabel(t, 'fin')).toBe('Finance');
+  });
+
+  it('names them in Arabic', () => {
+    const { t } = localized('ar');
+    expect(sectorFilterLabel(t, 'all')).toBe('الكل');
+    expect(sectorFilterLabel(t, 'fin')).toBe('المال');
+  });
+});
+
+describe('watchLabel', () => {
+  it('says what the star does for that symbol', () => {
+    expect(watchLabel(localized().t, 'AAPL', false)).toBe('Add AAPL to watchlist');
+    expect(watchLabel(localized().t, 'AAPL', true)).toBe('Remove AAPL from watchlist');
+    expect(watchLabel(localized('ar').t, 'AAPL', true)).toBe('أزل AAPL من المفضلة');
+  });
+});
+
+describe('sortLabel', () => {
+  it('names the sort key, or the added order when there is no sort', () => {
+    expect(sortLabel(localized().t, SORTS[4])).toBe('% Change');
+    expect(sortLabel(localized().t, null)).toBe('Order added');
+    expect(sortLabel(localized('ar').t, SORTS[0])).toBe('الاسم');
   });
 });
 

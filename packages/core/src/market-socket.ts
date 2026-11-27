@@ -1,27 +1,48 @@
 import { io, type Socket } from 'socket.io-client';
+import { type z } from 'zod';
 
 import {
+  AlertTriggeredEventSchema,
   AppConfigSchema,
   type ClientToServerEvents,
   MARKET_NAMESPACE,
   MarketStatusSchema,
+  NotificationEventSchema,
+  OrderUpdatedEventSchema,
   type Quote,
   QuotesEventSchema,
   type ServerToClientEvents,
+  type SocketAuth,
   StocksChangedEventSchema,
+  SymbolHaltedEventSchema,
+  SymbolResumedEventSchema,
+  type TradingServerToClientEvents,
+  TradingStatusEventSchema,
 } from '@sarwa/contracts';
 
 import { type ConnectionState, type LiveStore } from './store';
 
-type MarketIo = Socket<ServerToClientEvents, ClientToServerEvents>;
+type MarketIo = Socket<ServerToClientEvents & TradingServerToClientEvents, ClientToServerEvents>;
+
+export type SocketAuthProvider = (callback: (auth: Partial<SocketAuth>) => void) => void;
+
+export type TradingEvent = {
+  [Name in keyof TradingServerToClientEvents]: {
+    name: Name;
+    payload: Parameters<TradingServerToClientEvents[Name]>[0];
+  };
+}[keyof TradingServerToClientEvents];
+
+export type TradingEventListener = (event: TradingEvent) => void;
 
 export interface MarketSocketOptions {
   url: string;
   store: LiveStore;
+  getDeviceId: () => Promise<string>;
   flushMs?: number;
   syncDelayMs?: number;
   reconnectJitterMs?: number;
-  createSocket?: (url: string) => MarketIo;
+  createSocket?: (url: string, auth: SocketAuthProvider) => MarketIo;
 }
 
 export interface MarketSocket {
@@ -29,26 +50,41 @@ export interface MarketSocket {
   disconnect(): void;
   acquire(symbols: string[]): () => void;
   subscribedSymbols(): string[];
+  onTradingEvent(listener: TradingEventListener): () => void;
 }
 
-const defaultCreateSocket = (url: string): MarketIo =>
+const defaultCreateSocket = (url: string, auth: SocketAuthProvider): MarketIo =>
   io(url, {
     transports: ['websocket'],
     autoConnect: false,
     reconnectionDelay: 500,
     reconnectionDelayMax: 15_000,
     randomizationFactor: 0.5,
+    auth,
   });
 
 export function createMarketSocket({
   url,
   store,
+  getDeviceId,
   flushMs = 100,
   syncDelayMs = 200,
   reconnectJitterMs = 1_000,
   createSocket = defaultCreateSocket,
 }: MarketSocketOptions): MarketSocket {
-  const socket = createSocket(`${url.replace(/\/$/, '')}${MARKET_NAMESPACE}`);
+  // Resolved on every (re)connect, so the handshake always carries the stored device id.
+  const auth: SocketAuthProvider = (callback) => {
+    getDeviceId().then(
+      (deviceId) => {
+        callback({ deviceId });
+      },
+      () => {
+        callback({});
+      },
+    );
+  };
+  const socket = createSocket(`${url.replace(/\/$/, '')}${MARKET_NAMESPACE}`, auth);
+  const tradingListeners = new Set<TradingEventListener>();
   const refCounts = new Map<string, number>();
   const subscribed = new Set<string>();
   const buffer = new Map<string, Quote>();
@@ -131,6 +167,42 @@ export function createMarketSocket({
     if (parsed.success) store.getState().setStocksChangedAt(parsed.data.at);
   });
 
+  // Each event is checked against its v1 schema; a shape this client doesn't know is dropped.
+  const relay =
+    <T>(schema: z.ZodType<T>, toEvent: (payload: T) => TradingEvent) =>
+    (payload: unknown) => {
+      const parsed = schema.safeParse(payload);
+      if (!parsed.success) return;
+      const event = toEvent(parsed.data);
+      tradingListeners.forEach((listener) => {
+        listener(event);
+      });
+    };
+  socket.on(
+    'order.updated',
+    relay(OrderUpdatedEventSchema, (payload) => ({ name: 'order.updated', payload })),
+  );
+  socket.on(
+    'alert.triggered',
+    relay(AlertTriggeredEventSchema, (payload) => ({ name: 'alert.triggered', payload })),
+  );
+  socket.on(
+    'notification',
+    relay(NotificationEventSchema, (payload) => ({ name: 'notification', payload })),
+  );
+  socket.on(
+    'symbol.halted',
+    relay(SymbolHaltedEventSchema, (payload) => ({ name: 'symbol.halted', payload })),
+  );
+  socket.on(
+    'symbol.resumed',
+    relay(SymbolResumedEventSchema, (payload) => ({ name: 'symbol.resumed', payload })),
+  );
+  socket.on(
+    'trading.status',
+    relay(TradingStatusEventSchema, (payload) => ({ name: 'trading.status', payload })),
+  );
+
   return {
     connect() {
       clearTimeout(reconnectTimer);
@@ -162,5 +234,11 @@ export function createMarketSocket({
       };
     },
     subscribedSymbols: () => [...subscribed],
+    onTradingEvent(listener) {
+      tradingListeners.add(listener);
+      return () => {
+        tradingListeners.delete(listener);
+      };
+    },
   };
 }

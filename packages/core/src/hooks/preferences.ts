@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 import { useSarwa } from '../provider';
 import { queryKeys } from './keys';
@@ -15,12 +16,17 @@ export function usePreference<T extends string>(key: string, allowed: readonly T
     retry: false,
   });
 
-  return {
-    value: allowed.find((option) => option === query.data) ?? fallback,
-    isLoaded: !query.isPending,
-    setValue: (value: T) => {
+  const setValue = useCallback(
+    (value: T) => {
       queryClient.setQueryData(queryKeys.preference(key), value);
       storage.setItem(key, value).catch(() => undefined);
     },
+    [queryClient, storage, key],
+  );
+
+  return {
+    value: allowed.find((option) => option === query.data) ?? fallback,
+    isLoaded: !query.isPending,
+    setValue,
   };
 }

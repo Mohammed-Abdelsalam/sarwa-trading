@@ -17,6 +17,7 @@ import { isNotFound } from '../api';
 import { axisCandles, chartBaseline, describeChart, periodChange, withLiveQuote } from '../chart';
 import { filterAndSort, keyStats, type MarketFilter, rangePosition } from '../markets';
 import { useSarwa } from '../provider';
+import { useI18n } from './i18n';
 import { queryKeys } from './keys';
 import { useLiveSymbols, useQuote } from './live';
 
@@ -59,6 +60,7 @@ export function useCandles(symbol: string, period: Period): UseQueryResult<Candl
 export type LoadState = 'loading' | 'error' | 'ready';
 
 export function useChartSeries(symbol: string, period: Period) {
+  const i18n = useI18n();
   const query = useCandles(symbol, period);
   const quote = useQuote(symbol);
   const candles = withLiveQuote(query.data ?? [], quote);
@@ -71,7 +73,7 @@ export function useChartSeries(symbol: string, period: Period) {
     showBaseline: period === '1D' && baseline !== null,
     rising: (candles.at(-1)?.c ?? 0) >= (baseline ?? 0),
     axisCandles: axisCandles(candles),
-    summary: describeChart(symbol, period, candles, baseline),
+    summary: describeChart(i18n, symbol, period, candles, baseline),
     periodChange: periodChange(candles, baseline),
     state,
     retry: () => void query.refetch(),
@@ -79,6 +81,7 @@ export function useChartSeries(symbol: string, period: Period) {
 }
 
 export function useStockDetail(symbol: string) {
+  const i18n = useI18n();
   const detail = useStock(symbol);
   const liveQuote = useQuote(symbol);
   useLiveSymbols([symbol]);
@@ -89,7 +92,7 @@ export function useStockDetail(symbol: string) {
   return {
     stock: detail.data?.stock,
     quote,
-    stats: detail.data && quote ? keyStats(detail.data, quote) : null,
+    stats: detail.data && quote ? keyStats(i18n, detail.data, quote) : null,
     week52:
       detail.data && quote
         ? {

@@ -1,18 +1,15 @@
 import { type Banner, type MarketStatus } from '@sarwa/contracts';
+import { type Messages } from '@sarwa/i18n';
 import { type BannerTone } from '@sarwa/tokens';
 
-import { formatClock, formatMarketTime } from './format';
+import { type Localized } from './format';
 import { type ConnectionState } from './store';
 
 export type LiveStatus = 'connecting' | 'live' | 'reconnecting' | 'offline' | 'paused';
 
-export const LIVE_STATUS_LABELS: Record<LiveStatus, string> = {
-  connecting: 'Connecting…',
-  live: 'Live',
-  reconnecting: 'Reconnecting…',
-  offline: 'Offline',
-  paused: 'Market paused',
-};
+export function liveStatusLabel(t: Messages, status: LiveStatus): string {
+  return t.market.states[status];
+}
 
 // Offline or paused means the prices on screen are no longer moving, so they render muted.
 export function isStale(status: LiveStatus): boolean {
@@ -47,17 +44,20 @@ export interface AppNotice {
 const MAX_NOTICES = 2;
 
 // Connection problems outrank the remote banner, and at most two notices show at once.
-export function appNotices({
-  connection,
-  market,
-  banner,
-  cachedAt,
-}: {
-  connection: ConnectionState;
-  market: MarketStatus | null;
-  banner: Banner | null | undefined;
-  cachedAt?: number | undefined;
-}): AppNotice[] {
+export function appNotices(
+  { t, f }: Localized,
+  {
+    connection,
+    market,
+    banner,
+    cachedAt,
+  }: {
+    connection: ConnectionState;
+    market: MarketStatus | null;
+    banner: Banner | null | undefined;
+    cachedAt?: number | undefined;
+  },
+): AppNotice[] {
   const notices: AppNotice[] = [];
   const status = liveStatus(connection, market);
 
@@ -65,10 +65,8 @@ export function appNotices({
     notices.push({
       kind: 'offline',
       tone: 'neutral',
-      title: "You're offline",
-      message: cachedAt
-        ? `— showing cached prices from ${formatClock(cachedAt)}.`
-        : '— showing cached prices.',
+      title: t.notices.offlineTitle,
+      message: cachedAt ? t.notices.offlineSince({ time: f.time(cachedAt) }) : t.notices.offline,
       dismissible: false,
     });
   } else if (status === 'reconnecting') {
@@ -76,17 +74,17 @@ export function appNotices({
     notices.push({
       kind: 'reconnecting',
       tone: 'warn',
-      title: 'Reconnecting…',
-      message: 'Prices may be a few seconds behind.',
-      ...(attempt > 0 && { meta: `try ${String(attempt)}` }),
+      title: t.market.states.reconnecting,
+      message: t.notices.reconnecting,
+      ...(attempt > 0 && { meta: t.notices.attempt(f.count(attempt)) }),
       dismissible: false,
     });
   } else if (status === 'paused' && market) {
     notices.push({
       kind: 'paused',
       tone: 'info',
-      title: 'Market paused',
-      message: `— prices are frozen at ${formatMarketTime(market.since)} and will resume automatically.`,
+      title: t.market.states.paused,
+      message: t.notices.paused({ time: f.time(market.since) }),
       dismissible: false,
     });
   }
