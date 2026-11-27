@@ -4,7 +4,6 @@ import { createFormatter, getMessages, type Locale, rejectionMessage } from '@sa
 import {
   alertRuleText,
   digitOptions,
-  haltDurationLabel,
   languageOptions,
   marketPill,
   notificationText,
@@ -142,11 +141,6 @@ describe('marketPill', () => {
 });
 
 describe('option labels', () => {
-  it('labels halt durations from the shared minutes copy', () => {
-    expect(haltDurationLabel('5m', copy())).toBe('5 min');
-    expect(haltDurationLabel('manual', copy())).toBe('Manual');
-  });
-
   it('shows each digit style in its own digits', () => {
     expect(digitOptions(copy()).map((option) => option.label)).toEqual([
       'Western · 123',

@@ -19,7 +19,10 @@ import {
   type EquityPeriod,
   type EquityResponse,
   EquityResponseSchema,
+  ErrorCode,
+  type ErrorCodeValue,
   IDEMPOTENCY_KEY_HEADER,
+  MARKET_ROUTES,
   type ModifyOrderRequest,
   type NotificationsQuery,
   type NotificationsResponse,
@@ -67,9 +70,19 @@ export class TimeoutError extends Error {
   }
 }
 
-export function isNotFound(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 404;
+export function isApiError(error: unknown, code: ErrorCodeValue): error is ApiError {
+  return error instanceof ApiError && error.problem.code === code;
 }
+
+// A body that isn't a problem (e.g. a proxy's HTML error page) still gets the code its status means.
+const CODE_BY_STATUS: Partial<Record<number, ErrorCodeValue>> = {
+  401: ErrorCode.Unauthorized,
+  403: ErrorCode.Forbidden,
+  404: ErrorCode.NotFound,
+  409: ErrorCode.Conflict,
+  429: ErrorCode.RateLimited,
+  503: ErrorCode.Unavailable,
+};
 
 const MAX_RETRIES = 2;
 const RETRYABLE_CLIENT_STATUSES = new Set([408, 429]);
@@ -119,15 +132,20 @@ export interface Request {
   (path: string, schema: null, options?: RequestOptions): Promise<void>;
 }
 
+// Who the caller is: the device id today, a signed-in session later. Adding one never touches a call.
+export interface RequestAuth {
+  headers?: () => Promise<Record<string, string>> | Record<string, string>;
+  credentials?: RequestCredentials;
+  onUnauthorized?: () => void;
+}
+
 export function createRequest({
   baseUrl,
-  headers: getHeaders,
-  credentials,
+  auth = {},
   timeoutMs = REQUEST_TIMEOUT_MS,
 }: {
   baseUrl: string;
-  headers?: () => Promise<Record<string, string>> | Record<string, string>;
-  credentials?: RequestCredentials;
+  auth?: RequestAuth;
   timeoutMs?: number;
 }): Request {
   const root = `${baseUrl.replace(/\/$/, '')}/${API_PREFIX}`;
@@ -142,11 +160,11 @@ export function createRequest({
       const response = await fetch(`${root}${path}`, {
         ...init,
         signal: call.signal,
-        credentials,
+        credentials: auth.credentials,
         headers: {
           Accept: 'application/json',
           ...(body !== undefined && { 'Content-Type': 'application/json' }),
-          ...(await getHeaders?.()),
+          ...(await auth.headers?.()),
           ...headers,
         },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -154,6 +172,7 @@ export function createRequest({
 
       if (!response.ok) {
         const parsed = ProblemSchema.safeParse(await response.json().catch(() => null));
+        if (response.status === 401) auth.onUnauthorized?.();
         throw new ApiError(
           parsed.success
             ? parsed.data
@@ -161,7 +180,7 @@ export function createRequest({
                 type: 'about:blank',
                 title: response.statusText,
                 status: response.status,
-                code: 'INTERNAL',
+                code: CODE_BY_STATUS[response.status] ?? ErrorCode.Internal,
               },
         );
       }
@@ -178,27 +197,39 @@ export function createRequest({
   return request as Request;
 }
 
-export interface ApiClient {
-  request: Request;
+export interface MarketApi {
   listStocks(options?: CallOptions): Promise<StocksResponse>;
   getStock(symbol: string, options?: CallOptions): Promise<StockDetailResponse>;
   getCandles(symbol: string, period: Period, options?: CallOptions): Promise<CandlesResponse>;
   getAppConfig(options?: CallOptions): Promise<AppConfig>;
+}
+
+export interface WatchlistApi {
   getWatchlist(options?: CallOptions): Promise<WatchlistResponse>;
   addToWatchlist(symbol: string): Promise<void>;
   removeFromWatchlist(symbol: string): Promise<void>;
+}
+
+export interface TradingApi {
   getAccount(options?: CallOptions): Promise<Account>;
   getPortfolio(options?: CallOptions): Promise<PortfolioResponse>;
   getEquity(period: EquityPeriod, options?: CallOptions): Promise<EquityResponse>;
+  getTradingStatus(options?: CallOptions): Promise<TradingStatus>;
   placeOrder(request: PlaceOrderRequest, idempotencyKey: string): Promise<Order>;
   listOrders(query?: Partial<OrdersQuery>, options?: CallOptions): Promise<OrdersResponse>;
   getOrder(id: string, options?: CallOptions): Promise<Order>;
   cancelOrder(id: string): Promise<CancelOrderResponse>;
   modifyOrder(id: string, patch: ModifyOrderRequest): Promise<Order>;
+}
+
+export interface AlertsApi {
   listAlerts(options?: CallOptions): Promise<AlertsResponse>;
   createAlert(request: CreateAlertRequest): Promise<Alert>;
   updateAlert(id: string, patch: UpdateAlertRequest): Promise<Alert>;
   deleteAlert(id: string): Promise<void>;
+}
+
+export interface NotificationsApi {
   listNotifications(
     query?: Partial<NotificationsQuery>,
     options?: CallOptions,
@@ -206,46 +237,59 @@ export interface ApiClient {
   markNotificationRead(id: string): Promise<void>;
   markAllNotificationsRead(): Promise<void>;
   registerPushToken(request: PushTokenRequest): Promise<void>;
-  getTradingStatus(options?: CallOptions): Promise<TradingStatus>;
 }
 
+export interface ApiClient
+  extends MarketApi, WatchlistApi, TradingApi, AlertsApi, NotificationsApi {
+  request: Request;
+}
+
+const M = MARKET_ROUTES;
 const R = TRADING_ROUTES;
 
-function queryString(query: Record<string, string | number | undefined>): string {
+// Empty values are left out, so an unset filter never reaches the server as "?q=".
+export function queryString(query: object): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined) params.set(key, String(value));
+    if (value !== undefined && value !== '') params.set(key, String(value));
   }
   const text = params.toString();
   return text ? `?${text}` : '';
 }
 
-export function createApiClient({
-  baseUrl,
-  getDeviceId,
-}: {
-  baseUrl: string;
-  getDeviceId: () => Promise<string>;
-}): ApiClient {
-  const request = createRequest({
-    baseUrl,
-    headers: async () => ({ [DEVICE_ID_HEADER]: await getDeviceId() }),
-  });
-
+export function createMarketApi(request: Request): MarketApi {
   return {
-    request,
-    listStocks: (options) => request('/stocks', StocksResponseSchema, options),
-    getStock: (symbol, options) => request(`/stocks/${symbol}`, StockDetailResponseSchema, options),
+    listStocks: (options) => request(routePath(M.stocks), StocksResponseSchema, options),
+    getStock: (symbol, options) =>
+      request(routePath(M.stock, { symbol }), StockDetailResponseSchema, options),
     getCandles: (symbol, period, options) =>
-      request(`/stocks/${symbol}/candles?period=${period}`, CandlesResponseSchema, options),
-    getAppConfig: (options) => request('/app-config', AppConfigSchema, options),
-    getWatchlist: (options) => request('/watchlist', WatchlistResponseSchema, options),
-    addToWatchlist: (symbol) => request(`/watchlist/${symbol}`, null, { method: 'PUT' }),
-    removeFromWatchlist: (symbol) => request(`/watchlist/${symbol}`, null, { method: 'DELETE' }),
+      request(
+        `${routePath(M.candles, { symbol })}${queryString({ period })}`,
+        CandlesResponseSchema,
+        options,
+      ),
+    getAppConfig: (options) => request(routePath(M.appConfig), AppConfigSchema, options),
+  };
+}
+
+export function createWatchlistApi(request: Request): WatchlistApi {
+  return {
+    getWatchlist: (options) => request(routePath(M.watchlist), WatchlistResponseSchema, options),
+    addToWatchlist: (symbol) =>
+      request(routePath(M.watchlistItem, { symbol }), null, { method: 'PUT' }),
+    removeFromWatchlist: (symbol) =>
+      request(routePath(M.watchlistItem, { symbol }), null, { method: 'DELETE' }),
+  };
+}
+
+export function createTradingApi(request: Request): TradingApi {
+  return {
     getAccount: (options) => request(routePath(R.account), AccountSchema, options),
     getPortfolio: (options) => request(routePath(R.portfolio), PortfolioResponseSchema, options),
     getEquity: (period, options) =>
-      request(`${routePath(R.equity)}?period=${period}`, EquityResponseSchema, options),
+      request(`${routePath(R.equity)}${queryString({ period })}`, EquityResponseSchema, options),
+    getTradingStatus: (options) =>
+      request(routePath(R.tradingStatus), TradingStatusSchema, options),
     placeOrder: async (body, idempotencyKey) =>
       (
         await request(routePath(R.orders), PlaceOrderResponseSchema, {
@@ -267,6 +311,11 @@ export function createApiClient({
           body,
         })
       ).order,
+  };
+}
+
+export function createAlertsApi(request: Request): AlertsApi {
+  return {
     listAlerts: (options) => request(routePath(R.alerts), AlertsResponseSchema, options),
     createAlert: async (body) =>
       (await request(routePath(R.alerts), AlertResponseSchema, { method: 'POST', body })).alert,
@@ -278,6 +327,11 @@ export function createApiClient({
         })
       ).alert,
     deleteAlert: (id) => request(routePath(R.alert, { id }), null, { method: 'DELETE' }),
+  };
+}
+
+export function createNotificationsApi(request: Request): NotificationsApi {
+  return {
     listNotifications: (query = {}, options) =>
       request(
         `${routePath(R.notifications)}${queryString(query)}`,
@@ -289,7 +343,35 @@ export function createApiClient({
     markAllNotificationsRead: () =>
       request(routePath(R.notificationsReadAll), null, { method: 'POST' }),
     registerPushToken: (body) => request(routePath(R.pushTokens), null, { method: 'POST', body }),
-    getTradingStatus: (options) =>
-      request(routePath(R.tradingStatus), TradingStatusSchema, options),
+  };
+}
+
+// The device id always identifies the caller; `auth` adds a session on top when there is one.
+export function createApiClient({
+  baseUrl,
+  getDeviceId,
+  auth = {},
+}: {
+  baseUrl: string;
+  getDeviceId: () => Promise<string>;
+  auth?: RequestAuth;
+}): ApiClient {
+  const request = createRequest({
+    baseUrl,
+    auth: {
+      ...auth,
+      headers: async () => ({
+        [DEVICE_ID_HEADER]: await getDeviceId(),
+        ...(await auth.headers?.()),
+      }),
+    },
+  });
+  return {
+    request,
+    ...createMarketApi(request),
+    ...createWatchlistApi(request),
+    ...createTradingApi(request),
+    ...createAlertsApi(request),
+    ...createNotificationsApi(request),
   };
 }

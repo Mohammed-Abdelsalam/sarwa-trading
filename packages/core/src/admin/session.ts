@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { type AdminUser, type LoginRequest } from '@sarwa/contracts';
 
 import { ApiError } from '../api';
+import { useCountdown } from '../hooks/time';
 import { adminKeys } from './keys';
 import { useAdmin } from './provider';
 
@@ -32,22 +33,6 @@ export function useAdminSession() {
 
 export function useCanEdit(): boolean {
   return useAdminSession().canEdit;
-}
-
-function useCountdown(until: number | null, onDone: () => void): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (until === null) return;
-    const timer = setInterval(() => {
-      const current = Date.now();
-      setNow(current);
-      if (current >= until) onDone();
-    }, 1_000);
-    return () => {
-      clearInterval(timer);
-    };
-  }, [until, onDone]);
-  return until === null ? 0 : Math.max(0, Math.ceil((until - now) / 1_000));
 }
 
 export function useLogin({ onSuccess }: { onSuccess?: (user: AdminUser) => void } = {}) {

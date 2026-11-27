@@ -1,4 +1,4 @@
-import { chartGeometry, type Direction } from '@sarwa/core';
+import { chartGeometry, type Direction } from '@sarwa/core/pure';
 
 import { cn } from '../lib/cn';
 

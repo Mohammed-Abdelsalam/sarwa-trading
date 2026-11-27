@@ -1,4 +1,4 @@
-import { type Messages, type OrderStatus } from '@sarwa/core';
+import { type Messages, type OrderStatus } from '@sarwa/core/pure';
 import { type BadgeTone } from '@sarwa/tokens';
 
 import { Badge } from '../primitives/feedback';

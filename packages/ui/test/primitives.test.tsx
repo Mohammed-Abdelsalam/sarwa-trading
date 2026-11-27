@@ -5,7 +5,7 @@ import { Button, IconButton } from '../src/primitives/button';
 import { Chip, SegmentedControl } from '../src/primitives/controls';
 import { Banner, StateView, Toast } from '../src/primitives/feedback';
 import { Field, Input, Select } from '../src/primitives/form';
-import { Breadcrumbs } from '../src/primitives/navigation';
+import { Breadcrumbs, Logo } from '../src/primitives/navigation';
 
 describe('Button', () => {
   it('calls onClick when pressed', async () => {
@@ -233,5 +233,13 @@ describe('Select', () => {
       'aria-invalid',
       'true',
     );
+  });
+});
+
+describe('Logo', () => {
+  it('wraps the name in its own element so a page can hide it without hiding the mark', () => {
+    render(<Logo />);
+
+    expect(screen.getByText('Mini Trading')).not.toHaveClass('type-logo');
   });
 });

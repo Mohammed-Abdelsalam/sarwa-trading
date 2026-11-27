@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useStore } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 
 import { type MarketStatus, type Quote } from '@sarwa/contracts';
 
@@ -13,6 +14,18 @@ import { queryKeys } from './keys';
 export function useQuote(symbol: string): Quote | undefined {
   const { store } = useSarwa();
   return useStore(store, (state) => state.quotes[symbol]);
+}
+
+// Live quotes for a set of symbols; a tick re-renders only when one of these symbols changes.
+export function useQuotes(symbols: readonly string[]): Partial<Record<string, Quote>> {
+  const { store } = useSarwa();
+  useLiveSymbols(symbols);
+  return useStore(
+    store,
+    useShallow((state) =>
+      Object.fromEntries(symbols.map((symbol) => [symbol, state.quotes[symbol]])),
+    ),
+  );
 }
 
 export function useLiveSymbols(symbols: readonly string[]): void {

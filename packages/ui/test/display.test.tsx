@@ -117,6 +117,35 @@ describe('SortHeader', () => {
   });
 });
 
+describe('Table', () => {
+  it('scrolls sideways inside a focusable region named after the table', () => {
+    render(
+      <Table label="Accounts">
+        <TBody>
+          <TRow>
+            <TCell>ACC-1</TCell>
+          </TRow>
+        </TBody>
+      </Table>,
+    );
+    const region = screen.getByRole('region', { name: 'Accounts' });
+    expect(region).toHaveClass('overflow-x-auto');
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('table', { name: 'Accounts' })).toBeInTheDocument();
+  });
+
+  it('adds no unnamed tab stop when the table has no label', async () => {
+    render(
+      <Table>
+        <TBody />
+      </Table>,
+    );
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+    await userEvent.tab();
+    expect(document.body).toHaveFocus();
+  });
+});
+
 describe('Input affixes', () => {
   it('renders a prefix and a suffix around the field', () => {
     render(<Input aria-label="Max slippage" prefix="$" suffix="%" defaultValue="0.5" />);

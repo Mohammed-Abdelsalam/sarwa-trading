@@ -30,3 +30,39 @@ export function usePreference<T extends string>(key: string, allowed: readonly T
     setValue,
   };
 }
+
+function parseList(raw: string | null | undefined): string[] {
+  try {
+    const value: unknown = JSON.parse(raw ?? '[]');
+    return Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+// A most-recent-first list kept in device storage, e.g. recent searches.
+export function useStoredList(key: string, max: number) {
+  const { storage } = useSarwa();
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: queryKeys.preference(key),
+    queryFn: () => storage.getItem(key),
+    staleTime: Infinity,
+    retry: false,
+  });
+  const list = parseList(query.data);
+  const save = (next: string[]) => {
+    const raw = JSON.stringify(next);
+    queryClient.setQueryData(queryKeys.preference(key), raw);
+    storage.setItem(key, raw).catch(() => undefined);
+  };
+  return {
+    list,
+    add: (item: string) => {
+      save([item, ...list.filter((entry) => entry !== item)].slice(0, max));
+    },
+    clear: () => {
+      save([]);
+    },
+  };
+}

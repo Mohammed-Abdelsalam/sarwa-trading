@@ -2,8 +2,11 @@ import { act, renderHook } from '@testing-library/react';
 
 import { type Order, type PlaceOrderRequest } from '@sarwa/contracts';
 import { type Side } from '@sarwa/domain';
+import { createFormatter, getMessages, rejectionMessage } from '@sarwa/i18n';
 
 import { queryKeys, useOrderTicket } from '../../src/hooks';
+import { type I18n } from '../../src/hooks/i18n';
+import { ticketEntryView, ticketResultView, ticketReviewView } from '../../src/ticket-copy';
 import { makeFilledOrder, makePortfolio, makeTradingStatus } from '../trading-fixtures';
 import { createTestClient, createWrapper, makeQuote, makeStock } from '../utils';
 
@@ -346,5 +349,60 @@ describe('useOrderTicket', () => {
 
     expect(ticket().form.side).toBe('buy');
     expect(ticket().form.amountText).toBe('');
+  });
+});
+
+describe('ticket copy', () => {
+  const copy = {
+    t: getMessages('en'),
+    f: createFormatter({ locale: 'en' }),
+    rejection: (rejection: Parameters<I18n['rejection']>[0], symbol: string) =>
+      rejectionMessage(rejection as Parameters<typeof rejectionMessage>[0], 'en', 'latn', {
+        symbol,
+      }),
+  };
+
+  it('describes the entry: the size hint, the currency prefix and the review button', () => {
+    const { ticket } = setup();
+    act(() => {
+      ticket().setAmountText('1000');
+    });
+
+    const entry = ticketEntryView(ticket(), { symbol: 'AAPL', status: makeTradingStatus() }, copy);
+
+    expect(entry.size).toMatchObject({ value: '1000', prefix: '$' });
+    expect(entry.size.hint).toMatch(/shares at ask \$231\.50/);
+    expect(entry.price).toBeNull();
+    expect(entry.reviewLabel).toBe('Review buy order');
+  });
+
+  it('describes the review: what is bought, the rows, the total and the place button', () => {
+    const { ticket } = setup();
+    act(() => {
+      ticket().setAmountText('1000');
+    });
+    act(() => {
+      ticket().review();
+    });
+
+    const review = ticketReviewView(ticket(), 'AAPL', copy);
+
+    expect(review?.headline).toBe('Buy $1,000.00 of AAPL');
+    expect(review?.rows.map((row) => row.key)).toEqual(['price', 'shares', 'reserved', 'fees']);
+    expect(review?.total).toMatchObject({ label: 'Est. total', value: '$1,000.00' });
+    expect(review?.placeLabel).toBe('Place buy order');
+  });
+
+  it('describes the result of a filled order with its fill rows', () => {
+    const order = makeFilledOrder();
+    const result = ticketResultView(
+      order,
+      { avgFillTicks: null, slippageBps: null, slippageCents: null },
+      { symbol: 'AAPL', opensAt: null },
+      copy,
+    );
+
+    expect(result).toMatchObject({ tone: 'pos', title: 'Order filled' });
+    expect(result.rows.map((row) => row.key)).toEqual(['at', 'id']);
   });
 });

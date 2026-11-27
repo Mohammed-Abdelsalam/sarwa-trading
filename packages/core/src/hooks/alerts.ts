@@ -5,14 +5,17 @@ import {
   type Alert,
   type AlertsResponse,
   type CreateAlertRequest,
+  ErrorCode,
   type UpdateAlertRequest,
 } from '@sarwa/contracts';
 import { type AlertIssue, bps, ticks, validateAlert } from '@sarwa/domain';
 
-import { ApiError } from '../api';
+import { alertRequest } from '../alerts';
+import { ApiError, isApiError } from '../api';
 import { useSarwa } from '../provider';
 import { toTradeQuote } from '../trading';
 import { queryKeys } from './keys';
+import { useLiveSymbols, useQuote } from './live';
 
 export function useAlerts(): UseQueryResult<AlertsResponse> {
   const { api } = useSarwa();
@@ -104,4 +107,44 @@ export function useDeleteAlert() {
       return queryClient.invalidateQueries({ queryKey: queryKeys.alerts });
     },
   });
+}
+
+// The create-alert form both apps show: typed text in, a request (or null) and the live quote out.
+export function useAlertForm(symbol: string) {
+  const create = useCreateAlert();
+  const limit = useAlerts().data?.limit ?? null;
+  useLiveSymbols(symbol ? [symbol] : []);
+  const quote = useQuote(symbol);
+  const [condition, setCondition] = useState<Alert['condition']>('price_above');
+  const [target, setTarget] = useState('');
+  const [repeat, setRepeat] = useState<Alert['repeat']>('once');
+  const request = alertRequest({ symbol, condition, target, repeat });
+
+  return {
+    condition,
+    target,
+    repeat,
+    request,
+    quote,
+    status: create.status,
+    issue: create.issue,
+    failed: create.error !== null,
+    limitReached: isApiError(create.error, ErrorCode.AlertLimit) ? limit : null,
+    setCondition: (next: Alert['condition']) => {
+      create.reset();
+      setCondition(next);
+    },
+    setTarget: (next: string) => {
+      create.reset();
+      setTarget(next);
+    },
+    setRepeat,
+    reset: create.reset,
+    // False when the target isn't a usable number, so nothing was sent.
+    submit: (): boolean => {
+      if (!request) return false;
+      create.create(request);
+      return true;
+    },
+  };
 }

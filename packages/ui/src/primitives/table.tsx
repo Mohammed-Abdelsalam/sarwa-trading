@@ -5,12 +5,23 @@ import { cn } from '../lib/cn';
 
 type Align = 'start' | 'end';
 
-export function Table({ className, ...props }: ComponentProps<'table'>) {
+// A named wrapper is a tab stop so keyboard users can scroll wide tables; an unnamed one is not.
+export function Table({
+  label,
+  className,
+  ...props
+}: ComponentProps<'table'> & { label?: string }) {
   return (
-    <table
-      className={cn('w-full border-separate border-spacing-0 text-sm leading-5', className)}
-      {...props}
-    />
+    <div
+      className="focus-visible:outline-focus relative min-w-0 overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2"
+      {...(label ? { role: 'region', 'aria-label': label, tabIndex: 0 } : {})}
+    >
+      <table
+        aria-label={label}
+        className={cn('w-full border-separate border-spacing-0 text-sm leading-5', className)}
+        {...props}
+      />
+    </div>
   );
 }
 

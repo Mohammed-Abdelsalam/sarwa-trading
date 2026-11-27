@@ -8,14 +8,22 @@ export {
   ApiError,
   createApiClient,
   createRequest,
-  isNotFound,
+  isApiError,
+  queryString,
   REQUEST_TIMEOUT_MS,
   shouldRetry,
   TimeoutError,
+  type AlertsApi,
   type ApiClient,
   type CallOptions,
+  type MarketApi,
+  type NotificationsApi,
   type Request,
+  type RequestAuth,
+  type TradingApi,
+  type WatchlistApi,
 } from './api';
+export { createSarwaClient, type SarwaClientOptions } from './client';
 export {
   axisCandles,
   axisTicks,
@@ -24,6 +32,7 @@ export {
   CHART_TYPES,
   chartBaseline,
   chartGeometry,
+  chartHead,
   describeChart,
   nearestPointIndex,
   ohlc,
@@ -33,9 +42,12 @@ export {
   periodChange,
   resolvePeriod,
   scrubPoint,
+  withLastPoint,
   withLiveQuote,
   type CandleShape,
+  type ChartFrame,
   type ChartGeometry,
+  type ChartHead,
   type ChartPoint,
   type ChartType,
   type ScrubPoint,
@@ -45,11 +57,15 @@ export { createDeviceIdGetter, type KeyValueStorage } from './device';
 export * from './format';
 export * from './hooks';
 export * from './markets';
+export * from './orders-copy';
+export * from './alerts';
+export * from './notifications';
 export * from './status';
 export {
   createMarketSocket,
   type MarketSocket,
   type MarketSocketOptions,
+  type SocketTransport,
   type SocketAuthProvider,
   type TradingEvent,
   type TradingEventListener,
@@ -57,6 +73,7 @@ export {
 export { SarwaProvider, useSarwa, useTrack, type SarwaClient } from './provider';
 export { createLiveStore, isNewer, type ConnectionState, type LiveStore } from './store';
 export * from './ticket';
+export * from './ticket-copy';
 export {
   livePortfolio,
   orderFill,

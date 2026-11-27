@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import { usePreference } from '../../src/hooks';
+import { usePreference, useStoredList } from '../../src/hooks';
 import { createMemoryStorage, createTestClient, createWrapper } from '../utils';
 
 const TYPES = ['area', 'candle'] as const;
@@ -46,5 +46,44 @@ describe('usePreference', () => {
       expect(result.current.value).toBe('candle');
     });
     await expect(storage.getItem('chart.type')).resolves.toBe('candle');
+  });
+});
+
+describe('useStoredList', () => {
+  function renderList(stored: Record<string, string> = {}) {
+    const storage = createMemoryStorage(stored);
+    const { Wrapper } = createWrapper({ ...createTestClient(), storage });
+    const view = renderHook(() => useStoredList('recent', 3), { wrapper: Wrapper });
+    return { ...view, storage };
+  }
+
+  it('reads only the strings of a saved list and survives a corrupt value', async () => {
+    const { result } = renderList({ recent: '["AAPL", 3, "NVDA"]' });
+    await waitFor(() => {
+      expect(result.current.list).toEqual(['AAPL', 'NVDA']);
+    });
+
+    expect(renderList({ recent: 'not json' }).result.current.list).toEqual([]);
+  });
+
+  it('puts the newest item first without duplicates, keeps at most max, and saves it', async () => {
+    const { result, storage } = renderList({ recent: '["A","B","C"]' });
+    await waitFor(() => {
+      expect(result.current.list).toHaveLength(3);
+    });
+
+    act(() => {
+      result.current.add('B');
+    });
+    await waitFor(() => {
+      expect(result.current.list).toEqual(['B', 'A', 'C']);
+    });
+    act(() => {
+      result.current.add('D');
+    });
+    await waitFor(() => {
+      expect(result.current.list).toEqual(['D', 'B', 'A']);
+    });
+    expect(await storage.getItem('recent')).toBe('["D","B","A"]');
   });
 });

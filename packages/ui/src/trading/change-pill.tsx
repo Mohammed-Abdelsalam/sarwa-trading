@@ -1,4 +1,4 @@
-import { type Direction, DIRECTION_ARROW, direction as toDirection } from '@sarwa/core';
+import { type Direction, DIRECTION_ARROW, direction as toDirection } from '@sarwa/core/pure';
 import { type ChangePillSize } from '@sarwa/tokens';
 
 import { cn } from '../lib/cn';

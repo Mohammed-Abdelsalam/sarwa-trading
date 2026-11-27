@@ -17,6 +17,7 @@ import {
   ratioBps,
   type Side,
   type TimeInForce,
+  type TradeQuote,
   validateOrder,
 } from '@sarwa/domain';
 
@@ -37,48 +38,69 @@ import { orderFill, spreadBps, toTradeQuote } from '../trading';
 import { useLiveStatus, useLiveSymbols, useMarketStatus, useQuote } from './live';
 import { usePlaceOrder } from './orders';
 import { usePortfolio } from './portfolio';
+import { useNow } from './time';
 import { useIsHalted, useTradingStatus } from './trading-status';
 
 const CLOCK_MS = 250;
-
-function useNow(intervalMs: number): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, intervalMs);
-    return () => {
-      clearInterval(timer);
-    };
-  }, [intervalMs]);
-  return now;
-}
 
 interface Frozen {
   quote: Quote;
   at: number;
 }
 
-// The order ticket as a view model: both apps render it, neither re-implements a rule.
-export function useOrderTicket({ symbol, initialSide }: { symbol: string; initialSide: Side }) {
-  const { store } = useSarwa();
-  useLiveSymbols([symbol]);
-  const quote = useQuote(symbol);
-  const status = useTradingStatus().data;
-  const marketStatus = useMarketStatus();
-  const live = useLiveStatus();
-  const halted = useIsHalted(symbol);
-  const portfolio = usePortfolio();
-  const place = usePlaceOrder();
-  const now = useNow(CLOCK_MS);
-
+// What the trader typed, edited field by field; a size edit always undoes "sell all".
+export function useTicketForm(initialSide: Side) {
   const [form, setForm] = useState<TicketForm>(() => initialTicketForm(initialSide));
-  const [rawStep, setStep] = useState<'entry' | 'review'>('entry');
-  const [frozen, setFrozen] = useState<Frozen | null>(null);
-  const step: TicketStep = rawStep === 'review' && place.status === 'done' ? 'result' : rawStep;
-  const counting = step === 'review' && place.status !== 'sending';
+  const edit = (patch: Partial<TicketForm>) => {
+    setForm((current) => ({ ...current, ...patch }));
+  };
+  const editSize = (patch: Partial<TicketForm>) => {
+    edit({ ...patch, sellAll: false });
+  };
+  return {
+    form,
+    setSide: (side: Side) => {
+      editSize({ side });
+    },
+    setType: (type: OrderType) => {
+      edit({ type });
+    },
+    setTif: (tif: TimeInForce) => {
+      edit({ tif });
+    },
+    setSizeMode: (sizeMode: SizeMode) => {
+      editSize({ sizeMode });
+    },
+    setAmountText: (amountText: string) => {
+      editSize({ amountText });
+    },
+    setQtyText: (qtyText: string) => {
+      editSize({ qtyText });
+    },
+    setLimitText: (limitText: string) => {
+      edit({ limitText });
+    },
+    setStopText: (stopText: string) => {
+      edit({ stopText });
+    },
+    chooseQuickAmount: (amount: QuickAmount) => {
+      edit({
+        sizeMode: 'amount',
+        amountText: centsToText(amount.cents),
+        sellAll: amount.key === 'max' && form.side === 'sell',
+      });
+    },
+    reset: () => {
+      setForm(initialTicketForm(initialSide));
+    },
+  };
+}
 
-  // When the reviewed price expires it is replaced by the latest one and the countdown restarts.
+// The quote a review shows; while `counting`, it is replaced by the latest one each time it expires.
+export function useFrozenQuote(symbol: string, counting: boolean) {
+  const { store } = useSarwa();
+  const [frozen, setFrozen] = useState<Frozen | null>(null);
+
   useEffect(() => {
     if (!counting || !frozen) return;
     const timer = setTimeout(
@@ -92,13 +114,37 @@ export function useOrderTicket({ symbol, initialSide }: { symbol: string; initia
     };
   }, [counting, frozen, store, symbol]);
 
+  return {
+    frozen,
+    freeze: (quote: Quote) => {
+      setFrozen({ quote, at: Date.now() });
+    },
+    clear: () => {
+      setFrozen(null);
+    },
+  };
+}
+
+// The draft checked against every rule with the live quote (what the server will see), and estimated
+// with `shownQuote` (the frozen one during review).
+export function useTicketValidation(
+  symbol: string,
+  form: TicketForm,
+  shownQuote: TradeQuote | null,
+) {
+  useLiveSymbols([symbol]);
+  const quote = useQuote(symbol);
+  const status = useTradingStatus().data;
+  const marketStatus = useMarketStatus();
+  const live = useLiveStatus();
+  const halted = useIsHalted(symbol);
+  const portfolio = usePortfolio();
+  const now = useNow(CLOCK_MS);
+
   const liveQuote = quote ? toTradeQuote(quote) : null;
-  const shownQuote = step !== 'entry' && frozen ? toTradeQuote(frozen.quote) : liveQuote;
   const sellable = portfolio.sellableMicros(symbol);
   const buyingPower = portfolio.buyingPowerCents ?? cents(0);
   const draft = buildDraft(form, sellable, liveQuote?.bidTicks ?? null);
-
-  // Rules are checked against the live quote (what the server will see); the review shows the frozen one.
   const ctx: OrderContext | null =
     liveQuote && status
       ? {
@@ -114,14 +160,45 @@ export function useOrderTicket({ symbol, initialSide }: { symbol: string; initia
         }
       : null;
   const issues = draft && ctx ? validateOrder(draft, ctx) : [];
-  const estimate =
-    draft && ctx && shownQuote ? estimateOrder(draft, { ...ctx, quote: shownQuote }) : null;
+  const priced = shownQuote ?? liveQuote;
+  const estimate = draft && ctx && priced ? estimateOrder(draft, { ...ctx, quote: priced }) : null;
   const connectionLive = live === 'live' || live === 'paused';
   const blockReason: TicketBlock | null = !connectionLive
     ? { code: 'CONNECTION_NOT_LIVE' }
     : !status || portfolio.isLoading
       ? { code: 'STATUS_LOADING' }
       : (issues[0] ?? null);
+
+  return {
+    quote,
+    liveQuote,
+    portfolio,
+    now,
+    sellable,
+    buyingPower,
+    draft,
+    ctx,
+    issues,
+    estimate,
+    blockReason,
+  };
+}
+
+// The order ticket as a view model: both apps render it, neither re-implements a rule.
+export function useOrderTicket({ symbol, initialSide }: { symbol: string; initialSide: Side }) {
+  const place = usePlaceOrder();
+  const ticketForm = useTicketForm(initialSide);
+  const { form } = ticketForm;
+  const [rawStep, setStep] = useState<'entry' | 'review'>('entry');
+  const step: TicketStep = rawStep === 'review' && place.status === 'done' ? 'result' : rawStep;
+  const counting = step === 'review' && place.status !== 'sending';
+  const { frozen, freeze, clear } = useFrozenQuote(symbol, counting);
+  const reviewed = step !== 'entry' && frozen ? toTradeQuote(frozen.quote) : null;
+  const rules = useTicketValidation(symbol, form, reviewed);
+  const { quote, liveQuote, portfolio, now, sellable, buyingPower, draft, ctx, estimate } = rules;
+  const { issues, blockReason } = rules;
+  const shownQuote = reviewed ?? liveQuote;
+
   const equity = portfolio.summary?.equityCents ?? cents(0);
   const fill = place.order ? orderFill(place.order) : null;
   // The price hint follows the typed price even before a size is entered.
@@ -136,13 +213,6 @@ export function useOrderTicket({ symbol, initialSide }: { symbol: string; initia
           ? buyingPower - estimate.holdCents
           : buyingPower + estimate.notionalCents,
       );
-
-  const edit = (patch: Partial<TicketForm>) => {
-    setForm((current) => ({ ...current, ...patch }));
-  };
-  const editSize = (patch: Partial<TicketForm>) => {
-    edit({ ...patch, sellAll: false });
-  };
 
   return {
     form,
@@ -178,62 +248,40 @@ export function useOrderTicket({ symbol, initialSide }: { symbol: string; initia
     submitError: place.error,
     result: place.order && fill ? { order: place.order, ...fill } : null,
 
-    setSide: (side: Side) => {
-      editSize({ side });
-    },
-    setType: (type: OrderType) => {
-      edit({ type });
-    },
-    setTif: (tif: TimeInForce) => {
-      edit({ tif });
-    },
-    setSizeMode: (sizeMode: SizeMode) => {
-      editSize({ sizeMode });
-    },
-    setAmountText: (amountText: string) => {
-      editSize({ amountText });
-    },
-    setQtyText: (qtyText: string) => {
-      editSize({ qtyText });
-    },
-    setLimitText: (limitText: string) => {
-      edit({ limitText });
-    },
-    setStopText: (stopText: string) => {
-      edit({ stopText });
-    },
-    chooseQuickAmount: (amount: QuickAmount) => {
-      edit({
-        sizeMode: 'amount',
-        amountText: centsToText(amount.cents),
-        sellAll: amount.key === 'max' && form.side === 'sell',
-      });
-    },
+    setSide: ticketForm.setSide,
+    setType: ticketForm.setType,
+    setTif: ticketForm.setTif,
+    setSizeMode: ticketForm.setSizeMode,
+    setAmountText: ticketForm.setAmountText,
+    setQtyText: ticketForm.setQtyText,
+    setLimitText: ticketForm.setLimitText,
+    setStopText: ticketForm.setStopText,
+    chooseQuickAmount: ticketForm.chooseQuickAmount,
     review: () => {
       if (step !== 'entry' || !draft || !estimate || blockReason || !quote) return;
-      setFrozen({ quote, at: Date.now() });
+      freeze(quote);
       setStep('review');
     },
     submit: () => {
       if (step !== 'review' || !draft || !frozen || blockReason) return;
-      const reviewed = toTradeQuote(frozen.quote);
+      const quoted = toTradeQuote(frozen.quote);
       place.submit({
         symbol,
         ...draft,
-        quotedTicks: draft.side === 'buy' ? reviewed.askTicks : reviewed.bidTicks,
+        quotedTicks: draft.side === 'buy' ? quoted.askTicks : quoted.bidTicks,
       });
     },
     retry: place.retry,
     backToEntry: () => {
       place.reset();
-      setFrozen(null);
+      clear();
       setStep('entry');
     },
     reset: () => {
       place.reset();
-      setFrozen(null);
+      clear();
       setStep('entry');
-      setForm(initialTicketForm(initialSide));
+      ticketForm.reset();
     },
   };
 }

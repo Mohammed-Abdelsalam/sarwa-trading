@@ -1,6 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import { type Order, type OrdersResponse, type PlaceOrderRequest } from '@sarwa/contracts';
+import {
+  type ErrorCodeValue,
+  type Order,
+  type OrdersResponse,
+  type PlaceOrderRequest,
+} from '@sarwa/contracts';
 
 import { ApiError } from '../../src/api';
 import {
@@ -32,7 +37,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const rejected = (code: string, status = 422) =>
+const rejected = (code: ErrorCodeValue, status = 422) =>
   new ApiError({ type: 'about:blank', title: 'Rejected', status, code });
 
 describe('usePlaceOrder', () => {

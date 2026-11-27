@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { type Candle } from '@sarwa/contracts';
 
+import { chartGeometry } from '../../src/chart';
 import {
   useChartSeries,
   useMarketList,
@@ -14,6 +15,7 @@ import { SORTS } from '../../src/markets';
 import { createTestClient, createWrapper, makeProblem, makeQuote, makeStock } from '../utils';
 
 const candle = (t: number, c: number): Candle => ({ t, o: c, h: c, l: c, c, v: 1 });
+const FRAME = { width: 300, height: 100, padding: 4 };
 
 describe('useStocks', () => {
   it('seeds the live store with the REST snapshot', async () => {
@@ -142,7 +144,7 @@ describe('useChartSeries', () => {
     client.store.getState().applyQuotes([makeQuote({ price: 98, prevClose: 99 })]);
     const { Wrapper } = createWrapper(client);
 
-    const { result } = renderHook(() => useChartSeries('AAPL', '1D'), { wrapper: Wrapper });
+    const { result } = renderHook(() => useChartSeries('AAPL', '1D', FRAME), { wrapper: Wrapper });
     expect(result.current.state).toBe('loading');
 
     await waitFor(() => {
@@ -153,13 +155,14 @@ describe('useChartSeries', () => {
     expect(result.current.showBaseline).toBe(true);
     expect(result.current.rising).toBe(false);
     expect(result.current.axisCandles).toHaveLength(5);
+    expect(result.current.area).toEqual(chartGeometry([100, 101, 98], 300, 100, 4, 99));
   });
 
   it('reports an error and refetches on retry', async () => {
     const getCandles = jest.fn(() => Promise.reject(makeProblem(503)));
     const { Wrapper } = createWrapper(createTestClient({ getCandles }));
 
-    const { result } = renderHook(() => useChartSeries('AAPL', '1M'), { wrapper: Wrapper });
+    const { result } = renderHook(() => useChartSeries('AAPL', '1M', FRAME), { wrapper: Wrapper });
     await waitFor(() => {
       expect(result.current.state).toBe('error');
     });

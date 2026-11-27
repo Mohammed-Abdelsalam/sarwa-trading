@@ -1,5 +1,4 @@
 import { io, type Socket } from 'socket.io-client';
-import { z } from 'zod';
 
 import {
   ADMIN_NAMESPACE,
@@ -8,12 +7,10 @@ import {
   type AdminServerToClientEvents,
   AdminSocketEvent,
   type AdminTrading,
-  AdminTradingSchema,
+  AdminTradingEventSchema,
 } from '@sarwa/contracts';
 
 export type AdminIo = Socket<AdminServerToClientEvents>;
-
-const TradingEventSchema = z.object({ v: z.literal(1), trading: AdminTradingSchema });
 
 export interface AdminSocket {
   connect(): void;
@@ -74,7 +71,7 @@ export function createAdminSocket({
     if (parsed.success) orders.emit(parsed.data.order);
   });
   socket.on(AdminSocketEvent.TradingStatus, (payload: unknown) => {
-    const parsed = TradingEventSchema.safeParse(payload);
+    const parsed = AdminTradingEventSchema.safeParse(payload);
     if (parsed.success) trading.emit(parsed.data.trading);
   });
   socket.on('connect', () => {

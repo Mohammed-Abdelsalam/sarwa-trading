@@ -5,9 +5,11 @@ import {
   type StockDetailResponse,
   type StockWithQuote,
 } from '@sarwa/contracts';
+import { type Bps, changeBps } from '@sarwa/domain';
 import { type Messages } from '@sarwa/i18n';
 
 import { changePct, formatMarketCap, formatPrice, type Localized } from './format';
+import { toTradeQuote } from './trading';
 
 export type SectorFilter = Sector | 'all';
 
@@ -139,4 +141,38 @@ export function sortByColumn(current: SortOption | null, key: SortKey): SortOpti
   const options = SORTS.filter((s) => s.key === key);
   const flipped = current?.key === key ? options.find((s) => s.dir !== current.dir) : undefined;
   return flipped ?? options[0] ?? SORTS[0];
+}
+
+export type MoversTab = 'gainers' | 'losers' | 'active';
+
+const MOVERS = 5;
+
+export function topMovers(
+  stocks: readonly StockWithQuote[],
+  tab: MoversTab,
+  count = MOVERS,
+): StockWithQuote[] {
+  const sorted = [...stocks].sort((a, b) => {
+    if (tab === 'active') return b.quote.volume - a.quote.volume;
+    const diff = changePct(b.quote) - changePct(a.quote);
+    return tab === 'gainers' ? diff : -diff;
+  });
+  return sorted.slice(0, count);
+}
+
+// Biggest companies first, each tile sized by its share of the total market cap.
+export function heatmapTiles(stocks: readonly StockWithQuote[], formatPct: (move: Bps) => string) {
+  const totalCap = stocks.reduce((sum, stock) => sum + stock.marketCap, 0) || 1;
+  return [...stocks]
+    .sort((a, b) => b.marketCap - a.marketCap)
+    .map((stock) => {
+      const quote = toTradeQuote(stock.quote);
+      return {
+        key: stock.symbol,
+        label: stock.symbol,
+        change: changePct(stock.quote),
+        changeLabel: formatPct(changeBps(quote.prevCloseTicks, quote.lastTicks)),
+        weight: stock.marketCap / totalCap,
+      };
+    });
 }

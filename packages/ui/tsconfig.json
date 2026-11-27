@@ -1,5 +1,5 @@
 {
   "extends": "@sarwa/tsconfig/library.json",
   "compilerOptions": { "rootDir": ".", "types": ["jest", "@testing-library/jest-dom"] },
-  "include": ["src", "test"]
+  "include": ["src", "test", "next-config.d.cts"]
 }

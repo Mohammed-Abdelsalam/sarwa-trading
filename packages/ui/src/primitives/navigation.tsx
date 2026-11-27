@@ -10,18 +10,23 @@ export type LinkComponent = ComponentType<{
   children: ReactNode;
 }>;
 
-const PlainLink: LinkComponent = (props) => <a {...props} />;
+export const PlainLink: LinkComponent = (props) => <a {...props} />;
 
 export function Logo({ showName = true, className }: { showName?: boolean; className?: string }) {
   return (
-    <span className={cn('type-logo text-fg inline-flex items-center gap-2.5', className)}>
+    <span
+      className={cn(
+        'type-logo text-fg inline-flex items-center gap-2.5 whitespace-nowrap',
+        className,
+      )}
+    >
       <span
         aria-hidden
         className="bg-brand text-on-brand rounded-mark grid size-7.5 place-items-center"
       >
         <TrendingUp className="size-4" />
       </span>
-      {showName ? 'Mini Trading' : <span className="sr-only">Mini Trading</span>}
+      <span className={showName ? undefined : 'sr-only'}>Mini Trading</span>
     </span>
   );
 }

@@ -3,7 +3,7 @@ import { jestConfig } from '@sarwa/eslint-config/jest';
 import react from '@sarwa/eslint-config/react';
 
 const UI_ONLY =
-  'ui is presentational: take data through props; only pure helpers and types come from @sarwa/core.';
+  'ui is presentational: take data through props; helpers and types come from @sarwa/core/pure.';
 
 export default [
   ...base,
@@ -16,7 +16,8 @@ export default [
       'no-restricted-imports': restrictedImports({
         paths: [
           { name: '@tanstack/react-query', message: UI_ONLY },
-          { name: '@sarwa/core', importNames: ['useSarwa'], message: UI_ONLY },
+          { name: '@sarwa/core', message: UI_ONLY },
+          { name: '@sarwa/core/admin', message: UI_ONLY },
         ],
         patterns: [
           {
@@ -39,6 +40,11 @@ export default [
     name: 'sarwa/ui/design-system',
     files: ['src/**/*.{ts,tsx}'],
     rules: { 'no-restricted-syntax': designSystemSyntax },
+  },
+  {
+    name: 'sarwa/ui/next-config',
+    files: ['next-config.cjs'],
+    languageOptions: { sourceType: 'commonjs' },
   },
   { languageOptions: { parserOptions: { tsconfigRootDir: import.meta.dirname } } },
 ];
