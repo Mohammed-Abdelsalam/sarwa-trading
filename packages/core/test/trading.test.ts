@@ -41,5 +41,13 @@ describe('parseMoveBps', () => {
     expect(parseMoveBps('0')).toBeNull();
     expect(parseMoveBps('-')).toBeNull();
     expect(parseMoveBps('5.255')).toBeNull();
+    expect(parseMoveBps('-0')).toBeNull();
+  });
+
+  it('caps a move at 100% either way', () => {
+    expect(parseMoveBps('100')).toBe(10_000);
+    expect(parseMoveBps('-100')).toBe(-10_000);
+    expect(parseMoveBps('150')).toBeNull();
+    expect(parseMoveBps('-100.01')).toBeNull();
   });
 });

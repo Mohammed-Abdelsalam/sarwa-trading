@@ -13,12 +13,19 @@ function setup({
   side,
   placeOrder = jest.fn(),
   statusLoaded = true,
-}: { side?: Side; placeOrder?: jest.Mock; statusLoaded?: boolean } = {}) {
+  portfolioLoaded = true,
+}: {
+  side?: Side;
+  placeOrder?: jest.Mock;
+  statusLoaded?: boolean;
+  portfolioLoaded?: boolean;
+} = {}) {
   jest.useFakeTimers({ now: NOW });
   const quote = makeQuote({ ts: NOW });
   const client = createTestClient({
     placeOrder,
-    getPortfolio: () => Promise.resolve(makePortfolio()),
+    getPortfolio: () =>
+      portfolioLoaded ? Promise.resolve(makePortfolio()) : new Promise<never>(() => undefined),
     getTradingStatus: () =>
       statusLoaded ? Promise.resolve(makeTradingStatus()) : new Promise<never>(() => undefined),
     listStocks: () => Promise.resolve({ items: [makeStock('AAPL', { quote })] }),
@@ -26,7 +33,7 @@ function setup({
   client.store.getState().setConnection({ status: 'open' });
   client.store.getState().applyQuotes([quote]);
   const { Wrapper, queryClient } = createWrapper(client);
-  queryClient.setQueryData(queryKeys.portfolio, makePortfolio());
+  if (portfolioLoaded) queryClient.setQueryData(queryKeys.portfolio, makePortfolio());
   if (statusLoaded) queryClient.setQueryData(queryKeys.tradingStatus, makeTradingStatus());
   queryClient.setQueryData(queryKeys.stocks, [makeStock('AAPL', { quote })]);
   const view = renderHook(() => useOrderTicket({ symbol: 'AAPL', initialSide: side ?? 'buy' }), {
@@ -152,18 +159,40 @@ describe('useOrderTicket', () => {
     expect(ticket().canReview).toBe(true);
   });
 
-  it('turns a sell covering at least 99% of the position into sell-all', () => {
+  it('turns a sell into sell-all only when what would remain is under $1 at the bid', () => {
     const { ticket } = setup({ side: 'sell' });
 
     act(() => {
-      ticket().setAmountText('2300');
+      ticket().setAmountText('2314');
     });
     expect(ticket().draft?.size).toEqual({ kind: 'all' });
 
     act(() => {
-      ticket().setAmountText('2000');
+      ticket().setAmountText('2300');
     });
-    expect(ticket().draft?.size).toEqual({ kind: 'amount', cents: 200_000 });
+    expect(ticket().draft?.size).toEqual({ kind: 'amount', cents: 230_000 });
+
+    act(() => {
+      ticket().setSizeMode('shares');
+      ticket().setQtyText('9.999');
+    });
+    expect(ticket().draft?.size).toEqual({ kind: 'all' });
+
+    act(() => {
+      ticket().setQtyText('9.99');
+    });
+    expect(ticket().draft?.size).toEqual({ kind: 'shares', micros: 9_990_000 });
+  });
+
+  it('blocks with the loading reason, not a funds issue, while the portfolio loads', () => {
+    const { ticket } = setup({ portfolioLoaded: false });
+
+    act(() => {
+      ticket().setAmountText('1000');
+    });
+
+    expect(ticket().blockReason).toEqual({ code: 'STATUS_LOADING' });
+    expect(ticket().canReview).toBe(false);
   });
 
   it('freezes the reviewed quote and refreshes it to the latest one after 10 s', async () => {

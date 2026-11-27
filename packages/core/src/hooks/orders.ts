@@ -76,15 +76,24 @@ interface Attempt {
   key: string;
 }
 
+// The same order apart from the quoted price, which refreshes while the review waits.
+const sameOrder = (a: PlaceOrderRequest, b: PlaceOrderRequest) =>
+  JSON.stringify({ ...a, quotedTicks: 0 }) === JSON.stringify({ ...b, quotedTicks: 0 });
+
 // Never optimistic: the order exists only once the server answers. Every send of one attempt
-// (automatic retries and retry()) carries the same Idempotency-Key, so it can never fill twice.
+// (automatic retries, retry() and placing the unchanged order again after an error) carries the
+// same Idempotency-Key, so an order the server already took can never fill twice.
 export function usePlaceOrder() {
   const { api, analytics, newId } = useSarwa();
   const queryClient = useQueryClient();
   const attempt = useRef<Attempt | null>(null);
+  const inFlight = useRef(false);
 
   const mutation = useMutation({
     mutationFn: ({ request, key }: Attempt) => api.placeOrder(request, key),
+    onSettled: () => {
+      inFlight.current = false;
+    },
     retry: shouldRetry,
     // Business rejections come back as a stored rejected order (201); a 4xx is a request error.
     onSuccess: (order) => {
@@ -93,12 +102,22 @@ export function usePlaceOrder() {
     },
   });
 
+  const send = (next: Attempt) => {
+    inFlight.current = true;
+    mutation.mutate(next);
+  };
+
   return {
     status: SUBMIT_STATUS[mutation.status],
     order: mutation.data ?? null,
     error: mutation.error,
     submit: (request: PlaceOrderRequest) => {
-      if (mutation.isPending) return;
+      if (inFlight.current) return;
+      const previous = attempt.current;
+      if (previous && mutation.status === 'error' && sameOrder(previous.request, request)) {
+        send(previous);
+        return;
+      }
       attempt.current = { request, key: newId() };
       analytics.track({
         name: 'order_submitted',
@@ -106,10 +125,10 @@ export function usePlaceOrder() {
         type: request.type,
         sizeKind: request.size.kind,
       });
-      mutation.mutate(attempt.current);
+      send(attempt.current);
     },
     retry: () => {
-      if (attempt.current && !mutation.isPending) mutation.mutate(attempt.current);
+      if (attempt.current && !inFlight.current) send(attempt.current);
     },
     reset: () => {
       attempt.current = null;

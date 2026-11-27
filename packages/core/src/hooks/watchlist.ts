@@ -62,7 +62,9 @@ export function useToggleWatchlist() {
       return { previous };
     },
     onError: (_error, _variables, context) => {
-      queryClient.setQueryData(queryKeys.watchlist, context?.previous);
+      // Setting undefined is a no-op, so an optimistic star on an empty cache needs a refetch.
+      if (context?.previous) queryClient.setQueryData(queryKeys.watchlist, context.previous);
+      else void queryClient.invalidateQueries({ queryKey: queryKeys.watchlist });
     },
     // Only the last toggle in flight refetches, so an early refetch can't undo a later optimistic star.
     onSettled: () =>

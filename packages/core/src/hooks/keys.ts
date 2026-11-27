@@ -16,6 +16,7 @@ export const queryKeys = {
   // The prefix also matches every equity curve, which moves with the books.
   portfolio: ['portfolio'] as const,
   equity: (period: EquityPeriod) => ['portfolio', 'equity', period] as const,
+  allOrders: ['orders'] as const,
   orderLists: ['orders', 'list'] as const,
   orders: (query: OrderListQuery = {}) => ['orders', 'list', query] as const,
   // Paged lists for the Orders screens; the first-page lists above serve the previews.

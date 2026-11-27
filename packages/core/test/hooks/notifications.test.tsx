@@ -12,15 +12,32 @@ const INBOX: NotificationsResponse = {
   unreadCount: 2,
 };
 
+// A tiny server: reads stick, so the refetch after a read returns what the server now holds.
 function setup(api: Parameters<typeof createTestClient>[0]) {
-  const client = createTestClient({ listNotifications: () => Promise.resolve(INBOX), ...api });
+  const read = new Set<string>();
+  const client = createTestClient({
+    listNotifications: () => {
+      const items = INBOX.items.map((item) => (read.has(item.id) ? { ...item, readAt: 1 } : item));
+      const unreadCount = items.filter((item) => item.readAt === null).length;
+      return Promise.resolve({ ...INBOX, items, unreadCount });
+    },
+    markNotificationRead: (id) => {
+      read.add(id);
+      return Promise.resolve();
+    },
+    markAllNotificationsRead: () => {
+      INBOX.items.forEach((item) => read.add(item.id));
+      return Promise.resolve();
+    },
+    ...api,
+  });
   const { Wrapper } = createWrapper(client);
   return { client, Wrapper };
 }
 
 describe('notifications', () => {
   it('marks everything read at once and tracks how many were unread', async () => {
-    const { client, Wrapper } = setup({ markAllNotificationsRead: () => Promise.resolve() });
+    const { client, Wrapper } = setup({});
     const { result } = renderHook(
       () => ({ inbox: useNotifications(), readAll: useMarkAllRead() }),
       {
@@ -64,8 +81,31 @@ describe('notifications', () => {
     expect(result.current.inbox.unreadCount).toBe(2);
   });
 
+  it('refetches the inbox after a read settles, so the rollback cannot drop newer items', async () => {
+    const listNotifications = jest.fn(() => Promise.resolve(INBOX));
+    const { Wrapper } = setup({
+      listNotifications,
+      markNotificationRead: () => Promise.reject(makeProblem(500)),
+    });
+    const { result } = renderHook(
+      () => ({ inbox: useNotifications(), read: useMarkNotificationRead() }),
+      { wrapper: Wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.inbox.unreadCount).toBe(2);
+    });
+
+    act(() => {
+      result.current.read.mutate('a');
+    });
+
+    await waitFor(() => {
+      expect(listNotifications).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('marks one notification read and lowers the unread count once', async () => {
-    const { Wrapper } = setup({ markNotificationRead: () => Promise.resolve() });
+    const { Wrapper } = setup({});
     const { result } = renderHook(
       () => ({ inbox: useNotifications(), read: useMarkNotificationRead() }),
       { wrapper: Wrapper },
@@ -100,7 +140,7 @@ describe('notifications', () => {
     );
     const { Wrapper } = setup({
       listNotifications,
-      markAllNotificationsRead: () => Promise.resolve(),
+      markAllNotificationsRead: () => new Promise<void>(() => undefined),
     });
     const { result } = renderHook(
       () => ({ inbox: useNotifications(), readAll: useMarkAllRead() }),

@@ -4,6 +4,7 @@ import {
   centsToDollars,
   dollarsToCents,
   marketValueCents,
+  micros,
   type Micros,
   type OrderDraft,
   type OrderSize,
@@ -11,7 +12,6 @@ import {
   parseCents,
   parseMicros,
   parseTicks,
-  ratioBps,
   type Rejection,
   type Side,
   type Ticks,
@@ -22,7 +22,7 @@ import { type ClientBlock } from '@sarwa/i18n';
 export type SizeMode = 'amount' | 'shares';
 export type TicketStep = 'entry' | 'review' | 'result';
 export type TicketField = 'size' | 'limit' | 'stop';
-// STATUS_LOADING holds the ticket until the trading status arrives, so nothing looks tradable early.
+// STATUS_LOADING holds the ticket until the trading status and the books arrive, so nothing looks tradable (or unaffordable) early.
 export type TicketBlock = Rejection | ClientBlock;
 export type KeypadKey =
   '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '.' | 'backspace';
@@ -45,8 +45,8 @@ export interface QuickAmount {
   cents: Cents;
 }
 
-// A sell this close to the whole position closes it, so no dust of a share is left behind.
-const SELL_ALL_BPS = 9_900;
+// A sell that would leave less than $1 of the position (at the bid) closes it, so no dust is left.
+const SELL_ALL_DUST_CENTS = 100;
 const QUICK_AMOUNTS = [
   { key: '100', cents: dollarsToCents(100) },
   { key: '500', cents: dollarsToCents(500) },
@@ -88,9 +88,13 @@ function positive<Unit extends number>(value: Unit | null): Unit | null {
 
 function covers(size: OrderSize, sellable: Micros, bidTicks: Ticks | null): boolean {
   if (size.kind === 'all') return true;
-  if (size.kind === 'shares') return ratioBps(size.micros, sellable) >= SELL_ALL_BPS;
+  if (size.kind === 'shares' && size.micros >= sellable) return true;
   if (bidTicks === null) return false;
-  return ratioBps(size.cents, marketValueCents(sellable, bidTicks)) >= SELL_ALL_BPS;
+  const left =
+    size.kind === 'shares'
+      ? marketValueCents(micros(sellable - size.micros), bidTicks)
+      : marketValueCents(sellable, bidTicks) - size.cents;
+  return left < SELL_ALL_DUST_CENTS;
 }
 
 // The typed form as a domain draft, or null while a required field is still empty or invalid.

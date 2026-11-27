@@ -82,7 +82,8 @@ function markRead(inbox: Inbox, id: string | null, now: number): Inbox {
   }));
 }
 
-// Read state is low-stakes, so it is optimistic and rolls back if the request fails.
+// Read state is low-stakes, so it is optimistic and rolls back if the request fails; the refetch
+// afterwards restores items the socket added meanwhile and the server's unread count.
 function useReadMutation() {
   const { api } = useSarwa();
   const queryClient = useQueryClient();
@@ -98,6 +99,7 @@ function useReadMutation() {
     onError: (_error, _id, context) => {
       queryClient.setQueryData(queryKeys.notifications, context?.previous);
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
   });
 }
 

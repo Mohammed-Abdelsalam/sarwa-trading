@@ -38,6 +38,8 @@ export function applyTradingEvent(
             }
           : current,
       );
+      // A once-alert disarms when it fires; only the server knows the new active count.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.alerts });
       return;
     }
     case 'symbol.halted': {
@@ -66,9 +68,18 @@ export function applyTradingEvent(
   }
 }
 
+const RESYNC_KEYS = [
+  queryKeys.allOrders,
+  queryKeys.portfolio,
+  queryKeys.account,
+  queryKeys.notifications,
+  queryKeys.alerts,
+  queryKeys.tradingStatus,
+];
+
 // Mount once per app, next to useMarketConnection: private socket events keep the caches current.
 export function useTradingEvents(): void {
-  const { market, analytics } = useSarwa();
+  const { market, analytics, store } = useSarwa();
   const queryClient = useQueryClient();
 
   useEffect(
@@ -78,4 +89,18 @@ export function useTradingEvents(): void {
       }),
     [market, queryClient, analytics],
   );
+
+  // Events sent while the socket was down are lost, so every reopen after the first refetches.
+  useEffect(() => {
+    let wasOpen = store.getState().connection.status === 'open';
+    let openedBefore = wasOpen;
+    return store.subscribe(({ connection }) => {
+      const open = connection.status === 'open';
+      if (open && !wasOpen && openedBefore) {
+        for (const queryKey of RESYNC_KEYS) void queryClient.invalidateQueries({ queryKey });
+      }
+      if (open) openedBefore = true;
+      wasOpen = open;
+    });
+  }, [store, queryClient]);
 }

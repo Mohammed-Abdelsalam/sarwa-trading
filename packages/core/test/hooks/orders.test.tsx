@@ -125,6 +125,53 @@ describe('usePlaceOrder', () => {
     expect(placeOrder).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores a double tap within one render', async () => {
+    const placeOrder = jest.fn(() => deferred<Order>().promise);
+    const { Wrapper } = createWrapper(createTestClient({ placeOrder }));
+    const { result } = renderHook(() => usePlaceOrder(), { wrapper: Wrapper });
+
+    act(() => {
+      result.current.submit(REQUEST);
+      result.current.submit(REQUEST);
+    });
+
+    await waitFor(() => {
+      expect(result.current.status).toBe('sending');
+    });
+    expect(placeOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('places the same attempt again after an error, and a changed order with a new key', async () => {
+    const placeOrder = jest
+      .fn<Promise<Order>, [PlaceOrderRequest, string]>()
+      .mockRejectedValueOnce(rejected('CONFLICT', 409))
+      .mockRejectedValueOnce(rejected('CONFLICT', 409))
+      .mockResolvedValue(makeOrder());
+    const { Wrapper } = createWrapper(createTestClient({ placeOrder }));
+    const { result } = renderHook(() => usePlaceOrder(), { wrapper: Wrapper });
+    const submitAndFail = async (request: PlaceOrderRequest) => {
+      act(() => {
+        result.current.submit(request);
+      });
+      await waitFor(() => {
+        expect(result.current.status).toBe('error');
+      });
+    };
+
+    await submitAndFail(REQUEST);
+    await submitAndFail({ ...REQUEST, quotedTicks: 2_316_000 });
+    act(() => {
+      result.current.submit({ ...REQUEST, size: { kind: 'amount', cents: 20_000 } });
+    });
+    await waitFor(() => {
+      expect(placeOrder).toHaveBeenCalledTimes(3);
+    });
+
+    const [first, second, third] = placeOrder.mock.calls;
+    expect(second).toEqual(first);
+    expect(third?.[1]).not.toBe(first?.[1]);
+  });
+
   it('tracks a rejected order by its rejection code', async () => {
     const order = makeOrder({
       status: 'rejected',

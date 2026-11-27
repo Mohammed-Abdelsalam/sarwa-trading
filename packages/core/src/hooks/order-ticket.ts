@@ -119,7 +119,7 @@ export function useOrderTicket({ symbol, initialSide }: { symbol: string; initia
   const connectionLive = live === 'live' || live === 'paused';
   const blockReason: TicketBlock | null = !connectionLive
     ? { code: 'CONNECTION_NOT_LIVE' }
-    : !status
+    : !status || portfolio.isLoading
       ? { code: 'STATUS_LOADING' }
       : (issues[0] ?? null);
   const equity = portfolio.summary?.equityCents ?? cents(0);

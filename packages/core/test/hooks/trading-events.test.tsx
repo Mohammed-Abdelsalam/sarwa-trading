@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 
 import {
   type AlertsResponse,
@@ -133,6 +133,48 @@ describe('useTradingEvents', () => {
     });
 
     expect(queryClient.getQueryData<AlertsResponse>(queryKeys.alerts)?.items[0]?.armed).toBe(false);
+  });
+
+  it('refetches the alerts after a trigger so the active count follows', () => {
+    const { queryClient, emit } = setup();
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+    emit({
+      name: 'alert.triggered',
+      payload: { v: 1, alert: makeAlert({ armed: false, lastFiredAt: 9 }), lastTicks: 2_600_000 },
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.alerts });
+  });
+
+  it('refetches every private cache when the socket reconnects, not on the first connect', () => {
+    const { client, queryClient } = setup();
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const setConnection = (status: 'open' | 'connecting') => {
+      act(() => {
+        client.store.getState().setConnection({ status });
+      });
+    };
+
+    setConnection('connecting');
+    setConnection('open');
+    expect(invalidate).not.toHaveBeenCalled();
+
+    act(() => {
+      client.store.getState().setConnection({ status: 'reconnecting', attempt: 1 });
+    });
+    setConnection('open');
+
+    for (const queryKey of [
+      queryKeys.allOrders,
+      queryKeys.portfolio,
+      queryKeys.account,
+      queryKeys.notifications,
+      queryKeys.alerts,
+      queryKeys.tradingStatus,
+    ]) {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey });
+    }
   });
 
   it('adds and clears halts and takes a newer trading status', () => {

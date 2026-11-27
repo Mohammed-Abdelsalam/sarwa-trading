@@ -12,13 +12,18 @@ class FakeSocket extends EventEmitter {
   active = false;
   io = new EventEmitter();
   sent: { event: string; symbols: string[] }[] = [];
+  rejectSubscribe = false;
 
   override emit(event: string, ...args: unknown[]): boolean {
     if (event === 'subscribe' || event === 'unsubscribe') {
       const { symbols } = args[0] as { symbols: string[] };
       this.sent.push({ event, symbols });
       const ack = args[1] as ((res: SubscribeAck) => void) | undefined;
-      ack?.({ ok: true, quotes: symbols.map((symbol) => makeQuote({ symbol })) });
+      ack?.(
+        this.rejectSubscribe
+          ? { ok: false, error: { code: 'TOO_MANY_SYMBOLS', message: 'Too many' } }
+          : { ok: true, quotes: symbols.map((symbol) => makeQuote({ symbol })) },
+      );
       return true;
     }
     return super.emit(event, ...args);
@@ -85,6 +90,34 @@ describe('market socket', () => {
     jest.advanceTimersByTime(200);
 
     expect(fake.sent).toEqual([{ event: 'subscribe', symbols: ['AAPL', 'TSLA'] }]);
+  });
+
+  it('subscribes in chunks the server accepts', () => {
+    const { fake, market } = setup();
+    market.connect();
+    const symbols = Array.from({ length: 60 }, (_, i) => `S${String(i)}`);
+
+    market.acquire(symbols);
+    jest.advanceTimersByTime(200);
+
+    expect(fake.sent.map((sent) => sent.symbols.length)).toEqual([50, 10]);
+    expect(market.subscribedSymbols()).toHaveLength(60);
+  });
+
+  it('does not count symbols the server refused as subscribed, and retries them', () => {
+    const { fake, market } = setup();
+    market.connect();
+    fake.rejectSubscribe = true;
+
+    market.acquire(['AAPL']);
+    jest.advanceTimersByTime(200);
+    expect(market.subscribedSymbols()).toEqual([]);
+
+    fake.rejectSubscribe = false;
+    market.acquire(['TSLA']);
+    jest.advanceTimersByTime(200);
+    expect(fake.sent.at(-1)).toEqual({ event: 'subscribe', symbols: ['AAPL', 'TSLA'] });
+    expect(market.subscribedSymbols()).toEqual(['AAPL', 'TSLA']);
   });
 
   it('unsubscribes only when the last user of a symbol releases it', () => {

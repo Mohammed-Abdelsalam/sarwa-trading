@@ -8,15 +8,14 @@ import {
 import {
   averageCostTicks,
   averageFillTicks,
-  bps,
   type Bps,
+  BPS_PER_UNIT,
   cents,
   type Cents,
   dollarsToTicks,
   type Hold,
   micros,
-  negate,
-  parseCents,
+  parsePercentBps,
   type Position,
   ratioBps,
   sharesToMicros,
@@ -62,13 +61,11 @@ export function toHold(hold: HoldWire): Hold {
   };
 }
 
-// A typed % move, signed: two decimals have the cents scale, so "-5.25" is −525 bps (a down move).
+// A typed % move, signed and non-zero, at most 100% either way (the alert schema's range).
 export function parseMoveBps(text: string): Bps | null {
-  const [, sign = '', digits = ''] = /^\s*([-+−]?)(.*)$/.exec(text) ?? [];
-  const parsed = parseCents(digits);
-  if (parsed === null || parsed === 0) return null;
-  const move = bps(parsed);
-  return sign === '' || sign === '+' ? move : negate(move);
+  const move = parsePercentBps(text);
+  if (move === null || move === 0 || Math.abs(move) > BPS_PER_UNIT) return null;
+  return move;
 }
 
 // The spread as a share of the mid price, the same on every screen.

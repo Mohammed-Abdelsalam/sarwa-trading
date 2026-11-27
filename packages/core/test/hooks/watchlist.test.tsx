@@ -92,6 +92,27 @@ describe('useToggleWatchlist', () => {
     expect(queryClient.getQueryData(queryKeys.watchlist)).toEqual(['AAPL', 'TSLA']);
   });
 
+  it('refetches right away when a toggle fails with nothing cached to roll back to', async () => {
+    const client = createTestClient({
+      addToWatchlist: jest
+        .fn()
+        .mockRejectedValueOnce(makeProblem(503))
+        .mockReturnValue(new Promise<void>(() => undefined)),
+    });
+    const { Wrapper, queryClient } = createWrapper(client);
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useToggleWatchlist(), { wrapper: Wrapper });
+    act(() => {
+      result.current.mutate({ symbol: 'AAPL', watched: false });
+      result.current.mutate({ symbol: 'TSLA', watched: false });
+    });
+
+    await waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.watchlist });
+    });
+  });
+
   it('refetches once, after the last of two overlapping toggles settles', async () => {
     const settle: (() => void)[] = [];
     const client = createTestClient({

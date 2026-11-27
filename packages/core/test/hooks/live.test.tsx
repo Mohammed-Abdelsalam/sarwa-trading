@@ -138,18 +138,24 @@ describe('useMarketConnection', () => {
 });
 
 describe('useSyncStocksOnChange', () => {
-  it('invalidates the stock list and details when the server reports a change', () => {
+  it('invalidates the stock list and details, but not the charts, when the server reports a change', () => {
     const client = createTestClient();
     const { Wrapper, queryClient } = createWrapper(client);
-    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    queryClient.setQueryData(queryKeys.stocks, []);
+    queryClient.setQueryData(queryKeys.stock('AAPL'), {});
+    queryClient.setQueryData(queryKeys.candles('AAPL', '1D'), []);
+    const invalidated = (queryKey: readonly unknown[]) =>
+      queryClient.getQueryState(queryKey)?.isInvalidated;
     renderHook(() => useSyncStocksOnChange(), { wrapper: Wrapper });
-    expect(invalidate).not.toHaveBeenCalled();
+    expect(invalidated(queryKeys.stocks)).toBe(false);
 
     act(() => {
       client.store.getState().setStocksChangedAt(1);
     });
 
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.stocks });
+    expect(invalidated(queryKeys.stocks)).toBe(true);
+    expect(invalidated(queryKeys.stock('AAPL'))).toBe(true);
+    expect(invalidated(queryKeys.candles('AAPL', '1D'))).toBe(false);
   });
 });
 

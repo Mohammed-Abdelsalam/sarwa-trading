@@ -7,6 +7,7 @@ import {
   type ClientToServerEvents,
   MARKET_NAMESPACE,
   MarketStatusSchema,
+  MAX_SUBSCRIBE_SYMBOLS,
   NotificationEventSchema,
   OrderUpdatedEventSchema,
   type Quote,
@@ -91,6 +92,8 @@ export function createMarketSocket({
   let flushTimer: ReturnType<typeof setInterval> | undefined;
   let syncTimer: ReturnType<typeof setTimeout> | undefined;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  // Acks from an earlier connection must not touch the current subscriptions.
+  let connections = 0;
   const setConnection = (connection: ConnectionState) => {
     store.getState().setConnection(connection);
   };
@@ -102,12 +105,17 @@ export function createMarketSocket({
     buffer.clear();
   };
 
+  // A refused chunk leaves `subscribed`, so the next sync asks for it again.
   const subscribe = (symbols: string[]) => {
-    if (symbols.length === 0) return;
-    for (const symbol of symbols) subscribed.add(symbol);
-    socket.emit('subscribe', { symbols }, (ack) => {
-      if (ack.ok) store.getState().applyQuotes(ack.quotes);
-    });
+    const connection = connections;
+    for (let i = 0; i < symbols.length; i += MAX_SUBSCRIBE_SYMBOLS) {
+      const chunk = symbols.slice(i, i + MAX_SUBSCRIBE_SYMBOLS);
+      for (const symbol of chunk) subscribed.add(symbol);
+      socket.emit('subscribe', { symbols: chunk }, (ack) => {
+        if (ack.ok) store.getState().applyQuotes(ack.quotes);
+        else if (connection === connections) for (const symbol of chunk) subscribed.delete(symbol);
+      });
+    }
   };
 
   const sync = () => {
@@ -127,6 +135,7 @@ export function createMarketSocket({
   };
 
   socket.on('connect', () => {
+    connections += 1;
     setConnection({ status: 'open' });
     subscribed.clear();
     subscribe([...refCounts.keys()]);
