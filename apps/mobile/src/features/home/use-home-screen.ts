@@ -1,0 +1,111 @@
+import { router } from 'expo-router';
+import { useState } from 'react';
+
+import { type StockWithQuote } from '@sarwa/contracts';
+import {
+  changePct,
+  direction,
+  marketPill,
+  useAlerts,
+  useLiveStatus,
+  useLiveSymbols,
+  useNotifications,
+  useOrders,
+  usePortfolio,
+  useTradingStatus,
+} from '@sarwa/core';
+
+import { useNow } from '../../lib/clock';
+import { type Copy, useCopy } from '../../lib/i18n';
+import { useStockIndex } from '../../lib/sectors';
+import { describeOrder } from '../orders/order-copy';
+import { useEquitySeries } from '../portfolio/use-portfolio-screen';
+
+export type MoverTab = 'gainers' | 'losers' | 'active';
+
+const MOVERS = 5;
+const RECENT = 3;
+
+export function topMovers(stocks: readonly StockWithQuote[], tab: MoverTab): StockWithQuote[] {
+  const sorted = [...stocks].sort((a, b) =>
+    tab === 'active'
+      ? b.quote.volume - a.quote.volume
+      : tab === 'gainers'
+        ? changePct(b.quote) - changePct(a.quote)
+        : changePct(a.quote) - changePct(b.quote),
+  );
+  return sorted.slice(0, MOVERS);
+}
+
+function greeting({ t }: Copy, hour: number): string {
+  if (hour < 12) return t.portfolio.goodMorning;
+  return hour < 18 ? t.portfolio.goodAfternoon : t.portfolio.goodEvening;
+}
+
+export function useHomeScreen() {
+  const copy = useCopy();
+  const { t, f } = copy;
+  const [moverTab, setMoverTab] = useState<MoverTab>('gainers');
+  const portfolio = usePortfolio();
+  const curve = useEquitySeries('1D');
+  const notifications = useNotifications();
+  const openOrders = useOrders({ filter: 'open' });
+  const recent = useOrders({ filter: 'all' });
+  const alerts = useAlerts();
+  const { stocks, sectorOf } = useStockIndex();
+  const movers = topMovers(stocks, moverTab);
+  useLiveSymbols(movers.map((stock) => stock.symbol));
+  const summary = portfolio.summary;
+  const now = useNow();
+
+  return {
+    greeting: greeting(copy, new Date(now).getHours()),
+    market: marketPill(useLiveStatus(), useTradingStatus().data?.session, copy),
+    unread: notifications.unreadCount,
+    bellLabel: t.notifications.unreadA11y(f.count(notifications.unreadCount)),
+    unreadBadge: f.number(notifications.unreadCount),
+    isLoading: portfolio.isLoading,
+    isError: portfolio.isError,
+    equity: summary && {
+      value: f.money(summary.equityCents),
+      today: {
+        label: `${f.money(summary.todayCents, { signed: true })} (${f.percent(summary.todayBps, { signed: true })})`,
+        direction: direction(summary.todayCents),
+      },
+      allTime: {
+        label: f.money(summary.allTimeCents, { signed: true }),
+        direction: direction(summary.allTimeCents),
+      },
+      buyingPower: f.money(summary.buyingPowerCents),
+      unrealized: {
+        label: f.money(summary.unrealizedCents, { signed: true }),
+        direction: direction(summary.unrealizedCents),
+      },
+    },
+    curve,
+    openOrders: f.number(openOrders.data?.items.length ?? 0),
+    activeAlerts: t.portfolio.alertsActive(f.count(alerts.data?.activeCount ?? 0)),
+    moverTab,
+    movers,
+    recent: (recent.data?.items ?? []).slice(0, RECENT).map((order) => ({
+      line: describeOrder(order, copy, now),
+      sector: sectorOf(order.symbol),
+    })),
+    actions: {
+      setMoverTab,
+      retry: () => void portfolio.refresh(),
+      openNotifications: () => {
+        router.push('/notifications');
+      },
+      openOrders: () => {
+        router.push('/orders');
+      },
+      openAlerts: () => {
+        router.push('/alerts');
+      },
+      openSearch: () => {
+        router.push('/search');
+      },
+    },
+  };
+}
