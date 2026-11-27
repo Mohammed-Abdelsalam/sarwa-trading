@@ -200,6 +200,9 @@ importers:
       '@sarwa/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@sarwa/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3

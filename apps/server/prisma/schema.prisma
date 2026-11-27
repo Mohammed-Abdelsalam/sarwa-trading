@@ -9,18 +9,30 @@ datasource db {
 }
 
 model Stock {
-  symbol     String   @id
-  name       String
-  sector     String
-  exchange   String
-  basePrice  Float
-  volatility Float    @default(1)
-  marketCap  Float    @default(0)
-  peRatio    Float?
-  isEnabled  Boolean  @default(true)
-  updatedAt  DateTime @updatedAt
+  symbol         String   @id
+  name           String
+  sector         String
+  exchange       String
+  basePrice      Float
+  volatility     Float    @default(1)
+  marketCap      Float    @default(0)
+  peRatio        Float?
+  isEnabled      Boolean  @default(true)
+  // Live price persisted so a restart doesn't re-randomize resting stop/limit triggers.
+  lastTicks      BigInt?
+  // The trading day's reference prices, so a restart keeps today's change and range.
+  tradingDate    String?
+  prevCloseTicks BigInt?
+  openTicks      BigInt?
+  dayHighTicks   BigInt?
+  dayLowTicks    BigInt?
+  updatedAt      DateTime @updatedAt
 
-  watchers WatchlistItem[]
+  watchers  WatchlistItem[]
+  positions Position[]
+  orders    Order[]
+  fills     Fill[]
+  alerts    Alert[]
 }
 
 model Device {
@@ -28,7 +40,9 @@ model Device {
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
 
-  watchlist WatchlistItem[]
+  watchlist  WatchlistItem[]
+  account    Account?
+  pushTokens PushToken[]
 }
 
 model WatchlistItem {
@@ -74,4 +88,179 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([action])
+}
+
+// Money, quantities and prices are integers in their smallest unit (cents, micros, ticks).
+model Account {
+  id        String    @id @default(cuid())
+  deviceId  String    @unique
+  handle    String    @unique
+  cashCents BigInt
+  // Bumped by a reset: history is kept and the books start again in the new epoch.
+  epoch     Int       @default(0)
+  createdAt DateTime
+  resetAt   DateTime?
+
+  device        Device              @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  positions     Position[]
+  orders        Order[]
+  fills         Fill[]
+  alerts        Alert[]
+  notifications Notification[]
+  snapshots     PortfolioSnapshot[]
+}
+
+model Position {
+  accountId      String
+  symbol         String
+  qtyMicros      BigInt
+  costBasisCents BigInt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  stock   Stock   @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+
+  @@id([accountId, symbol])
+  @@index([symbol])
+}
+
+model Order {
+  id                  String    @id @default(cuid())
+  accountId           String
+  epoch               Int
+  symbol              String
+  side                String
+  type                String
+  tif                 String
+  status              String
+  qtyMicros           BigInt?
+  amountCents         BigInt?
+  sellAll             Boolean   @default(false)
+  limitTicks          BigInt?
+  stopTicks           BigInt?
+  quotedTicks         BigInt
+  filledMicros        BigInt    @default(0)
+  filledNotionalCents BigInt    @default(0)
+  filledExactNotional String    @default("0")
+  heldCents           BigInt    @default(0)
+  heldMicros          BigInt    @default(0)
+  holdPriceTicks      BigInt?
+  rejection           String?
+  cancelReason        String?
+  idempotencyKey      String
+  requestHash         String
+  latencyMs           Int       @default(0)
+  createdAt           DateTime
+  updatedAt           DateTime
+  triggeredAt         DateTime?
+  expiresAt           DateTime?
+  closedAt            DateTime?
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  stock   Stock   @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+  fills   Fill[]
+
+  @@unique([accountId, idempotencyKey])
+  @@index([status])
+  @@index([symbol, status])
+  @@index([accountId, createdAt])
+}
+
+model Fill {
+  id            String   @id @default(cuid())
+  orderId       String
+  accountId     String
+  epoch         Int
+  symbol        String
+  side          String
+  qtyMicros     BigInt
+  priceTicks    BigInt
+  notionalCents BigInt
+  realizedCents BigInt
+  at            DateTime
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  stock   Stock   @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([accountId, at])
+  @@index([at])
+}
+
+model Alert {
+  id             String    @id @default(cuid())
+  accountId      String
+  symbol         String
+  condition      String
+  thresholdTicks BigInt?
+  thresholdBps   Int?
+  repeat         String
+  enabled        Boolean   @default(true)
+  armed          Boolean   @default(true)
+  lastFiredAt    DateTime?
+  createdAt      DateTime
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  stock   Stock   @relation(fields: [symbol], references: [symbol], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([enabled])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  accountId String
+  payload   String
+  readAt    DateTime?
+  createdAt DateTime
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
+}
+
+model PortfolioSnapshot {
+  id          Int      @id @default(autoincrement())
+  accountId   String
+  epoch       Int
+  t           DateTime
+  equityCents BigInt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, epoch, t])
+}
+
+model PushToken {
+  token     String   @id
+  deviceId  String
+  platform  String
+  updatedAt DateTime @updatedAt
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
+}
+
+model Halt {
+  id        String    @id @default(cuid())
+  symbol    String
+  source    String
+  message   String
+  since     DateTime
+  resumesAt DateTime?
+  endedAt   DateTime?
+  createdBy String?
+
+  @@index([symbol, endedAt])
+}
+
+model TradingConfig {
+  id             Int      @id @default(1)
+  tradingEnabled Boolean  @default(true)
+  sessionMode    String   @default("always-open")
+  rules          String
+  circuitBreaker String
+  changedBy      String?
+  updatedAt      DateTime @updatedAt
 }

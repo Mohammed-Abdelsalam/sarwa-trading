@@ -1,6 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
+import {
+  applyFill,
+  cents,
+  DEFAULT_CIRCUIT_BREAKER,
+  DEFAULT_EXECUTION_RULES,
+  dollarsToTicks,
+  micros,
+  POLICY,
+  type Position,
+  sharesToMicros,
+  type Side,
+} from '@sarwa/domain';
+
 const prisma = new PrismaClient();
 
 const STOCKS: [string, string, string, string, number, number, number | null, number][] = [
@@ -70,7 +83,168 @@ async function main(): Promise<void> {
   }
 
   await prisma.appConfig.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
-  console.log(`[seed] ${STOCKS.length} stocks, ${admins.length} admins, app config ready`);
+  await prisma.tradingConfig.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      tradingEnabled: true,
+      sessionMode: 'always-open',
+      rules: JSON.stringify(DEFAULT_EXECUTION_RULES),
+      circuitBreaker: JSON.stringify(DEFAULT_CIRCUIT_BREAKER),
+    },
+  });
+  const accounts = await seedDemoAccounts();
+  console.log(
+    `[seed] ${STOCKS.length} stocks, ${admins.length} admins, ${accounts} demo accounts, configs ready`,
+  );
+}
+
+type DemoTrade = [symbol: string, side: Side, shares: number];
+
+const DEMO_ACCOUNTS: { deviceId: string; handle: string; trades: DemoTrade[] }[] = [
+  {
+    deviceId: '5eed0000-0000-4000-8000-000000000001',
+    handle: 'ACC-5EED01',
+    trades: [
+      ['AAPL', 'buy', 40],
+      ['NVDA', 'buy', 120],
+      ['AAPL', 'sell', 10],
+    ],
+  },
+  {
+    deviceId: '5eed0000-0000-4000-8000-000000000002',
+    handle: 'ACC-5EED02',
+    trades: [
+      ['MSFT', 'buy', 30],
+      ['JPM', 'buy', 50],
+      ['XOM', 'buy', 100],
+    ],
+  },
+  {
+    deviceId: '5eed0000-0000-4000-8000-000000000003',
+    handle: 'ACC-5EED03',
+    trades: [
+      ['TSLA', 'buy', 60],
+      ['TSLA', 'sell', 60],
+      ['KO', 'buy', 200],
+    ],
+  },
+  {
+    deviceId: '5eed0000-0000-4000-8000-000000000004',
+    handle: 'ACC-5EED04',
+    trades: [
+      ['META', 'buy', 25],
+      ['NFLX', 'buy', 12],
+      ['PFE', 'buy', 400],
+      ['META', 'sell', 5],
+    ],
+  },
+];
+
+// Demo books built with the same domain functions the engine uses, so they always balance.
+async function seedDemoAccounts(): Promise<number> {
+  const prices = new Map(STOCKS.map(([symbol, , , , basePrice]) => [symbol, basePrice]));
+  const now = Date.now();
+  let created = 0;
+  for (const { deviceId, handle, trades } of DEMO_ACCOUNTS) {
+    if (await prisma.account.findUnique({ where: { deviceId } })) continue;
+    await prisma.device.upsert({ where: { id: deviceId }, update: {}, create: { id: deviceId } });
+    const openedAt = new Date(now - 7 * 86_400_000);
+    const account = await prisma.account.create({
+      data: {
+        deviceId,
+        handle,
+        cashCents: BigInt(POLICY.startingCashCents),
+        createdAt: openedAt,
+      },
+    });
+
+    let cashCents = POLICY.startingCashCents;
+    const positions = new Map<string, Position>();
+    for (const [index, [symbol, side, shares]] of trades.entries()) {
+      const priceTicks = dollarsToTicks(prices.get(symbol) ?? 1);
+      const qtyMicros = sharesToMicros(shares);
+      const at = new Date(openedAt.getTime() + (index + 1) * 86_400_000);
+      const result = applyFill(
+        cashCents,
+        positions.get(symbol) ?? null,
+        {
+          side,
+          type: 'market',
+          status: 'open',
+          qtyMicros,
+          amountCents: null,
+          limitTicks: null,
+          stopTicks: null,
+          filledMicros: micros(0),
+          filledNotionalCents: cents(0),
+          filledExactNotional: 0n,
+          heldCents: cents(0),
+          heldMicros: micros(0),
+          holdPriceTicks: priceTicks,
+        },
+        symbol,
+        { qtyMicros, priceTicks },
+      );
+      cashCents = result.cashCents;
+      if (result.position) positions.set(symbol, result.position);
+      else positions.delete(symbol);
+
+      await prisma.order.create({
+        data: {
+          accountId: account.id,
+          epoch: 0,
+          symbol,
+          side,
+          type: 'market',
+          tif: 'day',
+          status: result.order.status,
+          qtyMicros: BigInt(qtyMicros),
+          quotedTicks: BigInt(priceTicks),
+          filledMicros: BigInt(result.order.filledMicros),
+          filledNotionalCents: BigInt(result.order.filledNotionalCents),
+          filledExactNotional: result.order.filledExactNotional.toString(),
+          idempotencyKey: `seed-${handle}-${index}`,
+          requestHash: 'seed',
+          latencyMs: 4,
+          createdAt: at,
+          updatedAt: at,
+          closedAt: at,
+          fills: {
+            create: {
+              accountId: account.id,
+              epoch: 0,
+              symbol,
+              side,
+              qtyMicros: BigInt(qtyMicros),
+              priceTicks: BigInt(priceTicks),
+              notionalCents: BigInt(result.notionalCents),
+              realizedCents: BigInt(result.realizedCents),
+              at,
+            },
+          },
+        },
+      });
+    }
+
+    await prisma.account.update({
+      where: { id: account.id },
+      data: { cashCents: BigInt(cashCents) },
+    });
+    for (const position of positions.values()) {
+      await prisma.position.create({
+        data: {
+          accountId: account.id,
+          symbol: position.symbol,
+          qtyMicros: BigInt(position.qtyMicros),
+          costBasisCents: BigInt(position.costBasisCents),
+        },
+      });
+    }
+    created++;
+  }
+  return created;
 }
 
 main()
