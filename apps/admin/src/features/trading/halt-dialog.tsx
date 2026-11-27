@@ -1,19 +1,19 @@
 import { Pause, TriangleAlert } from 'lucide-react';
 
 import { HALT_DURATIONS, type HaltDuration } from '@sarwa/contracts';
-import { haltDurationLabel, type I18n, useI18n } from '@sarwa/core';
+import { type AdminI18n, haltDurationLabel, useAdminI18n } from '@sarwa/core/admin';
 import { Button, Callout, Dialog, Field, Input, SegmentedControl, Select } from '@sarwa/ui';
 
 import { type HaltDialogModel } from './use-trading-page';
 
-export function haltConfirmLabel(copy: I18n, symbol: string, duration: HaltDuration): string {
+export function haltConfirmLabel(copy: AdminI18n, symbol: string, duration: HaltDuration): string {
   if (duration === 'until_close') return copy.t.admin.haltConfirmUntilClose({ symbol });
   if (duration === 'manual') return copy.t.admin.trading.haltManual({ symbol });
   return copy.t.admin.haltConfirm({ symbol, duration: haltDurationLabel(duration, copy) });
 }
 
 export function HaltDialog({ halt }: { halt: HaltDialogModel }) {
-  const copy = useI18n();
+  const copy = useAdminI18n();
   const { t, f } = copy;
   const symbol = halt.symbol || '—';
 

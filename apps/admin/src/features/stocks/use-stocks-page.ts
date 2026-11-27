@@ -1,9 +1,17 @@
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
-import { type AdminStock, type Exchange, type Sector } from '@sarwa/contracts';
+import {
+  type AdminStock,
+  ErrorCode,
+  EXCHANGES,
+  type Exchange,
+  type Sector,
+  SECTORS,
+} from '@sarwa/contracts';
 import {
   EMPTY_STOCK_DRAFT,
-  isConflict,
+  isApiError,
   type StockDraft,
   type StockErrors,
   stockToDraft,
@@ -15,7 +23,10 @@ import {
   validateStockDraft,
 } from '@sarwa/core/admin';
 
-export type StockSortKey = 'symbol' | 'name' | 'sector' | 'exchange' | 'basePrice' | 'volatility';
+import { oneOf, setSearchParams, useSearchParamText } from '../../lib/search-params';
+
+const SORT_KEYS = ['symbol', 'name', 'sector', 'exchange', 'basePrice', 'volatility'] as const;
+export type StockSortKey = (typeof SORT_KEYS)[number];
 export interface StockSort {
   key: StockSortKey;
   direction: 'ascending' | 'descending';
@@ -91,7 +102,7 @@ function useStockDialog(existing: readonly string[]) {
           create.mutate(result.create, {
             ...close,
             onError: (error) => {
-              if (isConflict(error)) setTaken(true);
+              if (isApiError(error, ErrorCode.Conflict)) setTaken(true);
             },
           });
         }
@@ -105,15 +116,19 @@ export function useStocksPage() {
   const stocks = useAdminStocks();
   const toggle = useUpdateStock();
   const remove = useDeleteStock();
-  const [search, setSearch] = useState('');
-  const [sector, setSector] = useState<Sector | 'all'>('all');
-  const [exchange, setExchange] = useState<Exchange | 'all'>('all');
-  const [sort, setSort] = useState<StockSort>({ key: 'symbol', direction: 'ascending' });
+  const params = useSearchParams();
+  const search = useSearchParamText(params, 'q');
+  const sector = oneOf<Sector | 'all'>(params.get('sector'), SECTORS, 'all');
+  const exchange = oneOf<Exchange | 'all'>(params.get('exchange'), EXCHANGES, 'all');
+  const sort: StockSort = {
+    key: oneOf(params.get('sort'), SORT_KEYS, 'symbol'),
+    direction: params.get('dir') === 'desc' ? 'descending' : 'ascending',
+  };
   const [deleting, setDeleting] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const all = stocks.data ?? [];
   const dialog = useStockDialog(all.map((stock) => stock.symbol));
-  const q = search.trim().toLowerCase();
+  const q = search.text.trim().toLowerCase();
   const rows = sortStocks(
     all.filter(
       (stock) =>
@@ -129,7 +144,7 @@ export function useStocksPage() {
     rows,
     total: all.length,
     enabledCount: all.filter((stock) => stock.isEnabled).length,
-    search,
+    search: search.text,
     sector,
     exchange,
     sort,
@@ -145,18 +160,19 @@ export function useStocksPage() {
     },
     actions: {
       retry: () => void stocks.refetch(),
-      search: setSearch,
+      search: search.set,
       clearSearch: () => {
-        setSearch('');
+        search.clear();
       },
-      setSector,
-      setExchange,
+      setSector: (next: Sector | 'all') => {
+        setSearchParams({ sector: next === 'all' ? null : next });
+      },
+      setExchange: (next: Exchange | 'all') => {
+        setSearchParams({ exchange: next === 'all' ? null : next });
+      },
       sortBy: (key: StockSortKey) => {
-        setSort((current) => ({
-          key,
-          direction:
-            current.key === key && current.direction === 'ascending' ? 'descending' : 'ascending',
-        }));
+        const descending = sort.key === key && sort.direction === 'ascending';
+        setSearchParams({ sort: key === 'symbol' ? null : key, dir: descending ? 'desc' : null });
       },
       setEnabled: (symbol: string, isEnabled: boolean) => {
         toggle.mutate({ symbol, patch: { isEnabled } });
@@ -176,7 +192,7 @@ export function useStocksPage() {
             setDeleting(null);
           },
           onError: (error) => {
-            if (isConflict(error)) setConflict(true);
+            if (isApiError(error, ErrorCode.Conflict)) setConflict(true);
           },
         });
       },

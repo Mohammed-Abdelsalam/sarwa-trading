@@ -1,5 +1,4 @@
-import { useI18n } from '@sarwa/core';
-import { type TickerRow, dollarsToCents } from '@sarwa/core/admin';
+import { dollarsToCents, type TickerRow, useAdminI18n } from '@sarwa/core/admin';
 import { ChangePill, cn, PriceFlash, Skeleton, Sparkline, StockAvatar } from '@sarwa/ui';
 
 export function TickerRows({
@@ -15,7 +14,7 @@ export function TickerRows({
   sparkline?: boolean;
   className?: string;
 }) {
-  const { f } = useI18n();
+  const { f } = useAdminI18n();
   const money = (price: number) => f.money(dollarsToCents(price));
 
   if (isLoading) {

@@ -3,7 +3,7 @@
 import { Ban, Check, ChevronDown, Eye, Info, Search, Shield, UserPlus } from 'lucide-react';
 
 import { RoleSchema } from '@sarwa/contracts';
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import {
   Badge,
   Button,
@@ -33,7 +33,7 @@ import { type UserFilter, type UsersPageModel, useUsersPage } from './use-users-
 const FILTERS: readonly UserFilter[] = ['all', 'active', 'disabled'];
 
 function UsersTable({ page }: { page: UsersPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.users;
   if (page.isError) return <LoadError what={copy.loading} onRetry={page.actions.retry} />;
   if (page.isLoading) return <TableSkeleton columns={5} rows={5} label={copy.loading} />;
@@ -41,13 +41,13 @@ function UsersTable({ page }: { page: UsersPageModel }) {
     return <p className="type-sm text-fg-2 px-5 py-10 text-center">{copy.noMatch}</p>;
   }
   return (
-    <Table>
+    <Table label={copy.title}>
       <THead>
         <TRow>
           <TH className="ps-5">{copy.columns.user}</TH>
           <TH>{copy.columns.role}</TH>
           <TH>{copy.columns.status}</TH>
-          <TH>{copy.columns.lastActive}</TH>
+          <TH className="max-md:hidden">{copy.columns.lastActive}</TH>
           <TH align="end">
             <span className="sr-only">{t.admin.stocks.columns.actions}</span>
           </TH>
@@ -108,7 +108,7 @@ function UsersTable({ page }: { page: UsersPageModel }) {
               <TCell>
                 <Badge tone={disabled ? 'neg' : 'pos'}>{copy.statuses[user.status]}</Badge>
               </TCell>
-              <TCell className="text-fg-2 tabular-nums">
+              <TCell className="text-fg-2 tabular-nums max-md:hidden">
                 {user.lastActiveAt === null
                   ? t.admin.states.never
                   : f.relative(Date.parse(user.lastActiveAt), page.now)}
@@ -141,7 +141,7 @@ function UsersTable({ page }: { page: UsersPageModel }) {
 }
 
 function UserConfirmDialog({ page }: { page: UsersPageModel }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   const request = page.confirm.request;
   const copy =
     request?.kind === 'demote' ? t.admin.users.confirmDemote : t.admin.users.confirmDisable;
@@ -161,7 +161,7 @@ function UserConfirmDialog({ page }: { page: UsersPageModel }) {
 
 export function UsersPage() {
   const page = useUsersPage();
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.users;
 
   if (page.forbidden) return <Forbidden page={t.admin.nav.users} user={page.me} />;
@@ -189,17 +189,19 @@ export function UsersPage() {
         </Button>
       </PageHeader>
       <div className="flex flex-wrap items-center gap-3">
-        <Input
-          type="search"
-          icon={<Search />}
-          className="w-80"
-          aria-label={copy.searchLabel}
-          placeholder={copy.search}
-          value={page.search}
-          onChange={(event) => {
-            page.actions.search(event.target.value);
-          }}
-        />
+        <div className="w-80 max-sm:w-full">
+          <Input
+            type="search"
+            icon={<Search />}
+            className="w-full"
+            aria-label={copy.searchLabel}
+            placeholder={copy.search}
+            value={page.search}
+            onChange={(event) => {
+              page.actions.search(event.target.value);
+            }}
+          />
+        </div>
         <SegmentedControl
           label={copy.filter}
           options={FILTERS.map((value) => ({ value, label: copy.filters[value] }))}

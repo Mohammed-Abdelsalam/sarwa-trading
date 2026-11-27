@@ -1,8 +1,7 @@
 import { TriangleAlert } from 'lucide-react';
 
 import { EXCHANGES, SECTORS } from '@sarwa/contracts';
-import { useI18n } from '@sarwa/core';
-import { type StockDraft, stockErrorText, volatilityRange } from '@sarwa/core/admin';
+import { type StockDraft, stockErrorText, useAdminI18n, volatilityRange } from '@sarwa/core/admin';
 import { Button, Callout, Dialog, Field, Input, Select, Switch } from '@sarwa/ui';
 
 import { type StockDialogModel } from './use-stocks-page';
@@ -10,7 +9,7 @@ import { type StockDialogModel } from './use-stocks-page';
 type TextKey = 'symbol' | 'name' | 'basePrice' | 'volatility' | 'peRatio';
 
 export function StockDialog({ dialog }: { dialog: StockDialogModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.stocks;
   const errorOf = (key: keyof StockDraft) => {
     const code = dialog.errors[key];
@@ -125,7 +124,11 @@ export function StockDialog({ dialog }: { dialog: StockDialogModel }) {
           </Field>
         </div>
         <div className="grid grid-cols-3 gap-4">
-          {text('basePrice', { inputMode: 'decimal', prefix: '$', className: 'tabular-nums' })}
+          {text('basePrice', {
+            inputMode: 'decimal',
+            prefix: f.currencyAffix(),
+            className: 'tabular-nums',
+          })}
           {text('volatility', { inputMode: 'decimal', className: 'tabular-nums' })}
           {text('peRatio', {
             inputMode: 'decimal',

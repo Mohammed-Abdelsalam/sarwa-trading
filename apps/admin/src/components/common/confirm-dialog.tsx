@@ -1,4 +1,4 @@
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import { Button, Callout, Dialog } from '@sarwa/ui';
 
 export function ConfirmDialog({
@@ -20,7 +20,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   return (
     <Dialog
       open={open}

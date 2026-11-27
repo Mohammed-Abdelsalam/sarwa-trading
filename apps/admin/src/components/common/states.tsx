@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, RefreshCw, TriangleAlert } from 'lucide-react';
 import { type ReactNode } from 'react';
 
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import { Button, cn, IconButton, Skeleton, StateView } from '@sarwa/ui';
 
 export function TableSkeleton({
@@ -42,7 +42,7 @@ export function LoadError({
   onRetry: () => void;
   className?: string;
 }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   return (
     <StateView
       className={cn('flex-1 justify-center', className)}
@@ -74,7 +74,9 @@ export function PageHeader({
         <h1 className="type-h1 text-fg">{title}</h1>
         {subtitle ? <p className="type-sm text-fg-2 mt-1 tabular-nums">{subtitle}</p> : null}
       </div>
-      {children ? <div className="flex flex-wrap items-center gap-3">{children}</div> : null}
+      {children ? (
+        <div className="flex flex-wrap items-center gap-3 max-sm:w-full">{children}</div>
+      ) : null}
     </div>
   );
 }
@@ -90,7 +92,7 @@ export function Pagination({
   total: number;
   onPage: (page: number) => void;
 }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(total, page * pageSize);

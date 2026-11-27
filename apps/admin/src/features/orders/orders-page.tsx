@@ -2,8 +2,8 @@
 
 import { Pause, Play } from 'lucide-react';
 
-import { bps, cents, useI18n } from '@sarwa/core';
-import { ORDER_STATUSES } from '@sarwa/core/admin';
+import { bps, cents } from '@sarwa/core';
+import { ORDER_STATUSES, useAdminI18n } from '@sarwa/core/admin';
 import {
   AllocationBar,
   type AllocationColor,
@@ -31,7 +31,7 @@ const TYPE_COLORS: Record<string, AllocationColor> = {
 };
 
 function Kpis({ page }: { page: OrdersPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const s = page.stats;
   const tiles = [
     { key: 'ordersToday', value: s && f.number(s.ordersToday) },
@@ -55,22 +55,24 @@ function Kpis({ page }: { page: OrdersPageModel }) {
 }
 
 function OrdersTable({ page }: { page: OrdersPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   if (page.isError) return <LoadError what={t.admin.orders.loading} onRetry={page.actions.retry} />;
   if (page.isLoading) return <TableSkeleton columns={6} label={t.admin.orders.loading} />;
   if (page.orders.length === 0) {
     return <p className="type-sm text-fg-2 px-4 py-10 text-center">{t.admin.orders.noOrders}</p>;
   }
   return (
-    <Table aria-label={t.admin.ordersMonitor}>
+    <Table label={t.admin.ordersMonitor}>
       <THead>
         <TRow>
           <TH className="ps-4">{t.admin.monitorColumns.time}</TH>
-          <TH>{t.admin.monitorColumns.account}</TH>
+          <TH className="max-md:hidden">{t.admin.monitorColumns.account}</TH>
           <TH>{t.admin.monitorColumns.order}</TH>
           <TH align="end">{t.admin.monitorColumns.notional}</TH>
           <TH>{t.admin.monitorColumns.status}</TH>
-          <TH align="end">{t.admin.monitorColumns.latency}</TH>
+          <TH align="end" className="max-md:hidden">
+            {t.admin.monitorColumns.latency}
+          </TH>
         </TRow>
       </THead>
       <TBody>
@@ -79,7 +81,7 @@ function OrdersTable({ page }: { page: OrdersPageModel }) {
             <TCell className="text-fg-2 ps-4 tabular-nums">
               {f.time(order.createdAt, { seconds: true })}
             </TCell>
-            <TCell className="type-mono">{order.accountHandle}</TCell>
+            <TCell className="type-mono max-md:hidden">{order.accountHandle}</TCell>
             <TCell>
               <span className="flex items-center gap-2">
                 <Badge
@@ -100,7 +102,7 @@ function OrdersTable({ page }: { page: OrdersPageModel }) {
             <TCell>
               <StatusBadge status={order.status} label={t.orderStatus[order.status]} />
             </TCell>
-            <TCell align="end" className="text-fg-3">
+            <TCell align="end" className="text-fg-3 max-md:hidden">
               {t.admin.orders.latency({ n: f.number(order.latencyMs) })}
             </TCell>
           </TRow>
@@ -112,7 +114,7 @@ function OrdersTable({ page }: { page: OrdersPageModel }) {
 
 export function OrdersPage() {
   const page = useOrdersPage();
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
 
   return (
     <>

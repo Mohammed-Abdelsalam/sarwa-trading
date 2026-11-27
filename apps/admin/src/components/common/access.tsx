@@ -9,13 +9,13 @@ import {
 } from 'react';
 
 import { type AdminUser } from '@sarwa/contracts';
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import { Badge, Button, buttonVariants, Callout, cn, Switch, Tooltip } from '@sarwa/ui';
 
 import { RoleBadge } from './identity';
 
 export function ViewerNotice() {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   return (
     <Callout tone="info" icon={<Eye />} role="status">
       <b>{t.admin.viewer.title}</b> {t.admin.viewer.body}
@@ -24,7 +24,7 @@ export function ViewerNotice() {
 }
 
 export function ReadOnlyBadge() {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   return (
     <Badge tone="outline">
       <Lock aria-hidden className="size-3.5" />
@@ -46,7 +46,7 @@ export function Locked({
   locked: boolean;
   children: ReactElement<Record<string, unknown>>;
 }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   const id = useId();
   if (!locked) return children;
   return (
@@ -100,7 +100,7 @@ export function GuardedSwitch({
 const FORBIDDEN_STATUS = 403;
 
 export function Forbidden({ page, user }: { page: string; user: AdminUser | null }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   return (
     <div className="grid flex-1 place-items-center">
       <div className="flex max-w-115 flex-col items-center gap-4 text-center">

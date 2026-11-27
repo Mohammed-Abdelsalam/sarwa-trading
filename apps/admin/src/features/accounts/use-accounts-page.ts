@@ -1,3 +1,4 @@
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import { type AdminAccount, type AdminAccountsQuery, resetConfirmation } from '@sarwa/contracts';
@@ -6,23 +7,26 @@ import {
   isResetConfirmed,
   useAdminAccounts,
   useAdminSession,
-  useDebouncedValue,
   useResetAccount,
 } from '@sarwa/core/admin';
 
+import { oneOf, pageParam, setSearchParams, useSearchParamText } from '../../lib/search-params';
+
 export type AccountSort = NonNullable<AdminAccountsQuery['sort']>;
 export const ACCOUNTS_PAGE_SIZE = 25;
+const SORTS: readonly AccountSort[] = ['allTime', 'equity', 'lastTrade'];
 
 export function useAccountsPage() {
   const { canEdit } = useAdminSession();
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<AccountSort>('allTime');
-  const [page, setPage] = useState(1);
+  const params = useSearchParams();
+  const search = useSearchParamText(params, 'q', { page: null });
+  const sort = oneOf(params.get('sort'), SORTS, 'allTime');
+  const page = pageParam(params.get('page'));
   const [viewing, setViewing] = useState<AdminAccount | null>(null);
   const [resetting, setResetting] = useState<AdminAccount | null>(null);
   const [confirmText, setConfirmText] = useState('');
   const [resetDone, setResetDone] = useState<string | null>(null);
-  const q = useDebouncedValue(search.trim());
+  const q = search.value;
   const accounts = useAdminAccounts({
     q: q || undefined,
     sort,
@@ -33,7 +37,7 @@ export function useAccountsPage() {
 
   return {
     canEdit,
-    search,
+    search: search.text,
     query: q,
     sort,
     page,
@@ -55,15 +59,13 @@ export function useAccountsPage() {
     },
     actions: {
       retry: () => void accounts.refetch(),
-      search: (value: string) => {
-        setSearch(value);
-        setPage(1);
-      },
+      search: search.set,
       sortBy: (key: AccountSort) => {
-        setSort(key);
-        setPage(1);
+        setSearchParams({ sort: key === 'allTime' ? null : key, page: null });
       },
-      setPage,
+      setPage: (next: number) => {
+        setSearchParams({ page: next > 1 ? next : null });
+      },
       view: setViewing,
       closeView: () => {
         setViewing(null);

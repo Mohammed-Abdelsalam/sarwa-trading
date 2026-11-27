@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { type ReactNode } from 'react';
 
 import { type AuditAction } from '@sarwa/contracts';
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import { Badge, Button, Card, ConnectionBadge, Skeleton, Spinner, StockAvatar } from '@sarwa/ui';
 
 import { BarList, LoadError, PageHeader } from '../../components/common/states';
@@ -64,7 +64,7 @@ const ACTIVITY_ICONS: Partial<Record<AuditAction, ReactNode>> = {
 };
 
 function MarketCard({ page }: { page: OverviewPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const market = page.stats?.market;
   if (!market) return null;
   const running = market.state === 'running';
@@ -114,7 +114,7 @@ function MarketCard({ page }: { page: OverviewPageModel }) {
 
 export function OverviewPage() {
   const page = useOverviewPage();
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const copy = t.admin.overview;
 
   const header = (

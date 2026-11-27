@@ -1,21 +1,26 @@
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import {
   type AdminUser,
   CreateUserSchema,
+  ErrorCode,
   type Role,
   type UpdateUser,
   type UserStatus,
 } from '@sarwa/contracts';
 import {
-  isConflict,
+  isApiError,
   useAdminSession,
   useAdminUsers,
   useCreateUser,
   useUpdateUser,
 } from '@sarwa/core/admin';
 
+import { oneOf, setSearchParams, useSearchParamText } from '../../lib/search-params';
+
 export type UserFilter = 'all' | UserStatus;
+const STATUSES: readonly UserStatus[] = ['active', 'disabled'];
 export type UserFieldError = 'emailInvalid' | 'required' | 'passwordShort' | 'exists';
 export interface UserConfirm {
   kind: 'disable' | 'demote';
@@ -39,14 +44,14 @@ function useAddUser() {
       if (key === 'password') errors.password = 'passwordShort';
     }
   }
-  if (submitted && isConflict(create.error)) errors.email = 'exists';
+  if (submitted && isApiError(create.error, ErrorCode.Conflict)) errors.email = 'exists';
 
   return {
     open,
     form,
     errors,
     isSaving: create.isPending,
-    failed: create.isError && !isConflict(create.error),
+    failed: create.isError && !isApiError(create.error, ErrorCode.Conflict),
     actions: {
       open: () => {
         create.reset();
@@ -79,8 +84,9 @@ export function useUsersPage() {
   const users = useAdminUsers({ enabled: session.canEdit });
   const update = useUpdateUser();
   const add = useAddUser();
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<UserFilter>('all');
+  const params = useSearchParams();
+  const search = useSearchParamText(params, 'q');
+  const filter = oneOf<UserFilter>(params.get('status'), STATUSES, 'all');
   const [confirm, setConfirm] = useState<UserConfirm | null>(null);
   const all = users.data ?? [];
   const ask = (kind: UserConfirm['kind'], id: string) => {
@@ -89,7 +95,7 @@ export function useUsersPage() {
     update.reset();
     setConfirm({ kind, user });
   };
-  const q = search.trim().toLowerCase();
+  const q = search.text.trim().toLowerCase();
 
   return {
     me: session.user,
@@ -105,7 +111,7 @@ export function useUsersPage() {
       admins: all.filter((user) => user.role === 'ADMIN').length,
       viewers: all.filter((user) => user.role === 'VIEWER').length,
     },
-    search,
+    search: search.text,
     filter,
     isLoading: users.isPending,
     isError: users.isError,
@@ -119,8 +125,10 @@ export function useUsersPage() {
     },
     actions: {
       retry: () => void users.refetch(),
-      search: setSearch,
-      setFilter,
+      search: search.set,
+      setFilter: (next: UserFilter) => {
+        setSearchParams({ status: next === 'all' ? null : next });
+      },
       setRole: (id: string, role: Role) => {
         if (role === 'VIEWER') ask('demote', id);
         else update.mutate({ id, patch: { role } });

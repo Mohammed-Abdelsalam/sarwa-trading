@@ -2,11 +2,11 @@
 
 import { TriangleAlert } from 'lucide-react';
 
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import { Button, StateView } from '@sarwa/ui';
 
 export default function Error({ reset }: { error: Error; reset: () => void }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   return (
     <StateView
       className="py-24"

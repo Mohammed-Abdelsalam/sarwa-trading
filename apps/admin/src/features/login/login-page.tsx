@@ -2,8 +2,7 @@
 
 import { Eye, EyeOff, ShieldCheck, TriangleAlert } from 'lucide-react';
 
-import { useI18n } from '@sarwa/core';
-import { PASSWORD_MIN_LENGTH, REMEMBER_DAYS } from '@sarwa/core/admin';
+import { PASSWORD_MIN_LENGTH, REMEMBER_DAYS, useAdminI18n } from '@sarwa/core/admin';
 import { Badge, Button, Callout, Card, Field, IconButton, Input, Logo } from '@sarwa/ui';
 
 import { TickerRows } from '../../components/common/ticker';
@@ -11,7 +10,7 @@ import { useLoginPage } from './use-login-page';
 
 export function LoginPage() {
   const page = useLoginPage();
-  const { t, f, dir } = useI18n();
+  const { t, f, dir } = useAdminI18n();
   const copy = t.admin.login;
   const fieldError = (code: 'emailInvalid' | 'passwordShort') =>
     code === 'emailInvalid'

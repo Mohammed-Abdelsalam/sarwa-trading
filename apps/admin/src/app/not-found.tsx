@@ -3,11 +3,11 @@
 import { SearchX } from 'lucide-react';
 import Link from 'next/link';
 
-import { useI18n } from '@sarwa/core';
+import { useAdminI18n } from '@sarwa/core/admin';
 import { buttonVariants, StateView } from '@sarwa/ui';
 
 export default function NotFound() {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   return (
     <StateView
       className="py-24"

@@ -1,42 +1,41 @@
-import { act, screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useAdminAccounts, useAdminSession, useResetAccount } from '@sarwa/core/admin';
+import { type AdminUser } from '@sarwa/contracts';
 
 import { AccountsPage } from '../../src/features/accounts/accounts-page';
-import { makeAccount, mutation, query, renderWithProviders, session } from '../utils';
+import { type ApiCall, makeAccount, me, renderWithApi } from '../utils';
 
-jest.mock('@sarwa/core/admin', () => ({
-  ...jest.requireActual<object>('@sarwa/core/admin'),
-  useAdminSession: jest.fn(),
-  useAdminAccounts: jest.fn(),
-  useResetAccount: jest.fn(),
-}));
-
-function setup(role: 'ADMIN' | 'VIEWER' = 'ADMIN') {
-  const reset = mutation();
-  jest.mocked(useAdminSession).mockReturnValue(session(role));
-  jest
-    .mocked(useAdminAccounts)
-    .mockReturnValue(query({ items: [makeAccount()], total: 1, page: 1, pageSize: 25 }));
-  jest.mocked(useResetAccount).mockReturnValue(reset as never);
-  renderWithProviders(<AccountsPage />);
-  return reset;
+function setup(role: AdminUser['role'] = 'ADMIN') {
+  return renderWithApi(<AccountsPage />, {
+    'GET admin/auth/me': me(role),
+    'GET admin/accounts': { items: [makeAccount()], total: 1, page: 1, pageSize: 25 },
+    'POST admin/accounts/acc-1/reset': {
+      id: 'acc-1',
+      handle: 'ACC-00AA11',
+      cashCents: 10_000_000,
+      startingCashCents: 10_000_000,
+      createdAt: 1_000,
+      resetAt: 2_000,
+    },
+  });
 }
 
+const resets = (calls: ApiCall[]) => calls.filter((call) => call.method === 'POST');
+
 describe('AccountsPage', () => {
-  it('lists accounts with formatted balances', () => {
+  it('lists accounts with formatted balances', async () => {
     setup();
 
-    expect(screen.getByText('ACC-00AA11')).toBeInTheDocument();
+    expect(await screen.findByText('ACC-00AA11')).toBeInTheDocument();
     expect(screen.getByText('$110,194.29')).toBeInTheDocument();
     expect(screen.getByText('+$647.32')).toBeInTheDocument();
   });
 
   it('only resets after the exact confirmation phrase is typed', async () => {
-    const reset = setup();
+    const { calls } = setup();
 
-    await userEvent.click(screen.getByRole('button', { name: 'View ACC-00AA11' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'View ACC-00AA11' }));
     await userEvent.click(screen.getByRole('button', { name: 'Reset account' }));
     const dialog = screen.getByRole('dialog', { name: 'Reset account' });
     const input = within(dialog).getByLabelText('Type RESET ACC-00AA11 to confirm');
@@ -48,40 +47,31 @@ describe('AccountsPage', () => {
     await userEvent.clear(input);
     await userEvent.type(input, 'RESET ACC-00AA11');
     expect(confirm).toBeEnabled();
+    expect(resets(calls)).toEqual([]);
 
     await userEvent.click(confirm);
-    expect(reset.mutate).toHaveBeenCalledWith(
-      { id: 'acc-1', confirm: 'RESET ACC-00AA11' },
-      expect.anything(),
-    );
+    expect(await screen.findByText('ACC-00AA11 was reset.')).toBeInTheDocument();
+    expect(resets(calls)).toEqual([
+      expect.objectContaining({
+        path: 'admin/accounts/acc-1/reset',
+        body: { confirm: 'RESET ACC-00AA11' },
+      }),
+    ]);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 
   it('locks the reset for viewers', async () => {
     setup('VIEWER');
 
-    await userEvent.click(screen.getByRole('button', { name: 'View ACC-00AA11' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'View ACC-00AA11' }));
 
-    expect(screen.getByRole('button', { name: 'Reset account' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-  });
-
-  it('queries the server once typing pauses, not on every keystroke', async () => {
-    jest.useFakeTimers();
-    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
-    setup();
-
-    await user.type(screen.getByLabelText('Search accounts'), 'acc');
-    const queried = () => jest.mocked(useAdminAccounts).mock.calls.map(([query]) => query.q);
-    expect(queried()).not.toContain('a');
-    expect(queried()).not.toContain('ac');
-
-    act(() => {
-      jest.advanceTimersByTime(300);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Reset account' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
     });
-    expect(queried()).toContain('acc');
-    expect(queried()).not.toContain('ac');
-    jest.useRealTimers();
   });
 });

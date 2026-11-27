@@ -2,8 +2,8 @@
 
 import { Pause } from 'lucide-react';
 
-import { bps, type MarketState, marketTime, type SessionPhase, useI18n } from '@sarwa/core';
-import { SESSION_MODES } from '@sarwa/core/admin';
+import { bps, type MarketState, marketTime, type SessionPhase } from '@sarwa/core';
+import { SESSION_MODES, useAdminI18n } from '@sarwa/core/admin';
 import {
   Badge,
   Callout,
@@ -41,7 +41,7 @@ const PILL_STATE: Record<SessionPhase, MarketState> = {
 };
 
 function ControlCards({ page }: { page: TradingPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const data = page.trading;
   if (!data) return null;
   const breaker = data.circuitBreaker;
@@ -139,7 +139,7 @@ function ControlCards({ page }: { page: TradingPageModel }) {
 }
 
 function TradingConfirmDialog({ page }: { page: TradingPageModel }) {
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   const copy = t.admin.trading;
   const request = page.confirm.request;
   const text =
@@ -165,7 +165,7 @@ function TradingConfirmDialog({ page }: { page: TradingPageModel }) {
 }
 
 function HaltsCard({ page }: { page: TradingPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   const halts = page.trading?.halts ?? [];
   const empty = halts.length === 0 && page.disabledStocks.length === 0;
   return (
@@ -189,11 +189,11 @@ function HaltsCard({ page }: { page: TradingPageModel }) {
           {t.admin.trading.noHalts}
         </p>
       ) : (
-        <Table>
+        <Table label={t.admin.halts}>
           <THead>
             <TRow>
               <TH className="ps-4">{t.admin.haltColumns.symbol}</TH>
-              <TH>{t.admin.haltColumns.reason}</TH>
+              <TH className="max-md:hidden">{t.admin.haltColumns.reason}</TH>
               <TH>{t.admin.haltColumns.since}</TH>
               <TH>{t.admin.haltColumns.resumes}</TH>
               <TH align="end">
@@ -215,7 +215,7 @@ function HaltsCard({ page }: { page: TradingPageModel }) {
                     <Badge tone="warn">{t.admin.haltedBadge}</Badge>
                   </span>
                 </TCell>
-                <TCell className="text-fg-2 max-w-60 truncate">{halt.message}</TCell>
+                <TCell className="text-fg-2 max-w-60 truncate max-md:hidden">{halt.message}</TCell>
                 <TCell className="tabular-nums">{f.time(halt.since)}</TCell>
                 <TCell className="tabular-nums">
                   {halt.resumesAt === null ? (
@@ -279,7 +279,7 @@ function HaltsCard({ page }: { page: TradingPageModel }) {
 }
 
 function CalendarStrip({ page }: { page: TradingPageModel }) {
-  const { t, f } = useI18n();
+  const { t, f } = useAdminI18n();
   return (
     <Card className="flex flex-wrap items-center gap-4.5 px-4.5 py-3.5">
       <h2 className="type-h3 text-fg whitespace-nowrap">{t.admin.marketCalendar}</h2>
@@ -320,7 +320,7 @@ function CalendarStrip({ page }: { page: TradingPageModel }) {
 
 export function TradingPage() {
   const page = useTradingPage();
-  const { t } = useI18n();
+  const { t } = useAdminI18n();
   const session = page.trading?.session;
 
   return (

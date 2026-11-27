@@ -1,10 +1,10 @@
 import { type Metadata } from 'next';
 
-import { getMessages } from '@sarwa/core/server';
+import { getAdminMessages } from '@sarwa/core/server';
 
 import { OverviewPage } from '../../../features/overview/overview-page';
 
-export const metadata: Metadata = { title: getMessages('en').admin.nav.overview };
+export const metadata: Metadata = { title: getAdminMessages('en').nav.overview };
 
 export default function Page() {
   return <OverviewPage />;

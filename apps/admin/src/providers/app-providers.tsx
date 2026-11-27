@@ -5,8 +5,8 @@ import { type ReactNode, useState } from 'react';
 
 import { SarwaProvider, shouldRetry, useMarketConnection } from '@sarwa/core';
 import { AdminProvider } from '@sarwa/core/admin';
+import { usePageLifecycle } from '@sarwa/ui';
 
-import { usePageLifecycle } from '../lib/browser';
 import { createBrowserClients } from '../lib/client';
 
 function LiveSync() {

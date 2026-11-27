@@ -1,11 +1,16 @@
 import { type Metadata } from 'next';
+import { Suspense } from 'react';
 
-import { getMessages } from '@sarwa/core/server';
+import { getAdminMessages } from '@sarwa/core/server';
 
 import { OrdersPage } from '../../../features/orders/orders-page';
 
-export const metadata: Metadata = { title: getMessages('en').admin.nav.orders };
+export const metadata: Metadata = { title: getAdminMessages('en').nav.orders };
 
 export default function Page() {
-  return <OrdersPage />;
+  return (
+    <Suspense>
+      <OrdersPage />
+    </Suspense>
+  );
 }
