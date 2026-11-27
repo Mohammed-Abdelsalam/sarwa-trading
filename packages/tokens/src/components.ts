@@ -50,6 +50,7 @@ export const componentRadius = {
   'pill-lg': 9,
   seg: 11,
   'avatar-lg': 16,
+  mark: 9,
   dialog: 18,
   art: 22,
 } as const;
@@ -65,6 +66,8 @@ export const componentTypography = {
   'avatar-sm': { family: 'display', size: 13, lineHeight: 16, weight: 800 },
   avatar: { family: 'display', size: 16, lineHeight: 20, weight: 800 },
   'avatar-lg': { family: 'display', size: 22, lineHeight: 26, weight: 800 },
+  logo: { family: 'display', size: 17, lineHeight: 20, weight: 800, tracking: -0.01 },
+  kbd: { family: 'mono', size: 11, lineHeight: 12, weight: 500 },
 } as const satisfies Record<string, TypeToken>;
 
 export type ComponentTypographyToken = keyof typeof componentTypography;
