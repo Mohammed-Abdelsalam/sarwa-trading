@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm format:check:*)",
+      "Bash(pnpm turbo run lint:*)",
+      "Bash(pnpm turbo run typecheck:*)",
+      "Bash(pnpm turbo run test:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch --show-current:*)",
+      "Bash(git worktree list:*)"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(git stash:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(git commit -n:*)",
+      "Bash(pnpm db:reset:*)",
+      "Bash(pnpm --filter @sarwa/server db:reset:*)",
+      "Bash(prisma migrate reset:*)",
+      "Bash(pnpm exec prisma migrate reset:*)",
+      "Bash(pnpm exec prisma db push --force-reset:*)",
+      "Read(./**/.env)"
+    ]
+  }
+}
