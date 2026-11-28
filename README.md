@@ -29,15 +29,16 @@ A paper-trading platform with live prices: a native Expo app, a Next.js website,
 5. [The brief, and how each requirement is met](#the-brief-and-how-each-requirement-is-met)
 6. [What I added beyond the brief, and why](#what-i-added-beyond-the-brief-and-why)
 7. [Admin dashboard](#admin-dashboard)
-8. [Architecture](#architecture)
-9. [Tech stack](#tech-stack)
-10. [Performance](#performance)
-11. [Security](#security)
-12. [Quality and testing](#quality-and-testing)
-13. [How I worked with AI](#how-i-worked-with-ai)
-14. [Known limitations](#known-limitations)
-15. [Roadmap](#roadmap)
-16. [Repository map and further reading](#repository-map-and-further-reading)
+8. [Design and design system](#design-and-design-system)
+9. [Architecture](#architecture)
+10. [Tech stack](#tech-stack)
+11. [Performance](#performance)
+12. [Security](#security)
+13. [Quality and testing](#quality-and-testing)
+14. [How I worked with AI](#how-i-worked-with-ai)
+15. [Known limitations](#known-limitations)
+16. [Roadmap](#roadmap)
+17. [Repository map and further reading](#repository-map-and-further-reading)
 
 ## TL;DR
 
@@ -46,6 +47,7 @@ A paper-trading platform with live prices: a native Expo app, a Next.js website,
 - **A real backend, not a mock.** NestJS + Prisma + SQLite with a simulated market that ticks every 500 ms, a trading engine, customer accounts and an admin API. `pnpm install && pnpm dev` runs everything with nothing else to install.
 - **Live everywhere.** Socket.IO rooms per symbol, a server snapshot for the first paint, then a batched stream; a tick re-renders only the rows whose price changed.
 - **The brief, then the product around it.** Stock list, stock detail with 1D/1W/1M/1Y/ALL charts and a watchlist that works for guests, plus paper trading, alerts, accounts, an admin console, Arabic/RTL, dark mode and offline cache.
+- **Designed before it was coded.** A full UI kit in Claude Design (41 boards: foundations, components, every screen of the three apps), mirrored one-to-one by the shared design tokens. See [Design and design system](#design-and-design-system).
 - **2,110 automated tests**, all passing, with per-workspace coverage floors enforced in CI (domain at 100%).
 - **Measured by hand.** Manual, local Lighthouse runs on the production web build (not in CI): home page performance 93 mobile / 100 desktop, accessibility 100, SEO 100, and best practices 100 on the home page. The mobile LCP fix is under [Performance](#performance).
 - **The AI setup is committed.** `CLAUDE.md`, subagent roles, slash commands, rules and the real prompts are all in the repo, with the incidents that shaped them.
@@ -336,6 +338,42 @@ A VIEWER sees masked emails and locked controls, and the server answers any writ
   <br><sub>Admin sign-in</sub>
 </p>
 
+## Design and design system
+
+Every screen was designed before it was coded. The product lives in a **Claude Design UI kit: 41 boards across eight pages**, from colour tokens to every screen of the mobile app, the website and the admin dashboard, in light and dark. Each feature wave started from a design brief written with AI ([accounts and auth brief](docs/ai/prompts/03-design-accounts-and-auth.md)), and the finished boards were turned into a written spec with numbered gaps before any implementation ([spec, gaps G1–G30](docs/ai/prompts/05-accounts-design-spec.md)).
+
+<p align="center"><b><a href="docs/design/mini-trading-ui-kit.pdf">📄 Open the full UI kit (PDF, 50 pages, bookmarked)</a></b></p>
+
+<table>
+<tr>
+<td width="40%" align="center"><img src="docs/design/foundations.png" alt="Design system foundations: colour tokens, typography, spacing, radii, elevation, motion" width="420"><br><sub><b>Foundations</b>: semantic colour tokens for light and dark with WCAG contrast ratios, type scale, 4 pt spacing, radii, elevation and motion</sub></td>
+<td width="40%" align="center"><img src="docs/design/trading-components.png" alt="Trading components: price text, price flash, change pill, star button, connection badge, sparkline, period tabs, stock row" width="420"><br><sub><b>Trading components</b>: PriceText, PriceFlash, ChangePill, StarButton, ConnectionBadge, Sparkline, PeriodTabs and StockRow in every state</sub></td>
+<td width="20%" align="center"><img src="docs/design/mobile-stock-detail.png" alt="Mobile stock detail design board" width="200"><br><sub><b>Screen boards</b>: every screen and state, here the mobile stock detail</sub></td>
+</tr>
+</table>
+
+<details>
+<summary><b>What the kit covers</b>, page by page (click to expand)</summary>
+
+| Page                  | Boards                                                                         |
+| --------------------- | ------------------------------------------------------------------------------ |
+| Design system         | Foundations, core components (every variant and state), trading components     |
+| Mobile app            | Markets, watchlist, stock detail, loading/empty/error states, global UI        |
+| Web app               | Markets, stock detail, watchlist, global UI                                    |
+| Admin dashboard       | Login, overview, market control, stocks, config, audit, team, read-only viewer |
+| Prototype & dev notes | Clickable mobile prototype, redlines and motion specs                          |
+| Extras                | Arabic and RTL, live-data architecture, accessibility and edge cases           |
+| Trading features (v2) | Order ticket, portfolio and orders on mobile and web, admin trading controls   |
+| Accounts & auth (v3)  | Account flows, sign-in and sign-up, gating, account settings, admin customers  |
+
+</details>
+
+**From design to code**
+
+- **One token source.** [`@sarwa/tokens`](packages/tokens/README.md) holds the kit's colour roles, type scale, spacing, radii, shadows and motion as data. It generates the CSS variables for web and admin (Tailwind v4) and the preset for mobile (NativeWind), so all three apps read the same names.
+- **Enforced, not hoped for.** Lint rejects raw hex colours and font files outside the tokens, and token tests check the colour contrast pairs.
+- **The kit's rules are in the product.** Price colour is never the only signal (every change carries ▲/▼ or +/−), prices use tabular numbers so live ticks never jitter, the price flash is 400 ms, and motion respects reduced-motion settings.
+
 ## Architecture
 
 ```mermaid
@@ -567,6 +605,7 @@ Honest trade-offs for a take-home; most are listed with their reasons in [SECURI
 
 | Topic              | Document                                                                                                                                                                                                                                                                                                                                                              |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design             | [UI kit (PDF, 50 pages)](docs/design/mini-trading-ui-kit.pdf), [design tokens](packages/tokens/README.md)                                                                                                                                                                                                                                                             |
 | Architecture       | [docs/architecture.md](docs/architecture.md)                                                                                                                                                                                                                                                                                                                          |
 | Decisions          | [docs/adr/](docs/adr/README.md) (13 ADRs)                                                                                                                                                                                                                                                                                                                             |
 | Security           | [SECURITY.md](SECURITY.md)                                                                                                                                                                                                                                                                                                                                            |
