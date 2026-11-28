@@ -39,6 +39,7 @@ A paper-trading platform with live prices: a native Expo app, a Next.js website,
 15. [Known limitations](#known-limitations)
 16. [Roadmap](#roadmap)
 17. [Repository map and further reading](#repository-map-and-further-reading)
+18. [Contact](#contact)
 
 ## TL;DR
 
@@ -342,7 +343,7 @@ A VIEWER sees masked emails and locked controls, and the server answers any writ
 
 Every screen was designed before it was coded. The product lives in a **Claude Design UI kit: 41 boards across eight pages**, from colour tokens to every screen of the mobile app, the website and the admin dashboard, in light and dark. Each feature wave started from a design brief written with AI ([accounts and auth brief](docs/ai/prompts/03-design-accounts-and-auth.md)), and the finished boards were turned into a written spec with numbered gaps before any implementation ([spec, gaps G1–G30](docs/ai/prompts/05-accounts-design-spec.md)).
 
-<p align="center"><b><a href="docs/design/mini-trading-ui-kit.pdf">📄 Open the full UI kit (PDF, 50 pages, bookmarked)</a></b></p>
+<p align="center"><b><a href="docs/design/README.md">Browse the design boards</a></b> &nbsp;·&nbsp; <a href="docs/design/mini-trading-ui-kit.pdf">Download the full UI kit (PDF, 50 pages)</a></p>
 
 <table>
 <tr>
@@ -605,7 +606,7 @@ Honest trade-offs for a take-home; most are listed with their reasons in [SECURI
 
 | Topic              | Document                                                                                                                                                                                                                                                                                                                                                              |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Design             | [UI kit (PDF, 50 pages)](docs/design/mini-trading-ui-kit.pdf), [design tokens](packages/tokens/README.md)                                                                                                                                                                                                                                                             |
+| Design             | [Design boards](docs/design/README.md), [UI kit (PDF, 50 pages)](docs/design/mini-trading-ui-kit.pdf), [design tokens](packages/tokens/README.md)                                                                                                                                                                                                                     |
 | Architecture       | [docs/architecture.md](docs/architecture.md)                                                                                                                                                                                                                                                                                                                          |
 | Decisions          | [docs/adr/](docs/adr/README.md) (13 ADRs)                                                                                                                                                                                                                                                                                                                             |
 | Security           | [SECURITY.md](SECURITY.md)                                                                                                                                                                                                                                                                                                                                            |
@@ -616,3 +617,11 @@ Honest trade-offs for a take-home; most are listed with their reasons in [SECURI
 | Apps               | [server](apps/server/README.md) · [web](apps/web/README.md) · [admin](apps/admin/README.md) · [mobile](apps/mobile/README.md)                                                                                                                                                                                                                                         |
 | Packages           | [domain](packages/domain/README.md) · [contracts](packages/contracts/README.md) · [core](packages/core/README.md) · [i18n](packages/i18n/README.md) · [tokens](packages/tokens/README.md) · [ui](packages/ui/README.md) · [eslint-config](packages/eslint-config/README.md) · [jest-config](packages/jest-config/README.md) · [tsconfig](packages/tsconfig/README.md) |
 | CI                 | [.github/workflows/ci.yml](.github/workflows/ci.yml)                                                                                                                                                                                                                                                                                                                  |
+
+## Contact
+
+**Mohamed Abdelsalam**
+
+- Email: [mohamedabdelsalamcsai@gmail.com](mailto:mohamedabdelsalamcsai@gmail.com)
+- LinkedIn: [linkedin.com/in/mo-abdelsalam-frontend](https://www.linkedin.com/in/mo-abdelsalam-frontend/)
+- Portfolio: [moabdelsalam.vercel.app](https://moabdelsalam.vercel.app/)
