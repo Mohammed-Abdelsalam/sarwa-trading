@@ -8,16 +8,16 @@ Light or dark follows your GitHub theme.
 
 <table>
   <tr>
-    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/admin-market-control.png"><img src="../../docs/screenshots/light/admin-market-control.png" alt="Market control room"></picture><br><sub>Market control room: pause the market, set volatility, drop all connections, live ticker.</sub></td>
-    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/admin-customers.png"><img src="../../docs/screenshots/light/admin-customers.png" alt="Customers list"></picture><br><sub>Customers: sign-up and activity stats, filters, and the customer table.</sub></td>
+    <td width="50%"><img src="../../docs/screenshots/light/admin-market-control.png" alt="Market control room"><br><sub>Market control room: pause the market, set volatility, drop all connections, live ticker.</sub></td>
+    <td width="50%"><img src="../../docs/screenshots/light/admin-customers.png" alt="Customers list"><br><sub>Customers: sign-up and activity stats, filters, and the customer table.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/admin-customer-actions.png"><img src="../../docs/screenshots/light/admin-customer-actions.png" alt="Suspend customer dialog"></picture><br><sub>Customer actions: suspending a customer needs a reason category and a message.</sub></td>
-    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/admin-viewer-customers.png"><img src="../../docs/screenshots/light/admin-viewer-customers.png" alt="Customers as a VIEWER"></picture><br><sub>VIEWER role: read-only banner and masked customer emails.</sub></td>
+    <td width="50%"><img src="../../docs/screenshots/light/admin-customer-actions.png" alt="Suspend customer dialog"><br><sub>Customer actions: suspending a customer needs a reason category and a message.</sub></td>
+    <td width="50%"><img src="../../docs/screenshots/light/admin-viewer-customers.png" alt="Customers as a VIEWER"><br><sub>VIEWER role: read-only banner and masked customer emails.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/admin-team.png"><img src="../../docs/screenshots/light/admin-team.png" alt="Team page"></picture><br><sub>Team: staff roles, disable access, and pending invites.</sub></td>
-    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/admin-audit.png"><img src="../../docs/screenshots/light/admin-audit.png" alt="Audit log"></picture><br><sub>Audit log: every admin action with actor, entity and payload.</sub></td>
+    <td width="50%"><img src="../../docs/screenshots/light/admin-team.png" alt="Team page"><br><sub>Team: staff roles, disable access, and pending invites.</sub></td>
+    <td width="50%"><img src="../../docs/screenshots/light/admin-audit.png" alt="Audit log"><br><sub>Audit log: every admin action with actor, entity and payload.</sub></td>
   </tr>
 </table>
 
