@@ -2,6 +2,8 @@
 
 The design system as data, and the single source of colours and type for every client. It defines light and dark colour roles, sector colours, typography, spacing, radius, shadows, motion and breakpoints, plus component sizes and variants. It generates the CSS variables for web and admin and a Tailwind preset for mobile.
 
+These values come from the project's design system: see the [full UI kit (PDF)](../../docs/design/mini-trading-ui-kit.pdf) and the [Design and design system](../../README.md#design-and-design-system) section of the root README.
+
 ## Run, test, build
 
 | Task                                       | In this folder                | From the root                                          |
