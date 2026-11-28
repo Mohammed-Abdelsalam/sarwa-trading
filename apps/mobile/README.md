@@ -4,17 +4,24 @@ The customer mobile app, built with Expo SDK 58, Expo Router and NativeWind. It 
 
 ## Screenshots
 
-Taken on a real phone in dark mode.
+Taken in Expo Go on a real iPhone, with live prices from the local API.
 
 <table>
-  <tr>
-    <td width="33%"><img src="../../docs/screenshots/mobile-app/portfolio-dark.jpg" alt="Portfolio tab" width="240"><br><sub>Portfolio: equity chart, cash, buying power and P&amp;L.</sub></td>
-    <td width="33%"><img src="../../docs/screenshots/mobile-app/watchlist-dark.jpg" alt="Watchlist tab" width="240"><br><sub>Watchlist: live prices, sparklines, swipe to remove.</sub></td>
-    <td width="33%"><img src="../../docs/screenshots/mobile-app/account-dark.jpg" alt="Account tab" width="240"><br><sub>Account: profile, security, language, appearance and trading settings.</sub></td>
-  </tr>
+<tr>
+<td width="25%" align="center"><img src="../../docs/screenshots/mobile-app/app-markets.jpg" alt="Markets tab with live prices, sparklines, sector chips and stars" width="200"><br><sub><b>Markets</b>: live prices, sparklines, sector chips, stars</sub></td>
+<td width="25%" align="center"><img src="../../docs/screenshots/mobile-app/app-stock-candles.jpg" alt="TSLA stock detail with a 1M candlestick chart and volume" width="200"><br><sub><b>Stock detail</b>: 1M candles with volume, period tabs, line or candle toggle</sub></td>
+<td width="25%" align="center"><img src="../../docs/screenshots/mobile-app/app-watchlist.jpg" alt="Watchlist tab with seven stocks and live prices" width="200"><br><sub><b>Watchlist</b>: live prices, swipe left to remove</sub></td>
+<td width="25%" align="center"><img src="../../docs/screenshots/mobile-app/app-home.jpg" alt="Home tab with total equity, equity chart, open orders, alerts and top movers" width="200"><br><sub><b>Home</b>: total equity, open orders, alerts, top movers</sub></td>
+</tr>
+<tr>
+<td width="25%" align="center"><img src="../../docs/screenshots/mobile-app/app-ticket.jpg" alt="Buy NVDA ticket with bid, ask, spread, order types and a numeric keypad" width="200"><br><sub><b>Ticket</b>: bid/ask/spread, Market/Limit/Stop, $ or shares, buying power after</sub></td>
+<td width="25%" align="center"><img src="../../docs/screenshots/mobile-app/app-filled.jpg" alt="Order filled with average fill price, slippage, fill time and the new position" width="200"><br><sub><b>Filled</b>: average fill price, slippage vs quote, new position</sub></td>
+<td width="25%" align="center"><img src="../../docs/screenshots/mobile-app/app-portfolio.jpg" alt="Portfolio tab with the NVDA position, cash, buying power, P&amp;L and allocation" width="200"><br><sub><b>Portfolio</b>: cash, buying power, unrealized and realized P&amp;L, allocation</sub></td>
+<td width="25%" align="center"><img src="../../docs/screenshots/mobile-app/app-orders.jpg" alt="Orders list with Open, Filled and All tabs" width="200"><br><sub><b>Orders</b>: Open, Filled and All, with filled buys and sells</sub></td>
+</tr>
 </table>
 
-## Run, test, lint
+## Run, test, build
 
 | Task                    | In this folder                                            | From the root                                          |
 | ----------------------- | --------------------------------------------------------- | ------------------------------------------------------ |

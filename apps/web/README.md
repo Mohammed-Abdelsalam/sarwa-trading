@@ -4,8 +4,6 @@ The customer web app, built with the Next.js 16 App Router and Tailwind v4. Gues
 
 ## Screenshots
 
-Light or dark follows your GitHub theme.
-
 <table>
   <tr>
     <td width="50%"><img src="../../docs/screenshots/light/web-home-guest.png" alt="Guest home page"><br><sub>Guest home: sign-up hero, top movers and the sector heatmap.</sub></td>

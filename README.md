@@ -14,8 +14,8 @@ A paper-trading platform with live prices: a native Expo app, a Next.js website,
   <br><sub><b>Web</b> · Next.js</sub>
 </td>
 <td align="center" valign="middle">
-  <img src="docs/screenshots/mobile-app/watchlist-dark.jpg" alt="The native Expo app on a real phone: watchlist with live prices" width="190">
-  <br><sub><b>Mobile app</b> · Expo, on a real phone</sub>
+  <img src="docs/screenshots/mobile-app/app-stock-line.jpg" alt="The native Expo app on a real iPhone: AMD stock detail with the ALL-period chart, key statistics and Buy and Sell" width="190">
+  <br><sub><b>Mobile app</b> · Expo, on a real iPhone</sub>
 </td>
 </tr>
 </table>
@@ -23,11 +23,11 @@ A paper-trading platform with live prices: a native Expo app, a Next.js website,
 ## Contents
 
 1. [TL;DR](#tldr)
-2. [Quick start](#quick-start)
-3. [Key decisions](#key-decisions)
-4. [The brief, and how each requirement is met](#the-brief-and-how-each-requirement-is-met)
-5. [What I added beyond the brief, and why](#what-i-added-beyond-the-brief-and-why)
-6. [Screenshots](#screenshots)
+2. [Screenshots](#screenshots)
+3. [Quick start](#quick-start)
+4. [Key decisions](#key-decisions)
+5. [The brief, and how each requirement is met](#the-brief-and-how-each-requirement-is-met)
+6. [What I added beyond the brief, and why](#what-i-added-beyond-the-brief-and-why)
 7. [Admin dashboard](#admin-dashboard)
 8. [Architecture](#architecture)
 9. [Tech stack](#tech-stack)
@@ -49,6 +49,113 @@ A paper-trading platform with live prices: a native Expo app, a Next.js website,
 - **2,110 automated tests**, all passing, with per-workspace coverage floors enforced in CI (domain at 100%).
 - **Measured by hand.** Manual, local Lighthouse runs on the production web build (not in CI): home page performance 93 mobile / 100 desktop, accessibility 100, SEO 100, and best practices 100 on the home page. The mobile LCP fix is under [Performance](#performance).
 - **The AI setup is committed.** `CLAUDE.md`, subagent roles, slash commands, rules and the real prompts are all in the repo, with the incidents that shaped them.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/live-prices.gif" alt="Prices ticking live on the markets page" width="820">
+  <br><sub>Live prices streaming over Socket.IO: only the rows whose price changed re-render.</sub>
+</p>
+
+### The brief: stock detail and watchlist
+
+<table>
+<tr>
+<td width="50%" align="center"><img src="docs/screenshots/dark/web-stock.png" alt="Stock detail with a live price and chart periods" width="420"><br><sub><b>Stock detail</b>: live price, 1D/1W/1M/1Y/ALL chart, key stats and the order ticket</sub></td>
+<td width="50%" align="center"><img src="docs/screenshots/light/web-watchlist.png" alt="Watchlist with live prices" width="420"><br><sub><b>Watchlist</b>: starred stocks with live prices; works for guests too</sub></td>
+</tr>
+</table>
+
+### Native app on a real device
+
+The Expo app running in Expo Go on a real iPhone, streaming live prices from the same backend as the web.
+
+**The brief: stock list, stock detail and watchlist**
+
+<table>
+<tr>
+<td width="25%" align="center"><img src="docs/screenshots/mobile-app/app-markets.jpg" alt="Native app: Markets with live prices, sparklines, sector chips and stars" width="200"><br><sub><b>Markets</b>: live prices, sparklines, sector chips, stars</sub></td>
+<td width="25%" align="center"><img src="docs/screenshots/mobile-app/app-stock-candles.jpg" alt="Native app: TSLA stock detail with a 1M candlestick chart and volume" width="200"><br><sub><b>Stock detail</b>: 1M candles with volume, period tabs, line or candle toggle</sub></td>
+<td width="25%" align="center"><img src="docs/screenshots/mobile-app/app-watchlist.jpg" alt="Native app: Watchlist with seven stocks and live prices" width="200"><br><sub><b>Watchlist</b>: live prices, swipe left to remove</sub></td>
+<td width="25%" align="center"><img src="docs/screenshots/mobile-app/app-home.jpg" alt="Native app: Home with total equity, equity chart, open orders, alerts and top movers" width="200"><br><sub><b>Home</b>: total equity, open orders, alerts, top movers</sub></td>
+</tr>
+</table>
+
+**Trade in three steps: ticket, review, fill**
+
+<table>
+<tr>
+<td width="25%" align="center"><img src="docs/screenshots/mobile-app/app-ticket.jpg" alt="Native app: Buy NVDA ticket with bid, ask, spread, order types and a numeric keypad" width="200"><br><sub><b>1. Ticket</b>: bid/ask/spread, Market/Limit/Stop, $ or shares, buying power after</sub></td>
+<td width="25%" align="center"><img src="docs/screenshots/mobile-app/app-review.jpg" alt="Native app: Review order with estimated price, quantity, reserved cash and a quote countdown" width="200"><br><sub><b>2. Review</b>: reserved cash, a 10 s quote that auto-refreshes, slide to buy</sub></td>
+<td width="25%" align="center"><img src="docs/screenshots/mobile-app/app-filled.jpg" alt="Native app: Order filled with average fill price, slippage, fill time and the new position" width="200"><br><sub><b>3. Filled</b>: average fill price, slippage vs quote, new position</sub></td>
+<td width="25%" align="center"><img src="docs/screenshots/mobile-app/app-portfolio.jpg" alt="Native app: Portfolio with the NVDA position, cash, buying power, P&amp;L and allocation" width="200"><br><sub><b>Portfolio</b>: the new position, cash, unrealized and realized P&amp;L</sub></td>
+</tr>
+</table>
+
+<details>
+<summary><b>More app screens</b>: orders, account, delete account (click to expand)</summary>
+
+<table>
+<tr>
+<td width="33%" align="center"><img src="docs/screenshots/mobile-app/app-orders.jpg" alt="Native app: Orders list with Open, Filled and All tabs" width="200"><br><sub><b>Orders</b>: Open, Filled and All, with filled buys and sells</sub></td>
+<td width="33%" align="center"><img src="docs/screenshots/mobile-app/app-account.jpg" alt="Native app: Account for a test customer whose email is not verified yet" width="200"><br><sub><b>Account</b>: security, language, appearance, trading, reset (test customer, email not verified yet)</sub></td>
+<td width="33%" align="center"><img src="docs/screenshots/mobile-app/app-delete.jpg" alt="Native app: Delete account with a 7-day grace period, password and typed DELETE confirmation" width="200"><br><sub><b>Delete account</b>: 7-day grace period, password and typed DELETE</sub></td>
+</tr>
+</table>
+
+</details>
+
+### Accounts and sign-in
+
+Guests browse freely; signing in unlocks trading, alerts and sessions. Shown with the seeded demo accounts.
+
+<table>
+<tr>
+<td width="50%" align="center"><img src="docs/screenshots/light/web-signin.png" alt="Sign-in page" width="420"><br><sub>Sign in with "Keep me signed in"</sub></td>
+<td width="50%" align="center"><img src="docs/screenshots/dark/web-account-menu.png" alt="Account menu of a signed-in customer" width="420"><br><sub>Account menu: equity, buying power, settings, theme, language and digits</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="docs/screenshots/dark/web-signup.png" alt="Sign-up with a password strength meter" width="420"><br><sub>Sign-up with a password strength meter</sub></td>
+<td width="50%" align="center"><img src="docs/screenshots/light/web-security.png" alt="Security settings with active sessions" width="420"><br><sub>Security: profile and active sessions on two devices, each can be signed out</sub></td>
+</tr>
+</table>
+
+### Arabic / RTL
+
+<p align="center">
+  <img src="docs/screenshots/rtl/web-ar.jpg" alt="The web home page as a guest in Arabic, mirrored right to left" width="820">
+  <br><sub>The guest home page in Arabic: the layout mirrors right to left, and prices keep Western digits by default.</sub>
+</p>
+
+<details>
+<summary><b>More web screens</b>: home, order ticket, portfolio (click to expand)</summary>
+
+<table>
+<tr>
+<td width="50%" align="center"><img src="docs/screenshots/light/web-home-guest.png" alt="Home as a guest" width="420"><br><sub>Home as a guest: movers, heatmap and a sign-up invite</sub></td>
+<td width="50%" align="center"><img src="docs/screenshots/dark/web-ticket.png" alt="Order ticket with a live estimate" width="420"><br><sub>Order ticket with a live estimate</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="docs/screenshots/dark/web-portfolio.png" alt="Portfolio and P&amp;L" width="420"><br><sub>Portfolio and P&amp;L</sub></td>
+<td width="50%"></td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><b>Responsive web at phone width</b> (click to expand)</summary>
+
+<table>
+<tr>
+<td width="25%" align="center"><img src="docs/screenshots/light/web-mobile-home.png" alt="Web at phone width: Home" width="200"><br><sub>Home</sub></td>
+<td width="25%" align="center"><img src="docs/screenshots/dark/web-mobile-markets.png" alt="Web at phone width: Markets" width="200"><br><sub>Markets</sub></td>
+<td width="25%" align="center"><img src="docs/screenshots/light/web-mobile-stock.png" alt="Web at phone width: Stock" width="200"><br><sub>Stock</sub></td>
+<td width="25%" align="center"><img src="docs/screenshots/dark/web-mobile-watchlist.png" alt="Web at phone width: Watchlist" width="200"><br><sub>Watchlist</sub></td>
+</tr>
+</table>
+
+</details>
 
 ## Quick start
 
@@ -154,120 +261,6 @@ One workspace: `pnpm turbo run typecheck lint test --filter=@sarwa/<name>`.
 | **Accessibility**                                                                                                                | Semantic HTML, focus management, reduced-motion support, `jsx-a11y` lint; Lighthouse accessibility 100 in manual runs.                                                                               |
 | **CI coverage floors**                                                                                                           | A floor per layer keeps the shared logic honest as the team grows. ([ADR 0011](docs/adr/0011-testing-jest-and-coverage-floors.md))                                                                   |
 
-## Screenshots
-
-<p align="center">
-  <img src="docs/screenshots/live-prices.gif" alt="Prices ticking live on the markets page" width="820">
-  <br><sub>Live prices streaming over Socket.IO: only the rows whose price changed re-render.</sub>
-</p>
-
-### Brief screens: light and dark
-
-<table>
-<tr><th width="50%">Light</th><th width="50%">Dark</th></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/web-stock.png" alt="Stock detail with live price and chart periods, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/web-stock.png" alt="Stock detail with live price and chart periods, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Stock detail with live price and chart periods</sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/web-watchlist.png" alt="Watchlist, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/web-watchlist.png" alt="Watchlist, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Watchlist</sub></td></tr>
-</table>
-
-### Native app on a real device
-
-The Expo app running in Expo Go on a real phone (dark theme).
-
-<table>
-<tr>
-<td width="33%" align="center"><img src="docs/screenshots/mobile-app/portfolio-dark.jpg" alt="Native app: Portfolio" width="240"><br><sub>Portfolio</sub></td>
-<td width="33%" align="center"><img src="docs/screenshots/mobile-app/watchlist-dark.jpg" alt="Native app: Watchlist" width="240"><br><sub>Watchlist</sub></td>
-<td width="33%" align="center"><img src="docs/screenshots/mobile-app/account-dark.jpg" alt="Native app: Account for a test customer whose email is not verified yet" width="240"><br><sub>Account (test customer, email not verified yet)</sub></td>
-</tr>
-</table>
-
-### Accounts and sign-in
-
-Guests browse freely; signing in unlocks trading, alerts and sessions. Shown with the seeded demo accounts.
-
-<table>
-<tr><th width="50%">Light</th><th width="50%">Dark</th></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/web-signin.png" alt="Sign-in page, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/web-signin.png" alt="Sign-in page, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Sign in with "Keep me signed in"</sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/web-account-menu.png" alt="Account menu of a signed-in customer, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/web-account-menu.png" alt="Account menu of a signed-in customer, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Account menu: equity, buying power, settings, theme, language and digits</sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/web-security.png" alt="Security settings with active sessions, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/web-security.png" alt="Security settings with active sessions, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Security: profile and active sessions on two devices, each can be signed out</sub></td></tr>
-</table>
-
-### Arabic / RTL
-
-<p align="center">
-  <img src="docs/screenshots/rtl/web-ar.jpg" alt="The web home page as a guest in Arabic, mirrored right to left" width="820">
-  <br><sub>The guest home page in Arabic: the layout mirrors right to left, and prices keep Western digits by default.</sub>
-</p>
-
-<details>
-<summary><b>More web screens</b>: home, order ticket, portfolio, sign-up (click to expand)</summary>
-
-<table>
-<tr><th width="50%">Light</th><th width="50%">Dark</th></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/web-home-guest.png" alt="Home as a guest, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/web-home-guest.png" alt="Home as a guest, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Home as a guest</sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/web-ticket.png" alt="Order ticket with a live estimate, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/web-ticket.png" alt="Order ticket with a live estimate, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Order ticket with a live estimate</sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/web-portfolio.png" alt="Portfolio and P&amp;L, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/web-portfolio.png" alt="Portfolio and P&amp;L, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Portfolio and P&amp;L</sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/web-signup.png" alt="Sign-up, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/web-signup.png" alt="Sign-up, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Sign-up</sub></td></tr>
-</table>
-
-</details>
-
-<details>
-<summary><b>Responsive web at phone width</b> (click to expand)</summary>
-
-<table>
-<tr>
-<td width="25%" align="center"><img src="docs/screenshots/light/web-mobile-home.png" alt="Web at phone width: Home, light theme" width="200"><br><sub>Home (light)</sub></td>
-<td width="25%" align="center"><img src="docs/screenshots/light/web-mobile-markets.png" alt="Web at phone width: Markets, light theme" width="200"><br><sub>Markets (light)</sub></td>
-<td width="25%" align="center"><img src="docs/screenshots/light/web-mobile-stock.png" alt="Web at phone width: Stock, light theme" width="200"><br><sub>Stock (light)</sub></td>
-<td width="25%" align="center"><img src="docs/screenshots/light/web-mobile-watchlist.png" alt="Web at phone width: Watchlist, light theme" width="200"><br><sub>Watchlist (light)</sub></td>
-</tr>
-<tr>
-<td width="25%" align="center"><img src="docs/screenshots/dark/web-mobile-home.png" alt="Web at phone width: Home, dark theme" width="200"><br><sub>Home (dark)</sub></td>
-<td width="25%" align="center"><img src="docs/screenshots/dark/web-mobile-markets.png" alt="Web at phone width: Markets, dark theme" width="200"><br><sub>Markets (dark)</sub></td>
-<td width="25%" align="center"><img src="docs/screenshots/dark/web-mobile-stock.png" alt="Web at phone width: Stock, dark theme" width="200"><br><sub>Stock (dark)</sub></td>
-<td width="25%" align="center"><img src="docs/screenshots/dark/web-mobile-watchlist.png" alt="Web at phone width: Watchlist, dark theme" width="200"><br><sub>Watchlist (dark)</sub></td>
-</tr>
-</table>
-
-</details>
-
 ## Admin dashboard
 
 A separate Next.js app on http://localhost:3001 with two roles, ADMIN and VIEWER ([ADR 0012](docs/adr/0012-admin-dashboard-separate-app.md)). Every write requires ADMIN and is written to the audit log. Sign in with `admin@sarwa.dev` / `admin12345` (ADMIN) or `viewer@sarwa.dev` / `viewer12345` (VIEWER, read-only).
@@ -277,7 +270,7 @@ A separate Next.js app on http://localhost:3001 with two roles, ADMIN and VIEWER
 Each change reaches every connected web and mobile client at once over Socket.IO (`market:status`, `config:updated`, `trading.status`, `symbol.halted` / `symbol.resumed`), with no refresh.
 
 <p align="center">
-  <img src="docs/screenshots/light/admin-market-control.png" alt="Market control room: market running, volatility and drop connections" width="820">
+  <img src="docs/screenshots/dark/admin-market-control.png" alt="Market control room: market running, volatility and drop connections" width="820">
   <br><sub>Market control room: market status, volatility and drop connections, with a live ticker.</sub>
 </p>
 
@@ -286,21 +279,21 @@ Each change reaches every connected web and mobile client at once over Socket.IO
 <tr>
 <td width="20%"><b>Pause and resume the market</b><br>Prices freeze and every client shows a "Market paused, prices are frozen" notice; trading picks up again the moment an admin resumes.</td>
 <td width="40%"><img src="docs/screenshots/light/admin-market-paused.png" alt="Admin market control with the market paused" width="360"></td>
-<td width="40%"><img src="docs/screenshots/light/web-live-paused.png" alt="Customer web app showing the market paused" width="360"></td>
+<td width="40%"><img src="docs/screenshots/dark/web-live-paused.png" alt="Customer web app showing the market paused" width="360"></td>
 </tr>
 <tr>
 <td width="20%"><b>Halt a symbol, or the kill switch</b><br>Shown: a TSLA halt with the reason "Pending news announcement", next to the kill switch, circuit breaker and session mode. The kill switch turns off Buy and Sell for everyone while prices stay live; the customer sees "TSLA halted" with submit disabled.</td>
-<td width="40%"><img src="docs/screenshots/light/admin-trading.png" alt="Admin trading controls with the kill switch and a halted symbol" width="360"></td>
+<td width="40%"><img src="docs/screenshots/dark/admin-trading.png" alt="Admin trading controls with the kill switch and a halted symbol" width="360"></td>
 <td width="40%"><img src="docs/screenshots/light/web-live-halt.png" alt="Customer web app showing a halted symbol" width="360"></td>
 </tr>
 <tr>
 <td width="20%"><b>Banner message</b><br>"Markets close early today at 1:00 PM ET", with a live web and mobile preview; shown at the top of both apps, empty hides it.</td>
 <td width="40%"><img src="docs/screenshots/light/admin-config.png" alt="Admin configuration with the banner message" width="360"></td>
-<td width="40%"><img src="docs/screenshots/light/web-live-banner.png" alt="Customer web app showing the admin banner" width="360"></td>
+<td width="40%"><img src="docs/screenshots/dark/web-live-banner.png" alt="Customer web app showing the admin banner" width="360"></td>
 </tr>
 <tr>
 <td width="20%"><b>Maintenance mode</b><br>Every client screen is replaced with "We'll be right back" and the server blocks writes; admin stays available.</td>
-<td width="40%"><img src="docs/screenshots/light/admin-config.png" alt="Admin configuration with the maintenance mode toggle" width="360"></td>
+<td width="40%" align="center"><sub>Same Config page as above: one switch.</sub></td>
 <td width="40%"><img src="docs/screenshots/light/web-live-maintenance.png" alt="Customer web app in maintenance mode" width="360"></td>
 </tr>
 </table>
@@ -309,15 +302,15 @@ Each change reaches every connected web and mobile client at once over Socket.IO
 
 <table>
 <tr>
-<td width="50%" align="center"><img src="docs/screenshots/light/admin-overview.png" alt="Admin overview" width="420"><br><sub><b>Overview</b>: connected clients, symbol streams, top watchlisted stocks, the live market and recent sign-ins and admin actions, refreshed every 10 s.</sub></td>
+<td width="50%" align="center"><img src="docs/screenshots/dark/admin-overview.png" alt="Admin overview" width="420"><br><sub><b>Overview</b>: connected clients, symbol streams, top watchlisted stocks, the live market and recent sign-ins and admin actions, refreshed every 10 s.</sub></td>
 <td width="50%" align="center"><img src="docs/screenshots/light/admin-customers.png" alt="Customers list" width="420"><br><sub><b>Customers</b>: search and filter; emails and IPs masked on the server.</sub></td>
 </tr>
 <tr>
 <td width="50%" align="center"><img src="docs/screenshots/light/admin-customer-actions.png" alt="Customer detail with an action dialog and a reason field" width="420"><br><sub><b>Customer actions</b>: suspend, reactivate, sign out and reset each need a reason of 10 to 280 characters. Suspension cancels open orders and signs the customer out on every device within seconds; revealing IPs is audited.</sub></td>
-<td width="50%" align="center"><img src="docs/screenshots/light/admin-stocks.png" alt="Stocks management" width="420"><br><sub><b>Stocks</b>: add, enable and tune the symbols the simulator runs (base price, volatility, sector, exchange).</sub></td>
+<td width="50%" align="center"><img src="docs/screenshots/dark/admin-stocks.png" alt="Stocks management" width="420"><br><sub><b>Stocks</b>: add, enable and tune the symbols the simulator runs (base price, volatility, sector, exchange).</sub></td>
 </tr>
 <tr>
-<td width="50%" align="center"><img src="docs/screenshots/light/admin-team.png" alt="Team members and a pending invite" width="420"><br><sub><b>Team</b>: ADMIN and VIEWER roles; single-use email invites expire in 48 hours.</sub></td>
+<td width="50%" align="center"><img src="docs/screenshots/dark/admin-team.png" alt="Team members and a pending invite" width="420"><br><sub><b>Team</b>: ADMIN and VIEWER roles; single-use email invites expire in 48 hours.</sub></td>
 <td width="50%" align="center"><img src="docs/screenshots/light/admin-audit.png" alt="Audit log" width="420"><br><sub><b>Audit log</b>: every sign-in and admin action, with its payload.</sub></td>
 </tr>
 </table>
@@ -329,12 +322,12 @@ A VIEWER sees masked emails and locked controls, and the server answers any writ
 <table>
 <tr>
 <td width="50%" align="center"><img src="docs/screenshots/light/admin-viewer-customers.png" alt="Customers as a VIEWER, with masked emails" width="420"><br><sub>Customers as a VIEWER: emails masked (d•••@sarwa.dev), Export CSV locked</sub></td>
-<td width="50%" align="center"><img src="docs/screenshots/light/admin-viewer-readonly.png" alt="Read-only notice and disabled controls for a VIEWER" width="420"><br><sub>Read-only badge; Pause and Drop connections locked</sub></td>
+<td width="50%" align="center"><img src="docs/screenshots/dark/admin-viewer-readonly.png" alt="Read-only notice and disabled controls for a VIEWER" width="420"><br><sub>Read-only badge; Pause and Drop connections locked</sub></td>
 </tr>
 </table>
 
 <p align="center">
-  <img src="docs/screenshots/light/admin-login.png" alt="Admin sign-in" width="360">
+  <img src="docs/screenshots/dark/admin-login.png" alt="Admin sign-in" width="360">
   <br><sub>Admin sign-in</sub>
 </p>
 

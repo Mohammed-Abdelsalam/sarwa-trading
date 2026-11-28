@@ -17,7 +17,7 @@ The server has no UI of its own. The [architecture doc](../../docs/architecture.
 
 `pnpm dev` first runs `db:setup`: `scripts/ensure-env.mjs` copies `.env.example` to `.env` if it is missing, then `prisma migrate deploy` applies `prisma/migrations`, then `prisma db seed` runs `prisma/seed.ts`. The seed only creates rows that are missing, so admin edits survive restarts. `postinstall` runs `prisma generate`, and `pnpm db:studio` opens Prisma Studio. Tests build their own throwaway `prisma/test.db` (`test/global-setup.js`) and never touch `dev.db`.
 
-## Port and env
+## Env
 
 The server listens on `0.0.0.0:4000`, so a phone on the same Wi-Fi can reach it. `src/env.ts` loads `.env` and validates it with Zod: `PORT` (4000), `DATABASE_URL`, `CORS_ORIGINS` (the 3000, 3001 and 8081 origins), `JWT_SECRET` (at least 16 characters; in production at least 32 and not the example value), `WEB_URL` and `ADMIN_URL` (where emailed links point), and `TRUST_PROXY` (`loopback`, for the Next rewrites). The seed reads `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `VIEWER_EMAIL` and `VIEWER_PASSWORD`. Emails are never sent: `LogMailer`, the only `Mailer`, prints each link to the server log as JSON lines with `"context":"Mail"`. A real mailer is on the roadmap.
 
