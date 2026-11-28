@@ -267,7 +267,7 @@ A separate Next.js app on http://localhost:3001 with two roles, ADMIN and VIEWER
 
 ### Control the market live
 
-Each change reaches every connected web and mobile client at once over Socket.IO (`market:status`, `config:updated`, `trading.status`, `symbol.halted` / `symbol.resumed`), with no refresh.
+Each change reaches every connected web and mobile client at once over Socket.IO (`market:status`, `config:updated`, `stocks:changed`, `trading.status`, `symbol.halted` / `symbol.resumed`), with no refresh.
 
 <p align="center">
   <img src="docs/screenshots/dark/admin-market-control.png" alt="Market control room: market running, volatility and drop connections" width="820">
@@ -295,6 +295,11 @@ Each change reaches every connected web and mobile client at once over Socket.IO
 <td width="20%"><b>Maintenance mode</b><br>Every client screen is replaced with "We'll be right back" and the server blocks writes; admin stays available.</td>
 <td width="40%" align="center"><sub>Same Config page as above: one switch.</sub></td>
 <td width="40%"><img src="docs/screenshots/light/web-live-maintenance.png" alt="Customer web app in maintenance mode" width="360"></td>
+</tr>
+<tr>
+<td width="20%"><b>Add a company / stock</b><br>Shown: Shopify (SHOP) on NASDAQ. The simulator starts pricing a new enabled symbol on its next tick, and a <code>stocks:changed</code> event makes every client refetch its stock list, so SHOP appears in Markets and streams live with no deploy and no page refresh.</td>
+<td width="40%"><img src="docs/screenshots/light/admin-stock-add.png" alt="Admin Add stock dialog filled in for Shopify Inc." width="360"></td>
+<td width="40%"><img src="docs/screenshots/dark/web-stock-added.png" alt="Customer web app showing the new SHOP stock page with a live price and chart" width="360"></td>
 </tr>
 </table>
 

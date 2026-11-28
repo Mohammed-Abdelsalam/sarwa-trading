@@ -17,6 +17,10 @@ The admin dashboard, a separate Next.js 16 app. Admins use it to watch the marke
     <td width="50%"><img src="../../docs/screenshots/light/admin-team.png" alt="Team page"><br><sub>Team: staff roles, disable access, and pending invites.</sub></td>
     <td width="50%"><img src="../../docs/screenshots/dark/admin-audit.png" alt="Audit log"><br><sub>Audit log: every admin action with actor, entity and payload.</sub></td>
   </tr>
+  <tr>
+    <td width="50%"><img src="../../docs/screenshots/light/admin-stock-add.png" alt="Add stock dialog"><br><sub>Add stock: symbol, company name, sector, exchange, base price, volatility and P/E; the simulator prices it from the next tick and clients pick it up live.</sub></td>
+    <td width="50%"><img src="../../docs/screenshots/dark/admin-stocks.png" alt="Stocks table"><br><sub>Stocks: every symbol the simulator runs, with live price, volatility and an enable switch.</sub></td>
+  </tr>
 </table>
 
 ## Run, test, build
