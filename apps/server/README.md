@@ -2,6 +2,10 @@
 
 The NestJS API behind every client. It serves REST under `/api/v1` and Socket.IO on the `/market` (quotes, order and session events) and `/admin` namespaces. It also runs the market simulator and the trading engine. Data lives in SQLite through Prisma.
 
+## Diagrams
+
+The server has no UI of its own. The [architecture doc](../../docs/architecture.md) draws its main flows as Mermaid diagrams: [system context](../../docs/architecture.md#system-context), [the journey of a price](../../docs/architecture.md#the-journey-of-a-price), [sign-in and refresh](../../docs/architecture.md#sign-in-and-refresh), [order execution](../../docs/architecture.md#order-execution) and [the guest watchlist](../../docs/architecture.md#guest-watchlist).
+
 ## Run, test, build
 
 | Task                       | In this folder                  | From the root                                          |

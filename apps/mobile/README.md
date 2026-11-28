@@ -2,6 +2,18 @@
 
 The customer mobile app, built with Expo SDK 58, Expo Router and NativeWind. It offers the same features as the web app (markets, live prices, watchlist, trading, alerts, portfolio) and uses only libraries that run in Expo Go.
 
+## Screenshots
+
+Taken on a real phone in dark mode.
+
+<table>
+  <tr>
+    <td width="33%"><img src="../../docs/screenshots/mobile-app/portfolio-dark.jpg" alt="Portfolio tab" width="240"><br><sub>Portfolio: equity chart, cash, buying power and P&amp;L.</sub></td>
+    <td width="33%"><img src="../../docs/screenshots/mobile-app/watchlist-dark.jpg" alt="Watchlist tab" width="240"><br><sub>Watchlist: live prices, sparklines, swipe to remove.</sub></td>
+    <td width="33%"><img src="../../docs/screenshots/mobile-app/account-dark.jpg" alt="Account tab" width="240"><br><sub>Account: profile, security, language, appearance and trading settings.</sub></td>
+  </tr>
+</table>
+
 ## Run, test, lint
 
 | Task                    | In this folder                                            | From the root                                          |

@@ -2,6 +2,29 @@
 
 The customer web app, built with the Next.js 16 App Router and Tailwind v4. Guests can browse markets and star stocks. Signed-in customers trade, manage alerts and see their portfolio. Prices stream live over Socket.IO.
 
+## Screenshots
+
+Light or dark follows your GitHub theme.
+
+<table>
+  <tr>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/web-home-guest.png"><img src="../../docs/screenshots/light/web-home-guest.png" alt="Guest home page"></picture><br><sub>Guest home: sign-up hero, top movers and the sector heatmap.</sub></td>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/web-ticket.png"><img src="../../docs/screenshots/light/web-ticket.png" alt="Stock page with order review"></picture><br><sub>Stock page: live chart and the buy order review with a quote countdown.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/web-live-paused.png"><img src="../../docs/screenshots/light/web-live-paused.png" alt="Market paused banner"></picture><br><sub>Live admin change: the market is paused, so a banner says prices are frozen.</sub></td>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/web-live-halt.png"><img src="../../docs/screenshots/light/web-live-halt.png" alt="Trading halted on a stock"></picture><br><sub>Live admin change: TSLA is halted, so the order ticket blocks new orders.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/web-portfolio.png"><img src="../../docs/screenshots/light/web-portfolio.png" alt="Portfolio page"></picture><br><sub>Portfolio: total equity, equity chart, cash and allocation, positions.</sub></td>
+    <td width="50%"><img src="../../docs/screenshots/rtl/web-ar.jpg" alt="Home page in Arabic"><br><sub>The home page in Arabic, laid out right to left.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/web-mobile-stock.png"><img src="../../docs/screenshots/light/web-mobile-stock.png" alt="Stock page at phone width" width="280"></picture><br><sub>Phone width: stock page with sticky Buy and Sell buttons.</sub></td>
+    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/dark/web-mobile-watchlist.png"><img src="../../docs/screenshots/light/web-mobile-watchlist.png" alt="Watchlist at phone width" width="280"></picture><br><sub>Phone width: watchlist with live prices and daily change.</sub></td>
+  </tr>
+</table>
+
 ## Run, test, build
 
 | Task               | In this folder                                                | From the root                                       |

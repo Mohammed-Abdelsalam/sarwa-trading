@@ -7,12 +7,21 @@ A paper-trading platform with live prices: a native Expo app, a Next.js website,
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![Lighthouse (manual, local)](https://img.shields.io/badge/Lighthouse%20%28manual%2C%20local%29-a11y%20100%20%C2%B7%20SEO%20100-success)
 
-<p align="center">
+<table align="center">
+<tr>
+<td align="center" valign="middle">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/web-markets.png">
-    <img src="docs/screenshots/light/web-markets.png" alt="The markets page on the web app, with live prices" width="900">
+    <img src="docs/screenshots/light/web-markets.png" alt="The markets page on the web app, with live prices" width="660">
   </picture>
-</p>
+  <br><sub><b>Web</b> · Next.js</sub>
+</td>
+<td align="center" valign="middle">
+  <img src="docs/screenshots/mobile-app/watchlist-dark.jpg" alt="The native Expo app on a real phone: watchlist with live prices" width="190">
+  <br><sub><b>Mobile app</b> · Expo, on a real phone</sub>
+</td>
+</tr>
+</table>
 
 ## Contents
 
@@ -22,15 +31,16 @@ A paper-trading platform with live prices: a native Expo app, a Next.js website,
 4. [The brief, and how each requirement is met](#the-brief-and-how-each-requirement-is-met)
 5. [What I added beyond the brief, and why](#what-i-added-beyond-the-brief-and-why)
 6. [Screenshots](#screenshots)
-7. [Architecture](#architecture)
-8. [Tech stack](#tech-stack)
-9. [Performance](#performance)
-10. [Security](#security)
-11. [Quality and testing](#quality-and-testing)
-12. [How I worked with AI](#how-i-worked-with-ai)
-13. [Known limitations](#known-limitations)
-14. [Roadmap](#roadmap)
-15. [Repository map and further reading](#repository-map-and-further-reading)
+7. [Admin dashboard](#admin-dashboard)
+8. [Architecture](#architecture)
+9. [Tech stack](#tech-stack)
+10. [Performance](#performance)
+11. [Security](#security)
+12. [Quality and testing](#quality-and-testing)
+13. [How I worked with AI](#how-i-worked-with-ai)
+14. [Known limitations](#known-limitations)
+15. [Roadmap](#roadmap)
+16. [Repository map and further reading](#repository-map-and-further-reading)
 
 ## TL;DR
 
@@ -261,49 +271,75 @@ Guests browse freely; signing in unlocks trading, alerts and sessions. Shown wit
 
 </details>
 
-<details>
-<summary><b>Admin dashboard</b> (click to expand)</summary>
+## Admin dashboard
+
+A separate Next.js app on http://localhost:3001 with two roles, ADMIN and VIEWER ([ADR 0012](docs/adr/0012-admin-dashboard-separate-app.md)). Every write requires ADMIN and is written to the audit log. Sign in with `admin@sarwa.dev` / `admin12345` (ADMIN) or `viewer@sarwa.dev` / `viewer12345` (VIEWER, read-only).
+
+### Control the market live
+
+Each change reaches every connected web and mobile client at once over Socket.IO (`market:status`, `config:updated`, `trading.status`, `symbol.halted` / `symbol.resumed`), with no refresh.
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-market-control.png"><img src="docs/screenshots/light/admin-market-control.png" alt="Market control room: market running, volatility and drop connections" width="820"></picture>
+  <br><sub>Market control room: market status, volatility and drop connections, with a live ticker.</sub>
+</p>
 
 <table>
-<tr><th width="50%">Light</th><th width="50%">Dark</th></tr>
+<tr><th width="20%">Admin action</th><th width="40%">Admin dashboard</th><th width="40%">Customer web app, live</th></tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/light/admin-overview.png" alt="Overview, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/admin-overview.png" alt="Overview, dark theme" width="420"></td>
+<td width="20%"><b>Pause and resume the market</b><br>Prices freeze and every client shows a "Market paused, prices are frozen" notice; trading picks up again the moment an admin resumes.</td>
+<td width="40%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-market-paused.png"><img src="docs/screenshots/light/admin-market-paused.png" alt="Admin market control with the market paused" width="360"></picture></td>
+<td width="40%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/web-live-paused.png"><img src="docs/screenshots/light/web-live-paused.png" alt="Customer web app showing the market paused" width="360"></picture></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Overview</sub></td></tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/light/admin-market.png" alt="Market control room: status, volatility, drop connections, live ticker, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/admin-market.png" alt="Market control room: status, volatility, drop connections, live ticker, dark theme" width="420"></td>
+<td width="20%"><b>Halt a symbol, or the kill switch</b><br>Shown: a TSLA halt with the reason "Pending news announcement", next to the kill switch, circuit breaker and session mode. The kill switch turns off Buy and Sell for everyone while prices stay live; the customer sees "TSLA halted" with submit disabled.</td>
+<td width="40%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-trading.png"><img src="docs/screenshots/light/admin-trading.png" alt="Admin trading controls with the kill switch and a halted symbol" width="360"></picture></td>
+<td width="40%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/web-live-halt.png"><img src="docs/screenshots/light/web-live-halt.png" alt="Customer web app showing a halted symbol" width="360"></picture></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Market control room: status, volatility, drop connections, live ticker</sub></td></tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/light/admin-customers.png" alt="Customers, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/admin-customers.png" alt="Customers, dark theme" width="420"></td>
+<td width="20%"><b>Banner message</b><br>"Markets close early today at 1:00 PM ET", with a live web and mobile preview; shown at the top of both apps, empty hides it.</td>
+<td width="40%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-config.png"><img src="docs/screenshots/light/admin-config.png" alt="Admin configuration with the banner message" width="360"></picture></td>
+<td width="40%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/web-live-banner.png"><img src="docs/screenshots/light/web-live-banner.png" alt="Customer web app showing the admin banner" width="360"></picture></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Customers</sub></td></tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/light/admin-customer-detail.png" alt="Customer detail: portfolio, sessions and audited admin actions, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/admin-customer-detail.png" alt="Customer detail: portfolio, sessions and audited admin actions, dark theme" width="420"></td>
+<td width="20%"><b>Maintenance mode</b><br>Every client screen is replaced with "We'll be right back" and the server blocks writes; admin stays available.</td>
+<td width="40%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-config.png"><img src="docs/screenshots/light/admin-config.png" alt="Admin configuration with the maintenance mode toggle" width="360"></picture></td>
+<td width="40%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/web-live-maintenance.png"><img src="docs/screenshots/light/web-live-maintenance.png" alt="Customer web app in maintenance mode" width="360"></picture></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Customer detail: portfolio, sessions and audited admin actions</sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/admin-team.png" alt="Team members and a pending invite, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/admin-team.png" alt="Team members and a pending invite, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Team: ADMIN and VIEWER roles, a pending email invite that expires in 48 hours</sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/admin-audit.png" alt="Audit log, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/admin-audit.png" alt="Audit log, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Audit log: every sign-in and admin action, with its payload</sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/light/admin-login.png" alt="Admin sign-in, light theme" width="420"></td>
-<td width="50%"><img src="docs/screenshots/dark/admin-login.png" alt="Admin sign-in, dark theme" width="420"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Admin sign-in</sub></td></tr>
 </table>
 
-</details>
+### Manage customers, team and audit
+
+<table>
+<tr>
+<td width="50%" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-overview.png"><img src="docs/screenshots/light/admin-overview.png" alt="Admin overview" width="420"></picture><br><sub><b>Overview</b>: connected clients, symbol streams, top watchlisted stocks, the live market and recent sign-ins and admin actions, refreshed every 10 s.</sub></td>
+<td width="50%" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-customers.png"><img src="docs/screenshots/light/admin-customers.png" alt="Customers list" width="420"></picture><br><sub><b>Customers</b>: search and filter; emails and IPs masked on the server.</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-customer-actions.png"><img src="docs/screenshots/light/admin-customer-actions.png" alt="Customer detail with an action dialog and a reason field" width="420"></picture><br><sub><b>Customer actions</b>: suspend, reactivate, sign out and reset each need a reason of 10 to 280 characters. Suspension cancels open orders and signs the customer out on every device within seconds; revealing IPs is audited.</sub></td>
+<td width="50%" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-stocks.png"><img src="docs/screenshots/light/admin-stocks.png" alt="Stocks management" width="420"></picture><br><sub><b>Stocks</b>: add, enable and tune the symbols the simulator runs (base price, volatility, sector, exchange).</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-team.png"><img src="docs/screenshots/light/admin-team.png" alt="Team members and a pending invite" width="420"></picture><br><sub><b>Team</b>: ADMIN and VIEWER roles; single-use email invites expire in 48 hours.</sub></td>
+<td width="50%" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-audit.png"><img src="docs/screenshots/light/admin-audit.png" alt="Audit log" width="420"></picture><br><sub><b>Audit log</b>: every sign-in and admin action, with its payload.</sub></td>
+</tr>
+</table>
+
+### Read-only VIEWER
+
+A VIEWER sees masked emails and locked controls, and the server answers any write with 403: masking happens on the server, so the browser never receives the data.
+
+<table>
+<tr>
+<td width="50%" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-viewer-customers.png"><img src="docs/screenshots/light/admin-viewer-customers.png" alt="Customers as a VIEWER, with masked emails" width="420"></picture><br><sub>Customers as a VIEWER: emails masked (d•••@sarwa.dev), Export CSV locked</sub></td>
+<td width="50%" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-viewer-readonly.png"><img src="docs/screenshots/light/admin-viewer-readonly.png" alt="Read-only notice and disabled controls for a VIEWER" width="420"></picture><br><sub>Read-only badge; Pause and Drop connections locked</sub></td>
+</tr>
+</table>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/admin-login.png"><img src="docs/screenshots/light/admin-login.png" alt="Admin sign-in" width="360"></picture>
+  <br><sub>Admin sign-in</sub>
+</p>
 
 ## Architecture
 
